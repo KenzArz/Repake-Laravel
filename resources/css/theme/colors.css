@@ -1,0 +1,101 @@
+/**
+ * Application Colors
+ * Converted from app_colors.dart
+ * 
+ * This file contains all color definitions including base colors,
+ * neutral scale, lime scale, semantic colors, surface colors,
+ * border colors, text colors, and brand colors.
+ */
+
+:root {
+  /* ===== Base Colors ===== */
+  --color-charcoal: #202320;
+  --color-lime: #B8D94E;
+  --color-off-white: #F5F5F0;
+  --color-gray: #D9DBD5;
+
+  /* ===== Neutral Scale ===== */
+  --color-neutral-50: #F5F5F0;
+  --color-neutral-100: #EAEBE6;
+  --color-neutral-200: #D9DBD5;
+  --color-neutral-300: #C2C4BE;
+  --color-neutral-400: #A4A6A1;
+  --color-neutral-500: #868984;
+  --color-neutral-600: #6A6D69;
+  --color-neutral-700: #515450;
+  --color-neutral-800: #3A3C39;
+  --color-neutral-900: #202320;
+
+  /* ===== Lime Scale ===== */
+  --color-lime-50: #EFF2E0;
+  --color-lime-100: #E6EEC8;
+  --color-lime-200: #DAE8A7;
+  --color-lime-300: #CDE387;
+  --color-lime-400: #C1DD66;
+  --color-lime-500: #B8D94E;
+  --color-lime-600: #9DB846;
+  --color-lime-700: #81973D;
+  --color-lime-800: #647535;
+  --color-lime-900: #46502C;
+
+  /* ===== Semantic Colors ===== */
+  /* Success */
+  --color-success-base: #4C8B4A;
+  --color-success-tint: #E1E8DC;
+  --color-success-shade: #365735;
+
+  /* Warning */
+  --color-warning-base: #D9A23B;
+  --color-warning-tint: #F2EBDA;
+  --color-warning-shade: #7C622E;
+
+  /* Error */
+  --color-error-base: #C1543F;
+  --color-error-tint: #EFE2DB;
+  --color-error-shade: #703C30;
+
+  /* Info */
+  --color-info-base: #4E7DA6;
+  --color-info-tint: #E1E7E7;
+  --color-info-shade: #375063;
+
+  /* ===== Surface Colors ===== */
+  --color-surface-page: #F5F5F0;
+  --color-surface-elevated: #FFFFFF;
+  --color-surface-inverse: #202320;
+
+  /* ===== Border Colors ===== */
+  --color-border-default: #D9DBD5;
+  --color-border-strong: #A4A6A1;
+
+  /* ===== Text Colors ===== */
+  --color-text-primary: #202320;
+  --color-text-secondary: #6A6D69;
+  --color-text-muted: #868984;
+  --color-text-on-inverse: #F5F5F0;
+  --color-text-on-dark: #FFFFFF;
+
+  /* ===== Additional Colors ===== */
+  --color-rating-yellow: #FFC107;
+
+  /* ===== Brand Colors ===== */
+  --color-google-blue: #4285F4;
+  --color-google-red: #EA4335;
+  --color-google-yellow: #FBBC05;
+  --color-google-green: #34A853;
+
+  /* ===== Color Scheme (Light Mode) ===== */
+  --color-primary: var(--color-lime);
+  --color-on-primary: var(--color-charcoal);
+  --color-secondary: var(--color-neutral-800);
+  --color-on-secondary: var(--color-neutral-50);
+  --color-surface: var(--color-surface-elevated);
+  --color-on-surface: var(--color-text-primary);
+  --color-on-surface-variant: var(--color-text-secondary);
+  --color-outline: var(--color-border-strong);
+  --color-outline-variant: var(--color-border-default);
+  --color-error: var(--color-error-base);
+  --color-on-error: var(--color-text-on-dark);
+  --color-inverse-surface: var(--color-surface-inverse);
+  --color-on-inverse-surface: var(--color-text-on-inverse);
+}
