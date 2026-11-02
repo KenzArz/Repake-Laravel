@@ -4,10 +4,10 @@ namespace App\Helpers;
 
 /**
  * Theme Helper
- * 
+ *
  * Provides convenient methods to access theme configuration values
  * in Blade templates and PHP code.
- * 
+ *
  * Usage examples:
  * - ThemeHelper::color('lime')
  * - ThemeHelper::neutral(500)
@@ -19,7 +19,7 @@ class ThemeHelper
     /**
      * Get a base color value
      *
-     * @param string $name Color name (e.g., 'lime', 'charcoal', 'off_white', 'gray')
+     * @param  string  $name  Color name (e.g., 'lime', 'charcoal', 'off_white', 'gray')
      * @return string|null Hex color code
      */
     public static function color(string $name): ?string
@@ -30,7 +30,7 @@ class ThemeHelper
     /**
      * Get a neutral scale color
      *
-     * @param int $shade Shade value (50, 100, 200, ..., 900)
+     * @param  int  $shade  Shade value (50, 100, 200, ..., 900)
      * @return string|null Hex color code
      */
     public static function neutral(int $shade): ?string
@@ -41,7 +41,7 @@ class ThemeHelper
     /**
      * Get a lime scale color
      *
-     * @param int $shade Shade value (50, 100, 200, ..., 900)
+     * @param  int  $shade  Shade value (50, 100, 200, ..., 900)
      * @return string|null Hex color code
      */
     public static function lime(int $shade): ?string
@@ -52,8 +52,8 @@ class ThemeHelper
     /**
      * Get a semantic color
      *
-     * @param string $type Type of semantic color (success, warning, error, info)
-     * @param string $variant Variant (base, tint, shade)
+     * @param  string  $type  Type of semantic color (success, warning, error, info)
+     * @param  string  $variant  Variant (base, tint, shade)
      * @return string|null Hex color code
      */
     public static function semantic(string $type, string $variant = 'base'): ?string
@@ -64,7 +64,7 @@ class ThemeHelper
     /**
      * Get a surface color
      *
-     * @param string $type Surface type (page, elevated, inverse)
+     * @param  string  $type  Surface type (page, elevated, inverse)
      * @return string|null Hex color code
      */
     public static function surface(string $type): ?string
@@ -75,7 +75,7 @@ class ThemeHelper
     /**
      * Get a border color
      *
-     * @param string $type Border type (default, strong)
+     * @param  string  $type  Border type (default, strong)
      * @return string|null Hex color code
      */
     public static function border(string $type = 'default'): ?string
@@ -86,7 +86,7 @@ class ThemeHelper
     /**
      * Get a text color
      *
-     * @param string $type Text type (primary, secondary, muted, on_inverse, on_dark)
+     * @param  string  $type  Text type (primary, secondary, muted, on_inverse, on_dark)
      * @return string|null Hex color code
      */
     public static function text(string $type = 'primary'): ?string
@@ -97,7 +97,7 @@ class ThemeHelper
     /**
      * Get a brand color
      *
-     * @param string $brand Brand name (google_blue, google_red, google_yellow, google_green)
+     * @param  string  $brand  Brand name (google_blue, google_red, google_yellow, google_green)
      * @return string|null Hex color code
      */
     public static function brand(string $brand): ?string
@@ -118,7 +118,7 @@ class ThemeHelper
     /**
      * Get a font family
      *
-     * @param string $type Font type (heading, body)
+     * @param  string  $type  Font type (heading, body)
      * @return string|null Font family name
      */
     public static function font(string $type): ?string
@@ -129,7 +129,7 @@ class ThemeHelper
     /**
      * Get a complete text style configuration
      *
-     * @param string $style Style name (display, h1, h2, h3, h4, h5, body_large, body, label, small_label, caption)
+     * @param  string  $style  Style name (display, h1, h2, h3, h4, h5, body_large, body, label, small_label, caption)
      * @return array|null Array containing font_family, font_size, line_height, font_weight
      */
     public static function textStyle(string $style): ?array
@@ -140,8 +140,8 @@ class ThemeHelper
     /**
      * Get color scheme value
      *
-     * @param string $key Color scheme key (primary, on_primary, secondary, etc.)
-     * @param string $mode Mode (light, dark) - currently only light is supported
+     * @param  string  $key  Color scheme key (primary, on_primary, secondary, etc.)
+     * @param  string  $mode  Mode (light, dark) - currently only light is supported
      * @return string|null Hex color code
      */
     public static function colorScheme(string $key, string $mode = 'light'): ?string
@@ -152,14 +152,14 @@ class ThemeHelper
     /**
      * Generate inline style attribute for text style
      *
-     * @param string $style Style name
+     * @param  string  $style  Style name
      * @return string Inline CSS style string
      */
     public static function textStyleAttribute(string $style): string
     {
         $config = self::textStyle($style);
-        
-        if (!$config) {
+
+        if (! $config) {
             return '';
         }
 
@@ -175,7 +175,7 @@ class ThemeHelper
     /**
      * Generate CSS class name for text style
      *
-     * @param string $style Style name
+     * @param  string  $style  Style name
      * @return string CSS class name
      */
     public static function textClass(string $style): string

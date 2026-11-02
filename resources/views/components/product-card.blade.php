@@ -6,8 +6,9 @@
     $badge     = $product->status === 'Dijual'
         ? 'bg-lime-500/90 text-neutral-900'
         : 'bg-neutral-200/90 text-neutral-700';
-    $ago = $product->created_at->locale('id')
-        ->diffForHumans(['syntax' => \Carbon\CarbonInterface::DIFF_ABSOLUTE]) . ' lalu';
+    $ago = is_string($product->created_at)
+        ? $product->created_at
+        : ($product->created_at?->locale('id')->diffForHumans(['syntax' => \Carbon\CarbonInterface::DIFF_ABSOLUTE]) . ' lalu' ?? 'Baru saja');
 @endphp
 
 <article class="relative flex h-full flex-col rounded-xl bg-white p-2.5">
@@ -37,9 +38,9 @@
         <span class="absolute left-2 top-2 rounded-md px-2.5 py-0.5 text-label {{ $badge }}">{{ $product->status }}</span>
 
         <button type="button"
-                aria-label="Favorit" aria-pressed="{{ $product->is_favorite ? 'true' : 'false' }}"
-                @guest data-open-login @else data-favorite-toggle data-url="{{ $favUrl }}" @endguest
-                class="absolute right-2 top-2 z-10 grid size-8 place-items-center rounded-full bg-neutral-900/55 text-white backdrop-blur-sm transition hover:bg-neutral-900/75 aria-pressed:[&>svg]:fill-white">
+                aria-label="Favorit" aria-pressed="{{ !empty($product->is_favorite) ? 'true' : 'false' }}"
+                data-favorite-toggle data-url="{{ $favUrl }}"
+                class="absolute right-2 top-2 z-10 grid size-8 place-items-center rounded-full bg-neutral-900/55 text-white backdrop-blur-sm transition hover:bg-neutral-900/75 aria-pressed:text-lime-500 aria-pressed:[&>svg]:fill-lime-500 aria-pressed:[&>svg]:stroke-lime-500">
             <svg viewBox="0 0 24 24" class="size-[18px] fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true">
                 <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
             </svg>

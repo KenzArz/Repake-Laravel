@@ -9,29 +9,51 @@ document.addEventListener("click", (e) => {
     window.dispatchEvent(new CustomEvent("open-login"));
 });
 
-/* Toggle favorit (user yang sudah login) */
+/* Toggle favorit */
 document.addEventListener("click", async (e) => {
     const btn = e.target.closest("[data-favorite-toggle]");
     if (!btn) return;
     e.preventDefault();
 
     const was = btn.getAttribute("aria-pressed") === "true";
-    btn.setAttribute("aria-pressed", String(!was)); // optimistic update
+    const nextState = !was;
+    btn.setAttribute("aria-pressed", String(nextState)); // optimistic update
 
     const url = btn.dataset.url;
-    if (!url) return; // route belum ada, cukup visual dulu
+    if (!url) return;
 
     try {
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const token = csrfMeta ? csrfMeta.content : "";
+
         const res = await fetch(url, {
             method: "POST",
             headers: {
-                "X-CSRF-TOKEN": document.querySelector(
-                    'meta[name="csrf-token"]',
-                ).content,
+                "X-CSRF-TOKEN": token,
                 Accept: "application/json",
+                "Content-Type": "application/json",
             },
         });
-        if (!res.ok) throw new Error();
+        if (!res.ok) throw new Error("Gagal mengubah status favorit");
+
+        const data = await res.json();
+        if (typeof data.is_favorite === "boolean") {
+            btn.setAttribute("aria-pressed", String(data.is_favorite));
+        }
+
+        // Update jumlah favorit di halaman jika ada
+        const countEl = document.getElementById("favorites-count");
+        if (countEl && typeof data.count === "number") {
+            countEl.textContent = data.count;
+        }
+
+        const favCard = btn.closest("[data-favorite-card]");
+        if (favCard && data.is_favorite === false) {
+            favCard.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+            favCard.style.opacity = "0.4";
+        } else if (favCard && data.is_favorite === true) {
+            favCard.style.opacity = "1";
+        }
     } catch {
         btn.setAttribute("aria-pressed", String(was)); // rollback
     }
