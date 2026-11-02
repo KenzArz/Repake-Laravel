@@ -1,15 +1,15 @@
 @props(['images' => []])
 
-@php $items = count($images) ? $images : [null, null, null]; @endphp
-
-<div data-banner-slider
-     class="no-scrollbar relative -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-4 md:mx-0 md:gap-5 md:px-0">
-    @foreach ($items as $src)
-        <div class="aspect-video w-[85%] shrink-0 snap-start overflow-hidden rounded-lg bg-neutral-400/70 md:w-[calc((100%-2.5rem)/3)]">
-            @if ($src)
-                <img src="{{ $src }}" alt="Banner promo {{ $loop->iteration }}"
-                     class="size-full object-cover" onerror="this.remove()">
-            @endif
-        </div>
-    @endforeach
+<div data-banner-slider class="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5">
+    @if (count($images) > 0)
+        @foreach ($images as $src)
+            <div class="aspect-[16/7] md:aspect-[16/9] overflow-hidden rounded-xl bg-neutral-300">
+                <img src="{{ $src }}" alt="Banner promo {{ $loop->iteration }}" class="size-full object-cover" onerror="this.remove()">
+            </div>
+        @endforeach
+    @else
+        <div class="h-36 md:h-44 rounded-xl bg-neutral-300"></div>
+        <div class="h-36 md:h-44 rounded-xl bg-neutral-300"></div>
+        <div class="h-36 md:h-44 rounded-xl bg-neutral-300"></div>
+    @endif
 </div>

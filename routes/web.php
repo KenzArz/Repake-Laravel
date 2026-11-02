@@ -2,10 +2,15 @@
 
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\ProductDetailController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
+
+// Detail Barang & Laporan
+Route::get('/products/{id}', [ProductDetailController::class, 'show'])->name('products.show');
+Route::post('/products/{id}/report', [ProductDetailController::class, 'report'])->name('products.report');
 
 // Favorit
 Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');

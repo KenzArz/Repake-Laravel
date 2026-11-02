@@ -17,7 +17,7 @@ class HomeController extends Controller
             'banners' => [],                       // kosong = placeholder
             'categories' => $this->dummyCategories(),
             'nearby' => $allProducts->take(4),
-            'latest' => $allProducts->slice(4)->values(),
+            'latest' => $allProducts->slice(4)->take(8)->values(),
         ]);
     }
 
