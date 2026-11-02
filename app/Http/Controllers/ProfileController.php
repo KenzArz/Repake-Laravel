@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateProfileRequest;
 use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,10 +19,10 @@ class ProfileController extends Controller
         $tab = $request->query('tab', 'dijual');
         $allProducts = Product::dummyCatalog();
 
-        // Produk yang dijual oleh pengguna
-        $soldProducts = $allProducts->take(5)->map(function (object $product) use ($profile): object {
+        // Produk yang dijual oleh pengguna (8 produk seperti di wireframe)
+        $soldProducts = $allProducts->take(8)->map(function (object $product) use ($profile): object {
             $clone = clone $product;
-            $clone->penjual = $profile['name'];
+            $clone->penjual = $profile['username'] ?? 'Midou_kun';
             $clone->kota = $profile['kota'];
 
             return $clone;
@@ -60,15 +61,9 @@ class ProfileController extends Controller
     /**
      * Simpan perubahan profil pengguna.
      */
-    public function update(Request $request): RedirectResponse
+    public function update(UpdateProfileRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:100',
-            'phone' => 'nullable|string|max:30',
-            'kota' => 'nullable|string|max:100',
-            'bio' => 'nullable|string|max:500',
-            'avatar' => 'nullable|image|max:2048',
-        ]);
+        $validated = $request->validated();
 
         $profile = $this->getProfile();
         $profile['name'] = $validated['name'];
@@ -118,14 +113,16 @@ class ProfileController extends Controller
     {
         if (! session()->has('user_profile')) {
             session()->put('user_profile', [
-                'name' => 'Midou_kun',
+                'name' => 'Midou Wijaya',
+                'username' => 'Midou_kun',
                 'email' => 'midou.kun@student.unsika.ac.id',
                 'phone' => '0812-3456-7890',
                 'kota' => 'Bekasi',
-                'bio' => 'Sedia perifer PC & setup mechanical keyboard bekas berkualitas.',
+                'bio' => 'Jual apa aja demi bisa nikahin hiura',
                 'avatar' => null,
                 'rating' => 4.5,
-                'reviews_count' => 48,
+                'reviews_count' => 67,
+                'sold_count' => 10,
                 'online_status' => 'Online 10 menit lalu',
                 'is_verified' => true,
             ]);

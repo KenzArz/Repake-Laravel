@@ -1,5 +1,5 @@
-<footer class="bg-neutral-200">
-    <div class="mx-auto flex min-h-[270px] max-w-7xl items-center justify-center px-4">
-        <p class="text-h1 text-center font-extrabold uppercase md:text-[44px]">Footer tapi blom jadi</p>
-    </div>
+<footer class="mt-20 w-full bg-[#D9D9D9] py-14 text-center">
+    <p class="text-2xl sm:text-3xl font-black uppercase tracking-wider text-neutral-800">
+        FOOTER TAPI BLOM JADI
+    </p>
 </footer>

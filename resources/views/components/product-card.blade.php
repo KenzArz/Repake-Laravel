@@ -11,53 +11,52 @@
         : ($product->created_at?->locale('id')->diffForHumans(['syntax' => \Carbon\CarbonInterface::DIFF_ABSOLUTE]) . ' lalu' ?? 'Baru saja');
 @endphp
 
-<article class="relative flex h-full flex-col rounded-xl bg-white p-2.5">
+<article class="relative flex h-full flex-col rounded-xl border border-neutral-200/80 bg-white p-2.5 shadow-2xs transition hover:shadow-sm">
     {{-- Header penjual --}}
     <div class="flex items-center gap-2 pb-2">
-        <span class="size-8 shrink-0 rounded-full bg-neutral-200"></span>
+        <span class="size-7 shrink-0 rounded-full bg-neutral-300"></span>
         <div class="min-w-0 flex-1 leading-tight">
-            <p class="truncate text-label font-semibold">{{ $product->penjual }}</p>
-            <p class="truncate text-caption text-neutral-500">{{ $product->kota }} · {{ $ago }}</p>
+            <p class="truncate text-xs font-bold text-neutral-900">{{ $product->penjual }}</p>
+            <p class="truncate text-[11px] text-neutral-500">{{ $product->kota }} · {{ $ago }}</p>
         </div>
-        {{-- TODO: dropdown menu "Laporkan" --}}
         <button type="button" aria-label="Opsi produk"
-                class="relative z-10 grid size-8 shrink-0 place-items-center rounded-full text-neutral-700 transition hover:bg-neutral-100">
-            <svg viewBox="0 0 24 24" class="size-[18px] fill-current" aria-hidden="true">
+                class="relative z-10 grid size-7 shrink-0 place-items-center rounded-full text-neutral-600 transition hover:bg-neutral-100">
+            <svg viewBox="0 0 24 24" class="size-4 fill-current" aria-hidden="true">
                 <circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/>
             </svg>
         </button>
     </div>
 
     {{-- Gambar + badge + favorit --}}
-    <div class="relative aspect-[19/20] overflow-hidden rounded-lg bg-neutral-200">
+    <div class="relative aspect-square overflow-hidden rounded-lg bg-neutral-200">
         @if ($product->gambar)
             <img src="{{ asset($product->gambar) }}" alt="{{ $product->judul }}" loading="lazy"
                  class="size-full object-cover" onerror="this.remove()">
         @endif
 
-        <span class="absolute left-2 top-2 rounded-md px-2.5 py-0.5 text-label {{ $badge }}">{{ $product->status }}</span>
+        <span class="absolute left-2 top-2 rounded px-2 py-0.5 text-[10px] font-bold bg-[#B8E639] text-neutral-900">{{ $product->status }}</span>
 
         <button type="button"
                 aria-label="Favorit" aria-pressed="{{ !empty($product->is_favorite) ? 'true' : 'false' }}"
                 data-favorite-toggle data-url="{{ $favUrl }}"
-                class="absolute right-2 top-2 z-10 grid size-8 place-items-center rounded-full bg-neutral-900/55 text-white backdrop-blur-sm transition hover:bg-neutral-900/75 aria-pressed:text-lime-500 aria-pressed:[&>svg]:fill-lime-500 aria-pressed:[&>svg]:stroke-lime-500">
-            <svg viewBox="0 0 24 24" class="size-[18px] fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true">
+                class="absolute right-2 top-2 z-10 grid size-7.5 place-items-center rounded-full bg-neutral-900/50 text-white backdrop-blur-xs transition hover:bg-neutral-900/75 aria-pressed:text-lime-400 aria-pressed:[&>svg]:fill-lime-400 aria-pressed:[&>svg]:stroke-lime-400">
+            <svg viewBox="0 0 24 24" class="size-4 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden="true">
                 <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
             </svg>
         </button>
     </div>
 
     {{-- Info produk --}}
-    <div class="mt-3 flex flex-1 flex-col">
-        <h3 class="text-h5 line-clamp-2 text-base leading-snug">
+    <div class="mt-2.5 flex flex-1 flex-col">
+        <h3 class="line-clamp-2 text-xs font-bold leading-snug text-neutral-900">
             {{-- stretched link: seluruh kartu bisa diklik, tombol di atas punya z-10 --}}
             <a href="{{ $detailUrl }}" class="after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-neutral-900">
                 {{ $product->judul }}
             </a>
         </h3>
-        <p class="text-h4 mt-1 font-bold">Rp {{ number_format($product->harga, 0, ',', '.') }}</p>
+        <p class="mt-1 text-sm font-extrabold text-neutral-900">Rp {{ number_format($product->harga, 0, ',', '.') }}</p>
 
-        <span class="mt-2 self-start rounded-md border border-neutral-200 bg-neutral-100 px-2.5 py-1 text-caption text-neutral-600">
+        <span class="mt-2 self-start rounded bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600">
             {{ $product->kondisi }}
         </span>
     </div>

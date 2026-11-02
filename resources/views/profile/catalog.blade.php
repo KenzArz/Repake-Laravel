@@ -1,157 +1,151 @@
 @extends('layouts.app')
 
-@section('title', $profile['name'] . ' - Profil & Katalog')
+@section('title', ($profile['name'] ?? 'Midou Wijaya') . ' - Detail User | RePake')
 
 @section('content')
-<div class="mx-auto max-w-4xl px-4 py-4 md:px-8">
+<div class="mx-auto max-w-6xl px-4 py-6 sm:px-6">
 
-    {{-- Top App Bar Profil --}}
-    <div class="mb-4 flex items-center justify-between border-b border-neutral-200 pb-3">
-        <div class="flex items-center gap-3">
-            <a href="{{ route('home') }}" class="grid size-9 place-items-center rounded-full text-neutral-800 transition hover:bg-neutral-200" aria-label="Kembali">
-                <svg viewBox="0 0 24 24" class="size-6 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]">
-                    <path d="M19 12H5M12 19l-7-7 7-7"/>
-                </svg>
-            </a>
-            <h1 class="text-h4 font-bold text-neutral-900">{{ $profile['name'] }}</h1>
+    {{-- Flash Message Sukses --}}
+    @if (session('success'))
+        <div class="mb-5 flex items-center justify-between rounded-xl bg-lime-50 border border-lime-300 p-3.5 text-xs font-semibold text-lime-900">
+            <div class="flex items-center gap-2">
+                <svg viewBox="0 0 24 24" class="size-4 fill-current text-lime-700"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                <span>{{ session('success') }}</span>
+            </div>
+            <button type="button" onclick="this.parentElement.remove()" class="text-lime-700 hover:text-lime-900">✕</button>
         </div>
+    @endif
 
-        <div class="flex items-center gap-1">
-            <a href="{{ route('profile.edit') }}" class="grid size-9 place-items-center rounded-full text-neutral-800 transition hover:bg-neutral-200" aria-label="Edit Profil">
-                <svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]">
-                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                </svg>
+    {{-- Detail User Profile Card (Sesuai Wireframe Image 3) --}}
+    <div class="rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8">
+        <div class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+
+            {{-- Kiri: Avatar Lingkaran Hijau Lime + Info User --}}
+            <div class="flex items-start sm:items-center gap-5">
+                {{-- Lingkaran Avatar Hijau Lime --}}
+                <div class="size-24 shrink-0 rounded-full bg-[#B8E639] overflow-hidden grid place-items-center">
+                    @if (!empty($profile['avatar']))
+                        <img src="{{ asset($profile['avatar']) }}" alt="{{ $profile['name'] }}" class="size-full object-cover">
+                    @endif
+                </div>
+
+                <div>
+                    {{-- Nama Lengkap --}}
+                    <h1 class="text-2xl font-black tracking-tight text-neutral-900">
+                        {{ $profile['name'] ?? 'Midou Wijaya' }}
+                    </h1>
+
+                    {{-- Username --}}
+                    <p class="text-xs font-bold text-neutral-800">
+                        @<span>{{ $profile['username'] ?? 'midou_kun' }}</span>
+                    </p>
+
+                    {{-- Bio --}}
+                    <p class="mt-1 text-xs text-neutral-600">
+                        {{ $profile['bio'] ?? 'Jual apa aja demi bisa nikahin hiura' }}
+                    </p>
+
+                    {{-- Lokasi --}}
+                    <p class="mt-2 flex items-center gap-1 text-xs text-neutral-600">
+                        <svg viewBox="0 0 24 24" class="size-3.5 fill-none stroke-current stroke-2 text-neutral-700">
+                            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
+                        </svg>
+                        <span>{{ $profile['kota'] ?? 'Bekasi' }}</span>
+                    </p>
+                </div>
+            </div>
+
+            {{-- Kanan: Rating, 3 Dots Menu, & Tombol Chat Penjual --}}
+            <div class="flex flex-col items-start md:items-end justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <div class="text-left md:text-right">
+                        <p class="flex items-center gap-1 text-xs font-bold text-neutral-900">
+                            <span class="text-amber-500">★</span>
+                            <span>{{ number_format($profile['rating'] ?? 4.5, 1) }} ({{ $profile['reviews_count'] ?? 67 }} ulasan) · {{ $profile['sold_count'] ?? 10 }} Terjual</span>
+                        </p>
+                        <p class="text-[11px] text-neutral-500">Rating & Ulasan</p>
+                    </div>
+
+                    {{-- 3 Vertical Dots (Menu Opsi / Edit Profil) --}}
+                    <div class="relative" x-data="{ open: false }">
+                        <button type="button" onclick="document.getElementById('profile-options-menu').classList.toggle('hidden')"
+                                class="grid size-8 place-items-center rounded-full text-neutral-700 transition hover:bg-neutral-100" aria-label="Menu Opsi">
+                            <svg viewBox="0 0 24 24" class="size-4.5 fill-current">
+                                <circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/>
+                            </svg>
+                        </button>
+                        <div id="profile-options-menu" class="absolute right-0 top-9 z-20 hidden w-44 rounded-xl border border-neutral-200 bg-white py-1.5 shadow-lg">
+                            <a href="{{ route('profile.edit') }}" class="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-100">
+                                <svg viewBox="0 0 24 24" class="size-4 stroke-current stroke-2 fill-none"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                                <span>Edit Profil</span>
+                            </a>
+                            <form action="{{ route('logout') }}" method="POST">
+                                @csrf
+                                <button type="submit" class="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
+                                    <svg viewBox="0 0 24 24" class="size-4 stroke-current stroke-2 fill-none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                                    <span>Keluar</span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Tombol Chat Penjual --}}
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <a href="{{ Route::has('chat.index') ? route('chat.index') : '#' }}"
+                       class="flex items-center justify-center gap-2 rounded-lg bg-[#B8E639] px-6 py-2.5 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 w-full sm:w-auto">
+                        <svg viewBox="0 0 24 24" class="size-4 fill-none stroke-current stroke-2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <span>Chat Penjual</span>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    {{-- Tabs (Produk & Ulasan Sesuai Wireframe) --}}
+    <div class="mt-8 border-b border-neutral-200">
+        <div class="flex items-center gap-6">
+            <a href="{{ route('profile.catalog', ['tab' => 'dijual']) }}"
+               class="pb-2 text-xs font-bold transition {{ $tab !== 'favorit' ? 'border-b-2 border-neutral-900 text-neutral-900' : 'text-neutral-500 hover:text-neutral-800' }}">
+                Produk
             </a>
-            <button type="button" onclick="navigator.clipboard?.writeText(window.location.href); alert('Tautan profil berhasil disalin!');" class="grid size-9 place-items-center rounded-full text-neutral-800 transition hover:bg-neutral-200" aria-label="Bagikan Profil">
-                <svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]">
-                    <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-                </svg>
+
+            <a href="{{ route('profile.catalog', ['tab' => 'favorit']) }}"
+               class="pb-2 text-xs font-bold transition {{ $tab === 'favorit' ? 'border-b-2 border-neutral-900 text-neutral-900' : 'text-neutral-500 hover:text-neutral-800' }}">
+                Favorit ({{ $favoriteCount }})
+            </a>
+
+            <button type="button" class="pb-2 text-xs font-semibold text-neutral-400 cursor-not-allowed">
+                Ulasan
             </button>
         </div>
     </div>
 
-    {{-- Flash message sukses --}}
-    @if (session('success'))
-        <div class="mb-4 flex items-center gap-2 rounded-xl bg-lime-100 border border-lime-300 px-4 py-3 text-sm font-semibold text-lime-900">
-            <svg viewBox="0 0 24 24" class="size-5 fill-current text-lime-700 shrink-0">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-            </svg>
-            <span>{{ session('success') }}</span>
-        </div>
-    @endif
+    {{-- Section: Semua Produk --}}
+    <section class="mt-6">
+        <div class="flex items-center justify-between">
+            <h2 class="text-base font-extrabold text-neutral-900">Semua Produk</h2>
 
-    {{-- Header Info Profil Pengguna --}}
-    <div class="pt-2">
-        <div class="flex items-start gap-4">
-            {{-- Avatar dengan Online Dot --}}
-            <div class="relative size-20 shrink-0">
-                <div class="size-20 overflow-hidden rounded-full bg-neutral-200 border-2 border-white shadow-sm grid place-items-center">
-                    @if (!empty($profile['avatar']))
-                        <img src="{{ asset($profile['avatar']) }}" alt="{{ $profile['name'] }}" class="size-full object-cover">
-                    @else
-                        <svg viewBox="0 0 24 24" class="size-12 fill-neutral-400 text-neutral-400">
-                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                        </svg>
-                    @endif
+            <div class="flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-800">
+                <span>Urutkan: <strong>Terbaru</strong></span>
+                <svg viewBox="0 0 24 24" class="size-3.5 fill-none stroke-current stroke-2"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+        </div>
+
+        {{-- Grid 4 Kolom x 2 Baris = 8 Produk Sesuai Wireframe --}}
+        <div class="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+            @forelse ($products as $product)
+                <x-product-card :product="$product" />
+            @empty
+                <div class="col-span-full my-8 text-center text-xs text-neutral-500">
+                    Tidak ada produk dalam daftar ini.
                 </div>
-                <span class="absolute bottom-0.5 right-0.5 size-4 rounded-full bg-emerald-500 border-2 border-white" title="Online"></span>
-            </div>
-
-            {{-- Detail Nama, Lokasi, Rating --}}
-            <div class="min-w-0 flex-1 leading-normal">
-                <div class="flex items-center gap-1.5 flex-wrap">
-                    <h2 class="text-h3 font-bold text-neutral-900">{{ $profile['name'] }}</h2>
-                    @if (!empty($profile['is_verified']))
-                        <svg viewBox="0 0 24 24" class="size-5 shrink-0 fill-emerald-600 text-white" aria-label="Terverifikasi">
-                            <circle cx="12" cy="12" r="10" class="fill-emerald-600"/>
-                            <path d="m9 12 2 2 4-4" class="fill-none stroke-white stroke-2 [stroke-linecap:round] [stroke-linejoin:round]"/>
-                        </svg>
-                    @endif
-                </div>
-
-                <p class="mt-0.5 flex items-center gap-1 text-xs text-neutral-600">
-                    <svg viewBox="0 0 24 24" class="size-3.5 fill-none stroke-red-500 stroke-2" aria-hidden="true">
-                        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
-                    </svg>
-                    <span>{{ $profile['kota'] }}</span>
-                    <span>•</span>
-                    <span class="text-neutral-500">{{ $profile['online_status'] }}</span>
-                </p>
-
-                <p class="mt-1 flex items-center gap-1 text-xs font-semibold text-neutral-900">
-                    <span class="text-amber-500 text-sm">★</span>
-                    <span>{{ number_format($profile['rating'], 1) }}</span>
-                    <span class="font-normal text-neutral-500">({{ $profile['reviews_count'] }} ulasan)</span>
-                </p>
-            </div>
+            @endforelse
         </div>
-
-        {{-- Box Bio / Deskripsi Toko --}}
-        @if (!empty($profile['bio']))
-            <div class="mt-4 rounded-xl border border-neutral-200 bg-neutral-100/80 px-4 py-3 text-sm leading-relaxed text-neutral-700">
-                {{ $profile['bio'] }}
-            </div>
-        @endif
-
-        {{-- Tombol Aksi Profil --}}
-        <div class="mt-4 grid grid-cols-2 gap-3">
-            <a href="{{ route('profile.edit') }}" class="flex items-center justify-center gap-2 rounded-xl bg-lime-500 py-2.5 text-label font-bold text-neutral-900 shadow-sm transition hover:bg-lime-600">
-                <svg viewBox="0 0 24 24" class="size-4 stroke-current stroke-2 fill-none">
-                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                </svg>
-                <span>Edit Profil</span>
-            </a>
-
-            <form action="{{ route('logout') }}" method="POST" class="w-full">
-                @csrf
-                <button type="submit" class="flex w-full items-center justify-center gap-2 rounded-xl border border-red-500 bg-white py-2.5 text-label font-bold text-red-600 shadow-sm transition hover:bg-red-50">
-                    <svg viewBox="0 0 24 24" class="size-4 stroke-current stroke-2 fill-none">
-                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
-                    </svg>
-                    <span>Keluar</span>
-                </button>
-            </form>
-        </div>
-    </div>
-
-    {{-- Tabs Katalog (Dijual / Favorit) --}}
-    <div class="mt-8 border-t border-neutral-200 pt-6">
-        <div class="flex items-center justify-between border-b border-neutral-200 pb-2">
-            {{-- Tabs --}}
-            <div class="flex items-center gap-4">
-                <a href="{{ route('profile.catalog', ['tab' => 'dijual']) }}"
-                   class="pb-2 text-label font-bold transition {{ $tab !== 'favorit' ? 'border-b-2 border-neutral-900 text-neutral-900' : 'text-neutral-500 hover:text-neutral-800' }}">
-                    Semua Produk ({{ $soldCount }})
-                </a>
-                <a href="{{ route('profile.catalog', ['tab' => 'favorit']) }}"
-                   class="pb-2 text-label font-bold transition {{ $tab === 'favorit' ? 'border-b-2 border-neutral-900 text-neutral-900' : 'text-neutral-500 hover:text-neutral-800' }}">
-                    Favorit ({{ $favoriteCount }})
-                </a>
-            </div>
-
-            {{-- Filter Urutkan --}}
-            <span class="text-caption text-neutral-500">Urutkan: Terbaru</span>
-        </div>
-
-        {{-- Grid Produk --}}
-        @if ($products->isEmpty())
-            <div class="my-10 flex flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 px-6 py-12 text-center">
-                <p class="text-body text-neutral-500">
-                    {{ $tab === 'favorit' ? 'Belum ada produk favorit tersimpan.' : 'Belum ada produk yang dijual saat ini.' }}
-                </p>
-                <a href="{{ route('home') }}" class="mt-4 inline-flex rounded-md bg-lime-500 px-4 py-2 text-label font-semibold text-neutral-900 transition hover:bg-lime-600">
-                    Jelajah Produk
-                </a>
-            </div>
-        @else
-            <div class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 lg:grid-cols-4">
-                @foreach ($products as $product)
-                    <x-product-card :product="$product" />
-                @endforeach
-            </div>
-        @endif
-    </div>
+    </section>
 
 </div>
 @endsection

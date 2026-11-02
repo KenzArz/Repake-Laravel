@@ -13,11 +13,10 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
 </head>
-<body class="min-h-screen">
+<body class="min-h-screen bg-neutral-100/60 text-neutral-900 antialiased selection:bg-lime-300 selection:text-neutral-900">
     <x-navbar-user />
 
-    {{-- pb-24 di mobile supaya tidak tertutup floating bottom nav --}}
-    <div class="pb-24 md:pb-0">
+    <div class="min-h-[calc(100vh-200px)]">
         <main>
             @yield('content')
         </main>
