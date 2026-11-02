@@ -1,27 +1,102 @@
+# Operating System Files
 *.log
 .DS_Store
+Thumbs.db
+
+# Environment Files
 .env
 .env.backup
 .env.production
+.env.local
+.env.*.local
+
+# IDE Configuration
 .phpactor.json
-.phpunit.result.cache
 /.codex
 /.cursor/
 /.idea
 /.nova
-/.phpunit.cache
 /.vscode
 /.zed
+_ide_helper.php
+_ide_helper_models.php
+.phpstorm.meta.php
+
+# Testing
+.phpunit.result.cache
+/.phpunit.cache
+/coverage
+/.pest
+
+# Composer
+/vendor
 /auth.json
+composer.lock
+
+# Node / NPM
 /node_modules
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.pnpm-debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build Output
 /public/build
-/public/fonts-manifest.dev.json
 /public/hot
+/public/fonts-manifest.dev.json
+/public/fonts-manifest.json
+
+# Storage
 /public/storage
 /storage/*.key
 /storage/pail
-/vendor
-_ide_helper.php
+/storage/logs/*.log
+/storage/framework/cache/*
+!/storage/framework/cache/.gitkeep
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitkeep
+/storage/framework/testing/*
+!/storage/framework/testing/.gitkeep
+/storage/framework/views/*
+!/storage/framework/views/.gitkeep
+
+# Laravel Specific
 Homestead.json
 Homestead.yaml
-Thumbs.db
+auth.json
+.vagrant
+
+# Backup Files
+*.swp
+*.swo
+*~
+*.bak
+*.tmp
+
+# OS Generated Files
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Laravel Boost / Pao / Pail
+/.boost
+/pao.db
+
+# Temporary Files
+/temp
+/tmp
+
+# Database
+*.sqlite
+*.sqlite-journal
+database.sqlite
+
+# Editor Backup Files
+*.kate-swp
+.*.sw[a-z]
