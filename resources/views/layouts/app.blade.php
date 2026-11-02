@@ -16,8 +16,8 @@
 <body class="min-h-screen">
     <x-navbar-user />
 
-    {{-- pb-16 di mobile supaya tidak tertutup bottom nav --}}
-    <div class="pb-16 md:pb-0">
+    {{-- pb-24 di mobile supaya tidak tertutup floating bottom nav --}}
+    <div class="pb-24 md:pb-0">
         <main>
             @yield('content')
         </main>

@@ -30,9 +30,9 @@
         {{-- Menu kanan --}}
         <nav class="ml-auto flex items-center gap-1 md:gap-2" aria-label="Menu pengguna">
             {{-- Favorit (desktop saja; di mobile ada di bottom nav) --}}
-            <a href="{{ $r('profile.catalog', ['tab' => 'favorit']) }}" {{ $needLogin }}
-               class="{{ $iconBtn }} hidden md:grid" aria-label="Favorit">
-                <svg viewBox="0 0 24 24" class="{{ $svg }}" aria-hidden="true">
+            <a href="{{ route('favorites.index') }}"
+               class="{{ $iconBtn }} {{ request()->routeIs('favorites.*') ? 'bg-neutral-200 text-lime-700' : '' }} hidden md:grid" aria-label="Favorit">
+                <svg viewBox="0 0 24 24" class="{{ $svg }} {{ request()->routeIs('favorites.*') ? 'fill-current' : '' }}" aria-hidden="true">
                     <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
                 </svg>
             </a>
@@ -44,16 +44,18 @@
                 </svg>
             </a>
 
-            {{-- Masuk / Profil --}}
-            @guest
-                <button type="button" data-open-login class="text-h5 hidden px-2 md:inline-block">Masuk</button>
-            @else
-                <a href="{{ $r('profile.catalog') }}"
-                   class="hidden size-9 place-items-center rounded-full bg-neutral-200 text-label font-semibold md:grid"
-                   aria-label="Profil">
+            {{-- Profil --}}
+            <a href="{{ route('profile.catalog') }}"
+                class="grid size-9 shrink-0 place-items-center rounded-full bg-neutral-200 text-label font-semibold text-neutral-800 transition hover:bg-neutral-300"
+                aria-label="Profil">
+                @if (auth()->check())
                     {{ strtoupper(mb_substr(auth()->user()->name, 0, 1)) }}
-                </a>
-            @endguest
+                @else
+                    <svg viewBox="0 0 24 24" class="size-5 fill-neutral-700">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                @endif
+            </a>
 
             {{-- +Jual --}}
             <a href="{{ $r('products.create') }}" {{ $needLogin }}
@@ -64,32 +66,47 @@
     </div>
 </header>
 
-{{-- Bottom nav (mobile saja) --}}
-<nav class="fixed inset-x-0 bottom-0 z-40 grid grid-cols-3 border-t border-neutral-200 bg-white md:hidden" aria-label="Navigasi utama">
-    @php
-        $item = 'flex flex-col items-center gap-1 py-2 text-caption';
-        $on = 'font-semibold text-neutral-900';
-        $off = 'text-neutral-500';
-    @endphp
+{{-- Bottom nav (mobile saja) - Floating Curved Pill Bar --}}
+<div class="fixed inset-x-0 bottom-3 z-40 px-4 md:hidden">
+    <nav class="mx-auto flex max-w-sm items-center justify-around rounded-[32px] border border-neutral-300 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-md" aria-label="Navigasi utama">
+        @php
+            $isHome = request()->routeIs('home');
+            $isFav = request()->routeIs('favorites.*');
+            $itemCls = 'flex flex-1 flex-col items-center justify-center gap-1 text-xs transition';
+            $activeCls = 'font-semibold text-lime-700';
+            $inactiveCls = 'text-neutral-700 hover:text-neutral-900';
+        @endphp
 
-    <a href="{{ $r('home') }}" class="{{ $item }} {{ request()->routeIs('home') ? $on : $off }}">
-        <svg viewBox="0 0 24 24" class="{{ $svg }}" aria-hidden="true">
-            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>
-        </svg>
-        Home
-    </a>
+        {{-- Home --}}
+        <a href="{{ route('home') }}" class="{{ $itemCls }} {{ $isHome ? $activeCls : $inactiveCls }}">
+            <svg viewBox="0 0 24 24" class="size-6 {{ $isHome ? 'fill-current stroke-current' : 'fill-none stroke-current' }} stroke-[1.8]" aria-hidden="true">
+                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>
+            </svg>
+            <span class="text-[11px] leading-none">Home</span>
+        </a>
 
-    <a href="{{ $r('profile.catalog', ['tab' => 'favorit']) }}" {{ $needLogin }} class="{{ $item }} {{ $off }}">
-        <svg viewBox="0 0 24 24" class="{{ $svg }}" aria-hidden="true">
-            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
-        </svg>
-        Favorit
-    </a>
+        {{-- Favorite --}}
+        <a href="{{ route('favorites.index') }}" class="{{ $itemCls }} {{ $isFav ? $activeCls : $inactiveCls }}">
+            <svg viewBox="0 0 24 24" class="size-6 {{ $isFav ? 'fill-current stroke-current' : 'fill-none stroke-current' }} stroke-[1.8]" aria-hidden="true">
+                <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+            </svg>
+            <span class="text-[11px] leading-none">Favorite</span>
+        </a>
 
-    <a href="{{ $r('profile.catalog') }}" {{ $needLogin }} class="{{ $item }} {{ $off }}">
-        <svg viewBox="0 0 24 24" class="{{ $svg }}" aria-hidden="true">
-            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-        </svg>
-        Profil
-    </a>
-</nav>
+        {{-- Jual --}}
+        <a href="{{ Route::has('products.create') ? route('products.create') : '#' }}" {{ $needLogin }} class="{{ $itemCls }} {{ request()->routeIs('products.create') ? $activeCls : $inactiveCls }}">
+            <svg viewBox="0 0 24 24" class="size-6 fill-none stroke-current stroke-[1.8]" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/>
+            </svg>
+            <span class="text-[11px] leading-none">Jual</span>
+        </a>
+
+        {{-- Chat --}}
+        <a href="{{ Route::has('chat.index') ? route('chat.index') : '#' }}" {{ $needLogin }} class="{{ $itemCls }} {{ request()->routeIs('chat.*') ? $activeCls : $inactiveCls }}">
+            <svg viewBox="0 0 24 24" class="size-6 fill-none stroke-current stroke-[1.8]" aria-hidden="true">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span class="text-[11px] leading-none">Chat</span>
+        </a>
+    </nav>
+</div>
