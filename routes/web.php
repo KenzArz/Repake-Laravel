@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProductDetailController;
@@ -15,6 +16,9 @@ Route::post('/products/{id}/report', [ProductDetailController::class, 'report'])
 // Favorit
 Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
 Route::post('/favorites/{id}', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
+
+// Otentikasi SSO Google UNSIKA
+Route::post('/login/google', [AuthController::class, 'loginGoogle'])->name('login.google');
 
 // Profil & Katalog
 Route::get('/profile', [ProfileController::class, 'catalog'])->name('profile.catalog');

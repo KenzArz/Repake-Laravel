@@ -14,7 +14,9 @@
 <article class="relative flex h-full flex-col rounded-xl border border-neutral-200/80 bg-white p-2.5 shadow-2xs transition hover:shadow-sm">
     {{-- Header penjual --}}
     <div class="flex items-center gap-2 pb-2">
-        <span class="size-7 shrink-0 rounded-full bg-neutral-300"></span>
+        <div class="size-7 shrink-0 rounded-full overflow-hidden bg-neutral-200 border border-neutral-300">
+            <img src="{{ asset('images/default-avatar.png') }}" alt="" class="size-full object-cover">
+        </div>
         <div class="min-w-0 flex-1 leading-tight">
             <p class="truncate text-xs font-bold text-neutral-900">{{ $product->penjual }}</p>
             <p class="truncate text-[11px] text-neutral-500">{{ $product->kota }} · {{ $ago }}</p>
