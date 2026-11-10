@@ -24,10 +24,12 @@ class UpdateProfileRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:100'],
+            'username' => ['nullable', 'string', 'max:50'],
             'phone' => ['nullable', 'string', 'max:30'],
             'kota' => ['nullable', 'string', 'max:100'],
             'bio' => ['nullable', 'string', 'max:500'],
             'avatar' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
+            'remove_avatar' => ['nullable'],
         ];
     }
 
@@ -41,6 +43,7 @@ class UpdateProfileRequest extends FormRequest
         return [
             'name.required' => 'Nama lengkap / username wajib diisi.',
             'name.max' => 'Nama tidak boleh melebihi 100 karakter.',
+            'username.max' => 'Username tidak boleh melebihi 50 karakter.',
             'phone.max' => 'Nomor telepon tidak boleh melebihi 30 karakter.',
             'kota.max' => 'Lokasi tidak boleh melebihi 100 karakter.',
             'bio.max' => 'Bio tidak boleh melebihi 500 karakter.',
