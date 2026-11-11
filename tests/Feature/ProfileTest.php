@@ -1,6 +1,20 @@
 <?php
 
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    $this->profileUser = User::factory()->create([
+        'name' => 'Midou Wijaya',
+        'username' => 'Midou_kun',
+        'kota' => 'Bekasi',
+    ]);
+
+    $this->actingAs($this->profileUser);
+});
 
 test('user can view profile catalog page', function () {
     $response = $this->get(route('profile.catalog'));
@@ -32,36 +46,40 @@ test('user can update profile information', function () {
 
     $response->assertRedirect(route('profile.catalog'));
 
-    $profile = session('user_profile');
-    expect($profile['name'])->toBe('Midou Updated');
-    expect($profile['username'])->toBe('midou_super');
-    expect($profile['kota'])->toBe('Bandung');
+    $user = $this->profileUser->refresh();
+    expect($user->name)->toBe('Midou Updated')
+        ->and($user->username)->toBe('midou_super')
+        ->and($user->kota)->toBe('Bandung')
+        ->and($user->phone)->toBe('0899-9999-9999');
+
+    expect(session('user_profile')['name'])->toBe('Midou Updated');
 });
 
-test('user can view edit form and update profile after logging in with sso', function () {
-    // Login SSO terlebih dahulu
-    $this->postJson(route('login.google'), [
-        'email' => 'mahasiswa.baru@student.unsika.ac.id',
-        'name' => 'Mahasiswa Baru',
-    ]);
-
-    // Buka form edit profil (memastikan tidak ada undefined key error)
-    $response = $this->get(route('profile.edit'));
-    $response->assertStatus(200);
-    $response->assertSee('Mahasiswa Baru');
-
-    // Update profil
-    $updateResponse = $this->put(route('profile.update'), [
+test('updated profile is still shown after logging in again', function () {
+    $this->put(route('profile.update'), [
         'name' => 'Mahasiswa Baru Unsika',
         'username' => 'mhs_unsika',
-        'phone' => '0812-9876-5432',
         'kota' => 'Telukjambe Timur',
         'bio' => 'Mahasiswa Teknik Informatika UNSIKA.',
-    ]);
+    ])->assertRedirect(route('profile.catalog'));
 
-    $updateResponse->assertRedirect(route('profile.catalog'));
-    expect(session('user_profile')['name'])->toBe('Mahasiswa Baru Unsika');
-    expect(session('user_profile')['kota'])->toBe('Telukjambe Timur');
+    $this->post(route('logout'));
+
+    $this->actingAs($this->profileUser->refresh());
+
+    $response = $this->get(route('profile.edit'));
+    $response->assertStatus(200);
+    $response->assertSee('Mahasiswa Baru Unsika');
+    $response->assertSee('mhs_unsika');
+});
+
+test('username must be unique', function () {
+    User::factory()->create(['username' => 'sudah_dipakai']);
+
+    $this->put(route('profile.update'), [
+        'name' => 'Midou Updated',
+        'username' => 'sudah_dipakai',
+    ])->assertSessionHasErrors('username');
 });
 
 test('user can upload avatar and remove avatar', function () {
@@ -73,13 +91,14 @@ test('user can upload avatar and remove avatar', function () {
     ]);
 
     $response->assertRedirect(route('profile.catalog'));
-    $profile = session('user_profile');
-    expect($profile['avatar'])->not->toBeNull();
-    expect(file_exists(public_path($profile['avatar'])))->toBeTrue();
+
+    $user = $this->profileUser->refresh();
+    expect($user->avatar)->not->toBeNull();
+    expect(file_exists(public_path($user->avatar)))->toBeTrue();
 
     // Hapus file buatan pengujian
-    if (file_exists(public_path($profile['avatar']))) {
-        unlink(public_path($profile['avatar']));
+    if (file_exists(public_path($user->avatar))) {
+        unlink(public_path($user->avatar));
     }
 
     // Hapus avatar via remove_avatar = 1
@@ -89,8 +108,10 @@ test('user can upload avatar and remove avatar', function () {
     ]);
 
     $responseRemove->assertRedirect(route('profile.catalog'));
-    expect(session('user_profile')['avatar'])->toBeNull();
-});
+
+    $user->refresh();
+    expect($user->avatar)->toBeNull();
+})->skip(! extension_loaded('gd'), 'Ekstensi GD belum terpasang.');
 
 test('user can switch between dijual and favorit tabs in profile catalog', function () {
     $response = $this->get(route('profile.catalog', ['tab' => 'favorit']));

@@ -368,6 +368,30 @@ MAIL_FROM_ADDRESS="hello@example.com"
 MAIL_FROM_NAME="${APP_NAME}"
 ```
 
+#### Firebase Authentication
+
+Login website memakai **Firebase Authentication (provider Google)**. ID token diverifikasi di server, lalu domain email dibatasi di Laravel.
+
+Aktifkan di Firebase Console:
+
+1. **Build → Authentication → Sign-in method → Google → Enable**.
+2. **Authentication → Settings → Authorized domains**: pastikan `localhost` ada.
+3. **Project settings → General → Your apps → Web app**: salin `apiKey`, `authDomain`, `projectId`, `appId`.
+4. Isi `.env`:
+
+```env
+FIREBASE_API_KEY=
+FIREBASE_AUTH_DOMAIN=
+FIREBASE_PROJECT_ID=
+FIREBASE_APP_ID=
+# Domain email yang boleh login; subdomain ikut diterima.
+FIREBASE_ALLOWED_DOMAINS=unsika.ac.id
+```
+
+Setelah mengubah `.env`, jalankan `php artisan config:clear`.
+
+Catatan: `apiKey` Firebase bukan rahasia (terlihat di browser). Jangan membatasinya dengan *HTTP referrer* jika key yang sama dipakai server untuk `accounts:lookup`, karena request server tidak mengirim referrer dan verifikasi login akan gagal.
+
 ### Theme Configuration
 
 The theme system is configured in `config/theme.php` and includes:

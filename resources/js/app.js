@@ -1,5 +1,11 @@
 import "./bootstrap";
 
+/* Firebase SDK dimuat dinamis hanya saat login modal dipakai,
+   agar semua halaman tidak ikut membawa bundle Firebase. */
+window.repakeFirebase = () =>
+    Promise.all([import("firebase/app"), import("firebase/auth")]);
+
+
 /* Tombol/link yang butuh login (guest) -> buka login modal.
    login-modal.blade.php (ALE) tinggal listen event 'open-login'. */
 document.addEventListener("click", (e) => {

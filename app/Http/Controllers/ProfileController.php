@@ -7,7 +7,6 @@ use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
-use Throwable;
 
 class ProfileController extends Controller
 {
@@ -131,16 +130,16 @@ class ProfileController extends Controller
     public function update(UpdateProfileRequest $request): RedirectResponse
     {
         $validated = $request->validated();
-        $profile = $this->getProfile();
+        $user = auth()->user();
 
         // Perbarui data utama profil
-        $profile['name'] = trim($validated['name']);
+        $user->name = trim($validated['name']);
         if (! empty($validated['username'])) {
-            $profile['username'] = ltrim(trim($validated['username']), '@');
+            $user->username = ltrim(trim($validated['username']), '@');
         }
-        $profile['phone'] = ! empty($validated['phone']) ? trim($validated['phone']) : null;
-        $profile['kota'] = ! empty($validated['kota']) ? trim($validated['kota']) : 'Karawang';
-        $profile['bio'] = ! empty($validated['bio']) ? trim($validated['bio']) : null;
+        $user->phone = ! empty($validated['phone']) ? trim($validated['phone']) : null;
+        $user->kota = ! empty($validated['kota']) ? trim($validated['kota']) : 'Karawang';
+        $user->bio = ! empty($validated['bio']) ? trim($validated['bio']) : null;
 
         // Upload foto profil jika pengguna memilih gambar baru
         if ($request->hasFile('avatar')) {
@@ -153,81 +152,50 @@ class ProfileController extends Controller
             }
 
             $avatarFile->move($destinationPath, $filename);
-            $profile['avatar'] = 'images/avatars/'.$filename;
+            $user->avatar = 'images/avatars/'.$filename;
         }
 
         // Hapus foto jika diminta
         if ($request->filled('remove_avatar') && $request->input('remove_avatar') == '1') {
-            $profile['avatar'] = null;
+            $user->avatar = null;
         }
 
-        session()->put('user_profile', $profile);
+        $user->save();
 
-        // Sinkronkan nama dengan user yang sedang terautentikasi (jika ada)
-        if (auth()->check()) {
-            $user = auth()->user();
-            $user->name = $profile['name'];
-            try {
-                $user->save();
-            } catch (Throwable) {
-                // Abaikan jika database in-memory / read-only
-            }
-        }
+        session()->put('user_profile', [
+            'name' => $user->name,
+            'email' => $user->email,
+            'username' => $user->username,
+            'kota' => $user->kota ?: 'Karawang',
+            'avatar' => $user->avatar,
+            'is_verified' => true,
+        ]);
 
         return redirect()->route('profile.catalog')->with('success', 'Profil berhasil diperbarui!');
     }
 
     /**
-     * Logout pengguna.
-     */
-    public function logout(Request $request): RedirectResponse
-    {
-        if (auth()->check()) {
-            auth()->logout();
-            $request->session()->forget(['auth_user', 'user_profile']);
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
-        }
-
-        return redirect()->route('home')->with('status', 'Anda telah keluar dari akun.');
-    }
-
-    /**
-     * Ambil data profil dari session atau nilai default terverifikasi.
+     * Ambil data profil dari user yang sedang login.
      *
      * @return array<string, mixed>
      */
     private function getProfile(): array
     {
-        $defaults = [
-            'name' => 'Midou Wijaya',
-            'username' => 'Midou_kun',
-            'email' => 'midou.kun@student.unsika.ac.id',
-            'phone' => '0812-3456-7890',
-            'kota' => 'Bekasi',
-            'bio' => 'Jual apa aja demi bisa nikahin hiura',
-            'avatar' => null,
+        $user = auth()->user();
+
+        return [
+            'name' => $user->name,
+            'username' => $user->username ?: str($user->email)->before('@')->replace('.', '_')->toString(),
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'kota' => $user->kota ?: 'Karawang',
+            'bio' => $user->bio,
+            'avatar' => $user->avatar,
             'rating' => 4.5,
             'reviews_count' => 67,
             'sold_count' => 10,
             'online_status' => 'Online 10 menit lalu',
             'is_verified' => true,
         ];
-
-        $current = session()->get('user_profile', []);
-        $merged = array_merge($defaults, $current);
-
-        if (auth()->check()) {
-            if (! empty(auth()->user()->name) && empty($current['name'])) {
-                $merged['name'] = auth()->user()->name;
-            }
-            if (! empty(auth()->user()->email)) {
-                $merged['email'] = auth()->user()->email;
-            }
-        }
-
-        session()->put('user_profile', $merged);
-
-        return $merged;
     }
 }
