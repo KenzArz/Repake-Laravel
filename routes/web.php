@@ -7,15 +7,12 @@ use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductDetailController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
-
-// Detail Barang & Laporan
-Route::get('/products/{id}', [ProductDetailController::class, 'show'])->name('products.show');
-Route::post('/products/{id}/report', [ProductDetailController::class, 'report'])->name('products.report');
 
 // Otentikasi Firebase Google
 Route::post('/auth/firebase', [FirebaseAuthController::class, 'login'])
@@ -25,6 +22,12 @@ Route::post('/auth/firebase', [FirebaseAuthController::class, 'login'])
 Route::post('/logout', [FirebaseAuthController::class, 'logout'])
     ->middleware('auth')
     ->name('logout');
+
+// Jual Produk (wajib login) — rute statis, harus sebelum wildcard /products/{id}
+Route::middleware(['auth', 'banned'])->group(function () {
+    Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
+    Route::post('/products', [ProductController::class, 'store'])->name('products.store');
+});
 
 // Favorit (wajib login)
 Route::middleware(['auth', 'banned'])->group(function () {
@@ -85,3 +88,7 @@ Route::middleware(['auth', 'banned'])->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/read', [NotificationController::class, 'markAllRead'])->name('notifications.readAll');
 });
+
+// Detail Barang & Laporan (wildcard /{id} — ditaruh paling bawah rute produk)
+Route::get('/products/{id}', [ProductDetailController::class, 'show'])->name('products.show');
+Route::post('/products/{id}/report', [ProductDetailController::class, 'report'])->name('products.report');
