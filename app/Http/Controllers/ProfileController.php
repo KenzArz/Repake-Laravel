@@ -111,16 +111,7 @@ class ProfileController extends Controller
 
         // Upload foto profil jika pengguna memilih gambar baru
         if ($request->hasFile('avatar')) {
-            $avatarFile = $request->file('avatar');
-            $filename = 'avatar_'.time().'_'.uniqid().'.'.$avatarFile->getClientOriginalExtension();
-            $destinationPath = public_path('images/avatars');
-
-            if (! file_exists($destinationPath)) {
-                mkdir($destinationPath, 0755, true);
-            }
-
-            $avatarFile->move($destinationPath, $filename);
-            $user->avatar = 'images/avatars/'.$filename;
+            $user->avatar = $request->file('avatar')->store('avatars', 'public');
         }
 
         // Hapus foto jika diminta
@@ -135,7 +126,7 @@ class ProfileController extends Controller
             'email' => $user->email,
             'username' => $user->username,
             'kota' => $user->kota ?: 'Karawang',
-            'avatar' => $user->avatar,
+            'avatar' => $user->avatar_url,
             'is_verified' => true,
         ]);
 
@@ -159,6 +150,7 @@ class ProfileController extends Controller
             'kota' => $user->kota ?: 'Karawang',
             'bio' => $user->bio,
             'avatar' => $user->avatar,
+            'avatar_url' => $user->avatar_url,
         ];
     }
 }

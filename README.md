@@ -26,17 +26,18 @@ A marketplace application built with Laravel 13 for buying and selling second-ha
 | Fitur | Status |
 |---|---|
 | Login Firebase (Google, domain UNSIKA) | ✅ Selesai |
-| Halaman home, detail produk, favorit, profil, edit profil | ✅ Selesai (data demo) |
-| Favorit & laporan tersimpan | 🟡 Belum — masih di session, bukan database |
-| Profil dengan data nyata (produk, rating, ulasan) | ❌ Belum — masih dummy |
-| Jual produk (CRUD + upload foto) | ❌ Belum |
-| Pencarian & filter | ❌ Belum |
-| Chat & tawar harga | ❌ Belum |
-| Notifikasi | ❌ Belum |
-| Admin & moderasi | ❌ Belum |
+| Halaman home, detail produk, favorit, profil, edit profil | ✅ Selesai |
+| Favorit tersimpan di database | ✅ Selesai |
+| Profil dengan data nyata (produk, rating, ulasan) | ✅ Selesai (rating/ulasan dari tabel `reviews`) |
+| Jual produk (CRUD + upload 3 foto, konversi WebP) | ✅ Selesai |
+| Pencarian & filter (kata kunci, kategori, kota) | ✅ Selesai |
+| Chat & tawar harga (polling, order saat tawaran diterima) | ✅ Selesai |
+| Notifikasi (pesan baru, tawaran baru, keputusan tawaran) | ✅ Selesai |
+| Admin kategori (CRUD) | ✅ Selesai |
+| Laporkan produk | 🟡 Sebagian — tersimpan, alur admin/solusi belum |
 | API untuk Flutter | ❌ Belum |
 
-Rencana lengkap: `docs/plan/` (jika tersedia) — lihat rencana induk untuk urutan pengerjaan.
+> Rencana & catatan pengerjaan tim disimpan di folder `docs/` **di luar repositori ini** (tidak ikut di-commit).
 
 ---
 
@@ -47,7 +48,7 @@ Repake is a marketplace platform specifically designed for the second-hand goods
 ### Key Objectives
 
 - Facilitate peer-to-peer transactions for second-hand goods
-- Provide real-time communication between buyers and sellers
+- Provide communication between buyers and sellers (chat antar pengguna)
 - Implement a comprehensive product management system
 - Ensure secure and reliable user authentication
 - Create an intuitive and responsive user interface
@@ -165,40 +166,81 @@ Repake is a marketplace platform specifically designed for the second-hand goods
 
 ## Installation
 
-### Quick Setup
+### Prerequisites (Wajib)
+
+- **PHP 8.3+** dengan ekstensi: `pdo_mysql`, `mysqli`, `gd`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `bcmath`, `fileinfo`
+- **Composer 2.x**
+- **Node.js 18+** dan **NPM 9+**
+- **MariaDB 10.6+** atau **MySQL 8.0+** yang **sedang berjalan** — proyek ini **tidak mendukung SQLite**
+
+### Langkah Instalasi (dari awal sampai akhir)
 
 ```bash
-# Clone the repository
+# 1. Clone repositori dan masuk ke folder
 git clone https://github.com/[username]/repake-laravel.git
 cd repake-laravel
 
-# Install PHP dependencies
+# 2. Pasang dependensi PHP dan JavaScript
 composer install
-
-# Install JavaScript dependencies
 npm install
 
-# Configure environment
+# 3. Siapkan environment dan kunci aplikasi
 cp .env.example .env
 php artisan key:generate
 
-# Setup database (MariaDB/MySQL)
-mysql -u root -e "CREATE DATABASE IF NOT EXISTS repake_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-# Configure database credentials in .env file
+# 4. Buat database aplikasi dan database test (MariaDB/MySQL)
+mysql -u root -e "CREATE DATABASE IF NOT EXISTS repake_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE DATABASE IF NOT EXISTS repake_testing CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+# Sesuaikan kredensial (DB_DATABASE, DB_USERNAME, DB_PASSWORD) di file .env
+
+# 5. Jalankan migrasi dan seed
 php artisan migrate
 php artisan db:seed
 
-# Create storage link
+# 6. Buat symbolic link storage (wajib agar upload gambar tampil)
 php artisan storage:link
 
-# Build assets
+# 7. Build aset satu kali
 npm run build
 
-# Start development server
-php artisan serve
+# 8. Jalankan aplikasi (lihat bagian "Menjalankan Aplikasi" di bawah)
+composer dev
 ```
 
-Access the application at: `http://localhost:8000`
+Akses aplikasi di: **http://localhost:8000**
+
+> **Tips:** skrip `composer setup` di `composer.json` menggabungkan langkah 2–7
+> (install → `.env` → key → migrate → npm → build) dalam satu perintah.
+
+### Menjalankan Aplikasi (PENTING)
+
+Gunakan **`composer dev`**, bukan `php artisan serve` sendirian:
+
+```bash
+composer dev
+```
+
+Perintah ini menjalankan `php artisan dev`, yang memulai **4 proses sekaligus**:
+
+| Proses | Keterangan |
+|---|---|
+| `php artisan serve` | Server aplikasi di `http://127.0.0.1:8000` |
+| `php artisan queue:listen` | Worker antrian (dibutuhkan notifikasi/email) |
+| `php artisan pail` | Log real-time di terminal |
+| `npm run dev` | Vite dev server dengan hot-reload aset |
+
+> Mengganti dengan `php artisan serve` saja tetap bisa membuka aplikasi, tetapi
+> **hot-reload (Live Reload) dan worker antrian tidak berjalan** — hasil edit CSS/JS
+> tidak muncul, dan fitur yang bergantung antrian tidak aktif.
+
+Untuk akses dari perangkat lain di jaringan yang sama, buka Vite & server Laravel
+ke alamat antarmuka jaringan. Vite sudah bind ke `0.0.0.0` secara default, sehingga
+perangkat lain cukup membuka `http://<IP-mesin>:8000`. Bila perlu, atur host yang
+digunakan Vite lewat `.env`:
+
+```env
+VITE_DEV_HOST=0.0.0.0        # alamat yang di-bind Vite
+VITE_HMR_HOST=192.168.1.10   # IP mesin untuk hot-reload dari perangkat lain; kosongkan untuk local
+```
 
 ---
 
@@ -277,9 +319,7 @@ repake-laravel/
 ├── package.json                    # JavaScript dependencies
 ├── phpunit.xml                     # PHPUnit configuration
 ├── vite.config.js                  # Vite configuration
-├── INSTALLATION.md                 # Installation guide
-├── AGENTS.md                       # Laravel Boost guidelines
-└── README.md                       # This file
+├── README.md                       # This file
 ```
 
 ### Key Components
@@ -288,14 +328,16 @@ repake-laravel/
 
 | Controller | Responsibility |
 |------------|----------------|
-| `HomeController` | Homepage display, banner management |
-| `ProductController` | Product CRUD operations |
-| `ProductImageController` | Product image management |
-| `CategoryController` | Category management |
-| `FavoriteController` | Favorite products management |
-| `ConversationController` | Chat conversations |
-| `MessageController` | Message handling |
-| `ReportController` | Product reporting system |
+| `HomeController` | Halaman beranda (kategori, produk, banner) |
+| `ProductController` | Listing, pencarian/filter, dan form jual produk |
+| `ProductDetailController` | Detail produk & laporan produk |
+| `FavoriteController` | Toggle & daftar favorit |
+| `ProfileController` | Profil, katalog, edit profil |
+| `ChatController` | Chat, tawaran harga, order saat tawaran diterima |
+| `NotificationController` | Notifikasi pengguna |
+| `LocationController` | Lokasi pengguna dari browser |
+| `Admin\CategoryController` | CRUD kategori (admin) |
+| `Auth\FirebaseAuthController` | Login/logout via Firebase Google |
 
 #### Models
 
@@ -305,10 +347,13 @@ repake-laravel/
 | `Product` | Product listings |
 | `ProductImage` | Product images (one-to-many with Product) |
 | `Category` | Product categories |
-| `Favorite` | User favorites (pivot table) |
+| `Favorite` | User favorites |
 | `Conversation` | Chat conversations between users |
-| `Message` | Chat messages |
+| `Message` | Chat messages (text & tawaran) |
 | `Report` | Product reports |
+| `Order` | Transaksi dari tawaran yang disepakati |
+| `Review` | Ulasan pembeli untuk penjual |
+| `CodArea` | Wilayah layanan COD |
 
 #### Database Schema
 
@@ -324,12 +369,15 @@ repake-laravel/
 - `categories` - Product categories
 - `products` - Product listings
 - `product_images` - Product images
+- `product_cod_areas` - Pivot produk & wilayah COD
+- `cod_areas` - Wilayah layanan COD
 - `favorites` - User favorites
 - `conversations` - User conversations
 - `messages` - Chat messages
 - `reports` - Product reports
-
-Note: Application table migrations are currently skeleton implementations and require complete schema definitions.
+- `orders` - Transaksi dari tawaran yang disepakati
+- `reviews` - Ulasan pembeli untuk penjual
+- `notifications` - Notifikasi pengguna
 
 ---
 
@@ -433,17 +481,19 @@ For detailed theme documentation, see `resources/css/theme/README.md`.
 
 #### Starting Development Servers
 
-**Laravel Application Server:**
-```bash
-# Using Laravel Pao (recommended)
-composer dev
+Cara utama menjalankan aplikasi (server + queue + log + Vite hot-reload sekaligus):
 
-# Or using Artisan serve
-php artisan serve
+```bash
+composer dev
 ```
 
-**Vite Development Server (for hot module replacement):**
+Alternatif manual:
+
 ```bash
+# Hanya server Laravel (tanpa queue & hot-reload)
+php artisan serve
+
+# Hanya Vite dev server (untuk hot module replacement)
 npm run dev
 ```
 
@@ -616,6 +666,10 @@ php artisan pail --filter="exception"
 ### Testing Framework
 
 The project uses Pest PHP as the primary testing framework, providing an elegant and expressive testing syntax.
+
+> **Sebelum menjalankan test**, pastikan database `repake_testing` sudah dibuat
+> (lihat langkah 4 di bagian Installation) dan ekstensi PHP `gd` terpasang
+> (dibutuhkan test upload gambar).
 
 ### Running Tests
 
@@ -853,7 +907,7 @@ This project is open-sourced software licensed under the [MIT License](https://o
 
 ### Additional Resources
 
-- [Installation Guide](INSTALLATION.md) - Comprehensive installation instructions
+- [Installation Guide](#installation) - Step-by-step installation instructions
 - [Theme Documentation](resources/css/theme/README.md) - Theme system guide
 - [Laravel Documentation](https://laravel.com/docs) - Official Laravel documentation
 - [Pest Documentation](https://pestphp.com/docs) - Testing framework documentation
@@ -861,26 +915,27 @@ This project is open-sourced software licensed under the [MIT License](https://o
 
 ### Project Roadmap
 
-#### Phase 1: Foundation (Current)
+#### Phase 1: Foundation ✅
 - [x] Project setup and configuration
 - [x] Theme system implementation
-- [ ] Complete database schema
-- [ ] Authentication system
-- [ ] Basic CRUD operations
+- [x] Complete database schema
+- [x] Authentication system (Firebase Google)
+- [x] Basic CRUD operations
 
-#### Phase 2: Core Features
-- [ ] Product management with image upload
-- [ ] Category management
-- [ ] User profile management
-- [ ] Search and filtering
-- [ ] Pagination
+#### Phase 2: Core Features ✅
+- [x] Product management with image upload
+- [x] Category management (admin)
+- [x] User profile management
+- [x] Search and filtering
+- [x] Pagination
 
 #### Phase 3: Advanced Features
-- [ ] Real-time chat system
-- [ ] Favorites functionality
-- [ ] Reporting system
-- [ ] Email notifications
-- [ ] Location-based features
+- [x] Chat system & tawar harga
+- [x] Favorites functionality
+- [ ] Reporting system (alur admin/solusi laporan)
+- [x] Notifications (pesan & tawaran)
+- [x] Location-based features (deteksi lokasi browser)
+- [ ] API untuk aplikasi Flutter
 
 #### Phase 4: Optimization
 - [ ] Performance optimization

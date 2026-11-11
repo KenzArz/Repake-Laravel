@@ -67,12 +67,12 @@
                     <div class="relative mx-auto size-32">
                         <div class="size-full overflow-hidden rounded-full border-4 border-neutral-100 bg-neutral-200 shadow-inner grid place-items-center">
                             @php
-                                $hasAvatar = !empty($profile['avatar']);
+                                $hasAvatar = !empty($profile['avatar_url']);
                             @endphp
 
                             {{-- Gambar Foto Profil Aktif / Preview / Siluet Default --}}
                             <img id="avatar-preview"
-                                 src="{{ $hasAvatar ? asset($profile['avatar']) : asset('images/default-avatar.png') }}"
+                                 src="{{ $hasAvatar ? $profile['avatar_url'] : asset('images/default-avatar.png') }}"
                                  alt="{{ $profile['name'] ?? 'Profil' }}"
                                  class="size-full object-cover">
                         </div>

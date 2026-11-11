@@ -2,8 +2,11 @@
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\Report;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -32,25 +35,60 @@ test('returns 404 for non-existent product', function () {
     $response->assertStatus(404);
 });
 
-test('user can submit report for a product', function () {
-    $response = $this->post(route('products.report', $this->product), [
-        'alasan' => 'penipuan',
-        'keterangan' => 'Barang ini terindikasi penipuan dan mencurigakan.',
-    ]);
+test('authenticated user can submit report for a product', function () {
+    Storage::fake('public');
+
+    $reporter = User::factory()->create();
+    $response = $this->actingAs($reporter)
+        ->post(route('products.report', $this->product), [
+            'alasan' => 'penipuan',
+            'keterangan' => 'Barang ini terindikasi penipuan dan mencurigakan.',
+            'bukti' => UploadedFile::fake()->image('bukti.jpg'),
+        ]);
 
     $response->assertRedirect();
     $response->assertSessionHas('report_success');
 
-    $reports = session('reports');
-    expect($reports)->not->toBeEmpty();
-    expect($reports[0]['alasan'])->toBe('penipuan');
+    $this->assertDatabaseHas('reports', [
+        'product_id' => $this->product->id,
+        'reporter_id' => $reporter->id,
+        'alasan' => 'penipuan',
+        'keterangan' => 'Barang ini terindikasi penipuan dan mencurigakan.',
+        'status' => Report::STATUS_PENDING,
+    ]);
+
+    expect(Report::first()?->bukti)->not->toBeNull();
+});
+
+test('guest cannot submit a report', function () {
+    $response = $this->post(route('products.report', $this->product), [
+        'alasan' => 'penipuan',
+        'keterangan' => 'Barang ini terindikasi penipuan.',
+    ]);
+
+    $response->assertRedirect();
+    $this->assertDatabaseCount('reports', 0);
+});
+
+test('product owner cannot report their own product', function () {
+    $owner = User::find($this->product->user_id);
+
+    $response = $this->actingAs($owner)
+        ->post(route('products.report', $this->product), [
+            'alasan' => 'penipuan',
+            'keterangan' => 'Produk saya sendiri.',
+        ]);
+
+    $response->assertForbidden();
+    $this->assertDatabaseCount('reports', 0);
 });
 
 test('validates report form input', function () {
-    $response = $this->post(route('products.report', $this->product), [
-        'alasan' => 'invalid_reason',
-        'keterangan' => '',
-    ]);
+    $response = $this->actingAs(User::factory()->create())
+        ->post(route('products.report', $this->product), [
+            'alasan' => 'invalid_reason',
+            'keterangan' => '',
+        ]);
 
     $response->assertSessionHasErrors(['alasan', 'keterangan']);
 });

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreReportRequest;
 use App\Models\Product;
+use App\Models\Report;
 use App\Models\Review;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -50,24 +51,27 @@ class ProductDetailController extends Controller
     }
 
     /**
-     * Simpan laporan pengaduan barang (disimpan di session untuk saat ini).
+     * Simpan laporan pengaduan barang ke database.
      */
     public function report(StoreReportRequest $request, int|string $id): RedirectResponse
     {
         $validated = $request->validated();
 
-        // Pastikan produk benar-benar ada di database
-        Product::findOrFail($id);
+        $product = Product::findOrFail($id);
 
-        $reports = session()->get('reports', []);
-        $reports[] = [
-            'id' => count($reports) + 1,
-            'product_id' => (int) $id,
+        // Pemilik tidak bisa melaporkan produknya sendiri.
+        abort_if($product->user_id === (int) auth()->id(), 403);
+
+        $report = Report::create([
+            'product_id' => $product->id,
+            'reporter_id' => auth()->id(),
             'alasan' => $validated['alasan'],
             'keterangan' => $validated['keterangan'],
-            'created_at' => now()->toDateTimeString(),
-        ];
-        session()->put('reports', $reports);
+            'bukti' => $request->hasFile('bukti')
+                ? $request->file('bukti')->store('reports', 'public')
+                : null,
+            'status' => Report::STATUS_PENDING,
+        ]);
 
         return back()->with('report_success', 'Laporan Anda berhasil dikirim. Tim RePake akan segera meninjau barang ini.');
     }
