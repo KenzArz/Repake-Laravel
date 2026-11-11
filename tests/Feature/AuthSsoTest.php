@@ -1,5 +1,10 @@
 <?php
 
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
 test('login modal is present on the page for guests', function () {
     $response = $this->get(route('home'));
 
@@ -9,48 +14,13 @@ test('login modal is present on the page for guests', function () {
     $response->assertSee('Continue with Google');
 });
 
-test('user can login successfully with student unsika google account', function () {
-    $response = $this->postJson(route('login.google'), [
-        'email' => 'ale.awaludin@student.unsika.ac.id',
-        'name' => 'Ale Awaludin',
-    ]);
+test('login modal no longer contains manual email login', function () {
+    $response = $this->get(route('home'));
 
     $response->assertStatus(200);
-    $response->assertJson([
-        'success' => true,
-    ]);
-
-    $this->assertAuthenticated();
-    expect(auth()->user()->email)->toBe('ale.awaludin@student.unsika.ac.id');
-    expect(session('user_profile')['email'])->toBe('ale.awaludin@student.unsika.ac.id');
-});
-
-test('login is rejected if email is not from student unsika domain', function () {
-    $response = $this->postJson(route('login.google'), [
-        'email' => 'ale.awaludin@gmail.com',
-        'name' => 'Ale Awaludin',
-    ]);
-
-    $response->assertStatus(422);
-    $response->assertJson([
-        'success' => false,
-        'message' => 'Akses ditolak: Hanya akun Google dengan domain @student.unsika.ac.id yang diizinkan masuk ke RePake.',
-    ]);
-
-    $this->assertGuest();
-});
-
-test('user can logout successfully', function () {
-    $this->postJson(route('login.google'), [
-        'email' => 'ale.awaludin@student.unsika.ac.id',
-        'name' => 'Ale Awaludin',
-    ]);
-
-    $this->assertAuthenticated();
-
-    $response = $this->post(route('logout'));
-    $response->assertRedirect(route('home'));
-    $this->assertGuest();
+    $response->assertDontSee('custom-email-input', false);
+    $response->assertDontSee('performSsoLogin', false);
+    $response->assertDontSee('Ketik email @student.unsika.ac.id');
 });
 
 test('guest navbar shows masuk button, logo, and action elements', function () {
@@ -65,13 +35,8 @@ test('guest navbar shows masuk button, logo, and action elements', function () {
     $response->assertDontSee('user-menu-wrapper');
 });
 
-test('authenticated user navbar shows avatar dropdown and logout option without username text button', function () {
-    $this->postJson(route('login.google'), [
-        'email' => 'ale.awaludin@student.unsika.ac.id',
-        'name' => 'Ale Awaludin',
-    ]);
-
-    $this->assertAuthenticated();
+test('authenticated user navbar shows avatar dropdown', function () {
+    $this->actingAs(User::factory()->create());
 
     $response = $this->get(route('home'));
     $response->assertStatus(200);

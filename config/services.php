@@ -35,4 +35,15 @@ return [
         ],
     ],
 
+    'firebase' => [
+        'api_key' => env('FIREBASE_API_KEY'),
+        'auth_domain' => env('FIREBASE_AUTH_DOMAIN'),
+        'project_id' => env('FIREBASE_PROJECT_ID'),
+        'app_id' => env('FIREBASE_APP_ID'),
+        'allowed_domains' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('FIREBASE_ALLOWED_DOMAINS', 'unsika.ac.id'))
+        ))),
+    ],
+
 ];
