@@ -3,7 +3,7 @@
 @php
     $detailUrl = Route::has('products.show') ? route('products.show', $product->id) : '#';
     $favUrl    = Route::has('favorites.toggle') ? route('favorites.toggle', $product->id) : '';
-    $badge     = $product->status === 'Dijual'
+    $badge     = $product->status_label === 'Dijual'
         ? 'bg-lime-500/90 text-neutral-900'
         : 'bg-neutral-200/90 text-neutral-700';
     $ago = is_string($product->created_at)
@@ -36,7 +36,7 @@
                  class="size-full object-cover" onerror="this.remove()">
         @endif
 
-        <span class="absolute left-2 top-2 rounded px-2 py-0.5 text-[10px] font-bold bg-[#B8E639] text-neutral-900">{{ $product->status }}</span>
+        <span class="absolute left-2 top-2 rounded px-2 py-0.5 text-[10px] font-bold bg-lime-400 text-neutral-900">{{ $product->status_label }}</span>
 
         <button type="button"
                 aria-label="Favorit" aria-pressed="{{ !empty($product->is_favorite) ? 'true' : 'false' }}"

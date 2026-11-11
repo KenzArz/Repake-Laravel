@@ -7,4 +7,32 @@
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* Brand palette (dari theme/colors.css) agar utility Tailwind memakai warna desain */
+    --color-charcoal: #202320;
+    --color-lime: #b8d94e;
+    --color-off-white: #f5f5f0;
+    --color-gray: #d9dbd5;
+
+    --color-neutral-50: #f5f5f0;
+    --color-neutral-100: #eaebe6;
+    --color-neutral-200: #d9dbd5;
+    --color-neutral-300: #c2c4be;
+    --color-neutral-400: #a4a6a1;
+    --color-neutral-500: #868984;
+    --color-neutral-600: #6a6d69;
+    --color-neutral-700: #515450;
+    --color-neutral-800: #3a3c39;
+    --color-neutral-900: #202320;
+
+    --color-lime-50: #eff2e0;
+    --color-lime-100: #e6eec8;
+    --color-lime-200: #dae8a7;
+    --color-lime-300: #cde387;
+    --color-lime-400: #c1dd66;
+    --color-lime-500: #b8d94e;
+    --color-lime-600: #9db846;
+    --color-lime-700: #81973d;
+    --color-lime-800: #647535;
+    --color-lime-900: #46502c;
 }

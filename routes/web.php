@@ -89,6 +89,9 @@ Route::middleware(['auth', 'banned'])->group(function () {
     Route::post('/notifications/read', [NotificationController::class, 'markAllRead'])->name('notifications.readAll');
 });
 
+// Listing & pencarian produk (statis, sebelum wildcard /{id})
+Route::get('/products', [ProductController::class, 'index'])->name('products.index');
+
 // Detail Barang & Laporan (wildcard /{id} — ditaruh paling bawah rute produk)
 Route::get('/products/{id}', [ProductDetailController::class, 'show'])->name('products.show');
 Route::post('/products/{id}/report', [ProductDetailController::class, 'report'])->name('products.report');

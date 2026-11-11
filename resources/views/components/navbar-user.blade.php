@@ -136,7 +136,7 @@
 
             {{-- Tombol +Jual (Pill Lime Hijau Sesuai Wireframe) --}}
             <a href="{{ $r('products.create') }}" {{ $needLogin }}
-               class="rounded-lg bg-[#B8E639] px-4 py-2 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 shadow-2xs">
+               class="rounded-lg bg-lime-400 px-4 py-2 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 shadow-2xs">
                 +Jual
             </a>
         </div>

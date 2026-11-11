@@ -20,11 +20,16 @@
     @endif
 
     @php
-        $gallery = [
-            $product->gambar,
-            'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=600&auto=format&fit=crop&q=80',
-            'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=600&auto=format&fit=crop&q=80',
-        ];
+        // Galeri dari gambar produk yang sesungguhnya (database)
+        $gallery = $product->images
+            ->map(fn ($img): string => $img->path_url)
+            ->filter()
+            ->values()
+            ->all();
+
+        if ($gallery === []) {
+            $gallery = $product->gambar ? [$product->gambar] : ['images/default-avatar.png'];
+        }
     @endphp
 
     {{-- Grid Layout Detail Produk Sesuai Wireframe --}}
@@ -105,8 +110,8 @@
 
             {{-- Badges / Tags Sesuai Wireframe --}}
             <div class="mt-3 flex flex-wrap items-center gap-2">
-                <span class="rounded bg-[#B8E639] px-2.5 py-0.5 text-xs font-bold text-neutral-900">
-                    {{ $product->status ?? 'Dijual' }}
+                <span class="rounded bg-lime-400 px-2.5 py-0.5 text-xs font-bold text-neutral-900">
+                    {{ $product->status_label ?? 'Dijual' }}
                 </span>
                 <span class="rounded bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600">
                     {{ $product->kondisi ?? 'Dirawat dengan baik' }}
@@ -131,7 +136,7 @@
                     @csrf
                     <input type="hidden" name="product_id" value="{{ $product->id }}">
                     <button type="submit"
-                            class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#B8E639] py-3 text-xs sm:text-sm font-bold text-neutral-900 transition hover:bg-lime-500">
+                            class="flex w-full items-center justify-center gap-2 rounded-lg bg-lime-400 py-3 text-xs sm:text-sm font-bold text-neutral-900 transition hover:bg-lime-500">
                         <svg viewBox="0 0 24 24" class="size-4.5 fill-none stroke-current stroke-2">
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                         </svg>
@@ -153,7 +158,7 @@
                            placeholder="Masukkan tawaran harga..."
                            class="h-10 flex-1 rounded-l-lg border border-r-0 border-neutral-300 bg-white px-3 text-xs sm:text-sm font-medium text-neutral-800 outline-none focus:border-neutral-900">
                     <button type="submit"
-                            class="h-10 rounded-r-lg bg-[#B8E639] px-5 text-xs sm:text-sm font-bold text-neutral-900 transition hover:bg-lime-500 whitespace-nowrap">
+                            class="h-10 rounded-r-lg bg-lime-400 px-5 text-xs sm:text-sm font-bold text-neutral-900 transition hover:bg-lime-500 whitespace-nowrap">
                         Tawar Harga
                     </button>
                 </form>

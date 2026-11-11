@@ -20,11 +20,14 @@
                    class="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-body text-neutral-900 focus:border-lime-500 focus:outline-none focus:ring-1 focus:ring-lime-500"
                    placeholder="cth. Perangkat Audio">
         </div>
-        <div class="w-full sm:w-44">
+        <div class="w-full sm:w-72">
             <label for="new-icon" class="mb-1 block text-label font-semibold text-neutral-800">Ikon (opsional)</label>
-            <input id="new-icon" name="icon" type="text" maxlength="50"
-                   class="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-body text-neutral-900 focus:border-lime-500 focus:outline-none focus:ring-1 focus:ring-lime-500"
-                   placeholder="cth. 🎧">
+            <div class="flex items-center gap-2">
+                <img src="" data-icon-preview class="hidden size-6 shrink-0 rounded object-contain" alt="">
+                <input id="new-icon" name="icon" type="text" maxlength="100" data-icon-input
+                       class="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-body text-neutral-900 focus:border-lime-500 focus:outline-none focus:ring-1 focus:ring-lime-500"
+                       placeholder="Path ikon, mis. /images/categories/elektronik.svg">
+            </div>
         </div>
         <button type="submit"
                 class="inline-flex items-center justify-center rounded-md bg-lime-500 px-5 py-2.5 text-label font-semibold text-neutral-900 transition hover:bg-lime-600">
@@ -62,9 +65,14 @@
                                            class="w-full min-w-40 max-w-64 rounded-md border border-neutral-300 px-3 py-1.5 text-body focus:border-lime-500 focus:outline-none focus:ring-1 focus:ring-lime-500">
                             </td>
                             <td class="px-4 py-3">
-                                    <input type="text" name="icon" value="{{ $category->icon }}" maxlength="50"
-                                           aria-label="Ikon kategori {{ $category->name }}"
-                                           class="w-20 rounded-md border border-neutral-300 px-2 py-1.5 text-body focus:border-lime-500 focus:outline-none focus:ring-1 focus:ring-lime-500">
+                                    <div class="flex items-center gap-2">
+                                        <img src="{{ $category->icon }}" data-icon-preview
+                                             class="size-6 shrink-0 rounded object-contain" alt=""
+                                             onerror="this.remove()">
+                                        <input type="text" name="icon" value="{{ $category->icon }}" maxlength="100" data-icon-input
+                                               aria-label="Ikon kategori {{ $category->name }}"
+                                               class="w-64 rounded-md border border-neutral-300 px-2 py-1.5 text-body focus:border-lime-500 focus:outline-none focus:ring-1 focus:ring-lime-500">
+                                    </div>
                             </td>
                             <td class="px-4 py-3 text-neutral-500">{{ $category->products_count }}</td>
                             <td class="px-4 py-3">
@@ -99,6 +107,23 @@
                 event.preventDefault();
             }
         });
+    });
+
+    // Preview ikon (input baru & per baris)
+    document.querySelectorAll('[data-icon-input]').forEach(function (input) {
+        const preview = input.parentElement.querySelector('[data-icon-preview]');
+        const update = function () {
+            const url = input.value.trim();
+            if (url && preview) {
+                preview.src = url;
+                preview.classList.remove('hidden');
+            } else if (preview) {
+                preview.src = '';
+                preview.classList.add('hidden');
+            }
+        };
+        input.addEventListener('input', update);
+        update();
     });
 </script>
 @endpush

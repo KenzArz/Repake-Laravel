@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreReportRequest;
 use App\Models\Product;
+use App\Models\Review;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -14,24 +15,28 @@ class ProductDetailController extends Controller
      */
     public function show(int|string $id): View
     {
-        $product = Product::findDummy($id);
+        $product = Product::with(['images', 'primaryImage', 'user', 'codAreas', 'category'])
+            ->findOrFail($id);
 
-        if (! $product) {
-            abort(404, 'Produk tidak ditemukan');
-        }
-
-        // Produk serupa / rekomendasi lainnya
-        $similarProducts = Product::dummyCatalog()
-            ->filter(fn (object $p): bool => (int) $p->id !== (int) $id)
+        // Produk serupa / rekomendasi lainnya dari kategori yang sama
+        $similarProducts = Product::with(['primaryImage', 'user'])
+            ->when($product->category_id, fn ($q) => $q->where('category_id', $product->category_id))
+            ->whereKeyNot($product->getKey())
+            ->dijual()
+            ->latest()
             ->take(4)
-            ->values();
+            ->get();
 
-        // Data penjual
+        // Statistik ulasan penjual dari database
+        $stats = Review::where('seller_id', $product->user_id)
+            ->selectRaw('COUNT(*) as total, COALESCE(AVG(rating), 0) as avg_rating')
+            ->first();
+
         $seller = (object) [
-            'name' => $product->penjual,
-            'kota' => $product->kota,
-            'rating' => 4.8,
-            'reviews_count' => 32,
+            'name' => $product->user?->name ?? 'Penjual RePake',
+            'kota' => $product->user?->kota ?? 'Karawang',
+            'rating' => round((float) $stats->avg_rating, 1),
+            'reviews_count' => (int) $stats->total,
             'online_status' => 'Aktif 15 menit lalu',
             'verified' => true,
             'joined' => 'Bergabung 6 bulan lalu',
@@ -45,16 +50,14 @@ class ProductDetailController extends Controller
     }
 
     /**
-     * Simpan laporan pengaduan barang.
+     * Simpan laporan pengaduan barang (disimpan di session untuk saat ini).
      */
     public function report(StoreReportRequest $request, int|string $id): RedirectResponse
     {
         $validated = $request->validated();
-        $product = Product::findDummy($id);
 
-        if (! $product) {
-            abort(404, 'Produk tidak ditemukan');
-        }
+        // Pastikan produk benar-benar ada di database
+        Product::findOrFail($id);
 
         $reports = session()->get('reports', []);
         $reports[] = [

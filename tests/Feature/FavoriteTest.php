@@ -1,12 +1,18 @@
 <?php
 
+use App\Models\Favorite;
+use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->actingAs(User::factory()->create());
+    $this->user = User::factory()->create();
+    $this->actingAs($this->user);
+
+    $seller = User::factory()->create();
+    $this->product = Product::factory()->create(['user_id' => $seller->id]);
 });
 
 test('user can view favorites page', function () {
@@ -16,27 +22,38 @@ test('user can view favorites page', function () {
     $response->assertSee('Produk Favorit');
 });
 
-test('user can toggle favorite via ajax', function () {
-    $response = $this->postJson(route('favorites.toggle', 1));
+test('user can store favorite in the favorites table', function () {
+    $response = $this->postJson(route('favorites.toggle', $this->product));
 
     $response->assertStatus(200)
         ->assertJson([
             'success' => true,
             'is_favorite' => true,
-            'product_id' => 1,
+            'product_id' => $this->product->id,
         ]);
 
-    expect(session('favorites'))->toContain(1);
+    expect(
+        Favorite::where('user_id', $this->user->id)
+            ->where('product_id', $this->product->id)
+            ->exists()
+    )->toBeTrue();
+});
 
-    // Toggle again to remove
-    $responseRemove = $this->postJson(route('favorites.toggle', 1));
+test('user can remove favorite', function () {
+    Favorite::create(['user_id' => $this->user->id, 'product_id' => $this->product->id]);
 
-    $responseRemove->assertStatus(200)
+    $response = $this->postJson(route('favorites.toggle', $this->product));
+
+    $response->assertStatus(200)
         ->assertJson([
             'success' => true,
             'is_favorite' => false,
-            'product_id' => 1,
+            'product_id' => $this->product->id,
         ]);
 
-    expect(session('favorites'))->not->toContain(1);
+    expect(
+        Favorite::where('user_id', $this->user->id)
+            ->where('product_id', $this->product->id)
+            ->exists()
+    )->toBeFalse();
 });

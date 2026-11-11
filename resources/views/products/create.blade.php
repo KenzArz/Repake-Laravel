@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <form action="{{ route('products.store') }}" method="POST" enctype="multipart/form-data" id="productForm">
+        <form action="{{ route('products.store') }}" method="POST" enctype="multipart/form-data" id="productForm" novalidate>
             @csrf
 
             <div class="grid grid-cols-1 gap-8 lg:grid-cols-12">
@@ -80,9 +80,7 @@
                                 <input type="text" id="judul" name="judul" value="{{ old('judul') }}" required
                                     placeholder="Masukkan nama barang..."
                                     class="mt-2 w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-surface-page)] px-4 py-3 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] outline-none transition focus:border-[var(--color-lime)] focus:bg-white focus:ring-1 focus:ring-[var(--color-lime)]">
-                                @error('judul')
-                                    <p class="mt-1 text-xs text-[var(--color-error-base)]">{{ $message }}</p>
-                                @enderror
+                                <p id="err-judul" class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('judul') ? '' : 'hidden' }}">{{ $errors->first('judul') }}</p>
                             </div>
 
                             {{-- 2. Kategori Produk --}}
@@ -109,9 +107,7 @@
                                         </svg>
                                     </div>
                                 </div>
-                                @error('category_id')
-                                    <p class="mt-1 text-xs text-[var(--color-error-base)]">{{ $message }}</p>
-                                @enderror
+                                <p id="err-category_id" class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('category_id') ? '' : 'hidden' }}">{{ $errors->first('category_id') }}</p>
                             </div>
 
                             {{-- 3. Kondisi Produk --}}
@@ -135,9 +131,7 @@
                                         </label>
                                     @endforeach
                                 </div>
-                                @error('kondisi')
-                                    <p class="mt-1 text-xs text-[var(--color-error-base)]">{{ $message }}</p>
-                                @enderror
+                                <p id="err-kondisi" class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('kondisi') ? '' : 'hidden' }}">{{ $errors->first('kondisi') }}</p>
                             </div>
 
                             {{-- 4. Harga --}}
@@ -154,9 +148,7 @@
                                         step="500" placeholder="Masukkan harga..."
                                         class="w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-surface-page)] py-3 pl-12 pr-4 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] outline-none transition focus:border-[var(--color-lime)] focus:bg-white focus:ring-1 focus:ring-[var(--color-lime)]">
                                 </div>
-                                @error('harga')
-                                    <p class="mt-1 text-xs text-[var(--color-error-base)]">{{ $message }}</p>
-                                @enderror
+                                <p id="err-harga" class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('harga') ? '' : 'hidden' }}">{{ $errors->first('harga') }}</p>
                             </div>
 
                             {{-- 5. Deskripsi --}}
@@ -167,9 +159,7 @@
                                 <textarea id="deskripsi" name="deskripsi" rows="4" required
                                     placeholder="Jelaskan kondisi, ukuran, kelengkapan, kekurangan, atau hal lain yang perlu diketahui pembeli..."
                                     class="mt-2 w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-surface-page)] p-4 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] outline-none transition focus:border-[var(--color-lime)] focus:bg-white focus:ring-1 focus:ring-[var(--color-lime)]">{{ old('deskripsi') }}</textarea>
-                                @error('deskripsi')
-                                    <p class="mt-1 text-xs text-[var(--color-error-base)]">{{ $message }}</p>
-                                @enderror
+                                <p id="err-deskripsi" class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('deskripsi') ? '' : 'hidden' }}">{{ $errors->first('deskripsi') }}</p>
                             </div>
 
                             {{-- Lokasi & Patokan COD (Compact Grid) --}}
@@ -195,9 +185,7 @@
                                             placeholder="Contoh: Kampus 1 UNSIKA / Telukjambe"
                                             class="w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-surface-page)] py-2.5 pl-9 pr-3 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] outline-none transition focus:border-[var(--color-lime)] focus:bg-white">
                                     </div>
-                                    @error('kota')
-                                        <p class="mt-1 text-xs text-[var(--color-error-base)]">{{ $message }}</p>
-                                    @enderror
+                                    <p id="err-kota" class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('kota') ? '' : 'hidden' }}">{{ $errors->first('kota') }}</p>
                                 </div>
 
                                 {{-- 7. Patokan Lokasi --}}
@@ -210,11 +198,12 @@
                                     <input type="text" id="patokan_lokasi" name="patokan_lokasi"
                                         value="{{ old('patokan_lokasi') }}" placeholder="Contoh: Depan Gd. H. Oemar Said"
                                         class="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-surface-page)] px-3 py-2.5 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] outline-none transition focus:border-[var(--color-lime)] focus:bg-white">
-                                    @error('patokan_lokasi')
-                                        <p class="mt-1 text-xs text-[var(--color-error-base)]">{{ $message }}</p>
-                                    @enderror
+                                    <p id="err-patokan_lokasi" class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('patokan_lokasi') ? '' : 'hidden' }}">{{ $errors->first('patokan_lokasi') }}</p>
                                 </div>
                             </div>
+
+                            {{-- Error umum (gagal simpan / server) --}}
+                            <p id="formError" class="hidden rounded-xl border border-[var(--color-error-base)] bg-red-50 p-3 text-xs font-semibold text-[var(--color-error-base)]"></p>
 
                             {{-- Submit Button --}}
                             <div class="pt-2">
@@ -236,12 +225,23 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            console.log('[create] DOMContentLoaded fired');
+            const form = document.getElementById('productForm');
             const dropzone = document.getElementById('dropzone');
             const imageInput = document.getElementById('imageInput');
             const previewContainer = document.getElementById('previewContainer');
             const errorContainer = document.getElementById('imageErrorContainer');
             const errorMessage = document.getElementById('imageErrorMessage');
             const closeErrorBtn = document.getElementById('closeErrorBtn');
+            const formError = document.getElementById('formError');
+            const submitBtn = form.querySelector('button[type="submit"]');
+
+            console.log('[create] elements:', { form: !!form, dropzone: !!dropzone, imageInput: !!imageInput, previewContainer: !!previewContainer, submitBtn: !!submitBtn });
+
+            const MAX_FILES = 3;
+            const MAX_BYTES = 5 * 1024 * 1024; // 5MB (client-side check)
+            const SAFE_UPLOAD_BYTES = 2 * 1024 * 1024; // 2MB — aman terhadap limit php.ini
+            const FIELD_IDS = ['judul', 'category_id', 'harga', 'deskripsi', 'kota', 'patokan_lokasi'];
 
             let filesArray = [];
 
@@ -255,23 +255,217 @@
                 errorMessage.textContent = '';
             }
 
-            closeErrorBtn.addEventListener('click', hideError);
+            function showFormError(msg) {
+                formError.textContent = msg;
+                formError.classList.toggle('hidden', !msg);
+            }
 
-            dropzone.addEventListener('click', () => imageInput.click());
+            function setFieldError(name, msg) {
+                const el = document.getElementById('err-' + name);
+                if (el) {
+                    el.textContent = msg;
+                    el.classList.toggle('hidden', !msg);
+                }
+            }
+
+            closeErrorBtn.addEventListener('click', hideError);
+            dropzone.addEventListener('click', () => {
+                // Pastikan imageInput ada sebelum memanggil .click()
+                if (imageInput) imageInput.click();
+            });
+
+            // Juga support drag & drop langsung ke dropzone
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.classList.add('border-[var(--color-lime)]', 'bg-[var(--color-lime-100)]');
+            });
+            dropzone.addEventListener('dragleave', () => {
+                dropzone.classList.remove('border-[var(--color-lime)]', 'bg-[var(--color-lime-100)]');
+            });
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('border-[var(--color-lime)]', 'bg-[var(--color-lime-100)]');
+                // Trigger change handler dengan file dari drag-drop
+                if (imageInput) imageInput.files = e.dataTransfer.files;
+                imageInput.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+
+            function textVal(id) {
+                const el = document.getElementById(id);
+                return el ? el.value.trim() : '';
+            }
+
+            const validators = {
+                judul: () => {
+                    const v = textVal('judul');
+                    if (!v) return 'Nama produk wajib diisi.';
+                    if (v.length > 255) return 'Nama produk maksimal 255 karakter.';
+                    return '';
+                },
+                category_id: () => (textVal('category_id') ? '' : 'Pilih kategori produk.'),
+                harga: () => {
+                    const el = document.getElementById('harga');
+                    if (el.value === '' || el.value === null) return 'Harga wajib diisi.';
+                    const n = Number(el.value);
+                    if (!Number.isInteger(n)) return 'Harga harus angka bulat.';
+                    if (n < 0) return 'Harga minimal 0 (Rp 0).';
+                    return '';
+                },
+                deskripsi: () => {
+                    const v = textVal('deskripsi');
+                    if (!v) return 'Deskripsi wajib diisi.';
+                    if (v.length < 10) return 'Deskripsi minimal 10 karakter.';
+                    return '';
+                },
+                kota: () => {
+                    const v = textVal('kota');
+                    if (!v) return 'Kota / area produk wajib diisi.';
+                    if (v.length > 255) return 'Kota maksimal 255 karakter.';
+                    return '';
+                },
+                patokan_lokasi: () => {
+                    const v = textVal('patokan_lokasi');
+                    if (v.length > 255) return 'Patokan lokasi maksimal 255 karakter.';
+                    return '';
+                },
+            };
+
+            // Validasi real-time tiap input
+            FIELD_IDS.forEach((name) => {
+                const el = document.getElementById(name);
+                if (el) {
+                    el.addEventListener('input', () => setFieldError(name, validators[name]()));
+                    el.addEventListener('change', () => setFieldError(name, validators[name]()));
+                }
+            });
+
+            function validateImages() {
+                if (filesArray.length === 0) return 'Unggah minimal 1 gambar produk.';
+                if (filesArray.length > MAX_FILES) return 'Maksimal ' + MAX_FILES + ' gambar produk.';
+                for (const f of filesArray) {
+                    if (!f.type.startsWith('image/')) return 'Hanya file gambar yang diperbolehkan.';
+                    if (f.size > MAX_BYTES) return 'Gambar "' + f.name + '" melebihi 5MB.';
+                }
+                return '';
+            }
+
+            // Validasi seluruh form; kembalikan nama field pertama yang gagal (atau 'images')
+            function validateAll() {
+                let first = null;
+                FIELD_IDS.forEach((name) => {
+                    const msg = validators[name]();
+                    setFieldError(name, msg);
+                    if (msg && first === null) first = name;
+                });
+                const imgErr = validateImages();
+                if (imgErr) {
+                    showError(imgErr);
+                    if (first === null) first = 'images';
+                } else {
+                    hideError();
+                }
+                return first;
+            }
+
+            function focusInvalid(name) {
+                if (name === 'images') {
+                    dropzone.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    return;
+                }
+                const el = document.getElementById(name);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.focus({ preventScroll: true });
+                }
+            }
 
             imageInput.addEventListener('change', (e) => {
+                console.log('[change] imageInput triggered, files:', e.target.files?.length);
                 hideError();
-                const selectedFiles = Array.from(e.target.files);
+                const accepted = [];
+                let rejected = '';
 
-                if (filesArray.length + selectedFiles.length > 3) {
-                    showError('Maksimal hanya dapat memilih 3 gambar produk.');
-                    imageInput.value = ''; // Reset nilai input
+                const fileInputFiles = Array.from(e.target.files || []);
+                if (fileInputFiles.length === 0) return;
+
+                fileInputFiles.forEach((f) => {
+                    if (!f.type.startsWith('image/')) { rejected = 'Hanya file gambar yang diperbolehkan.'; return; }
+                    if (f.size > MAX_BYTES) { rejected = 'Gambar "' + f.name + '" melebihi 5MB.'; return; }
+                    accepted.push(f);
+                });
+
+                if (filesArray.length + accepted.length > MAX_FILES) {
+                    showError('Maksimal hanya dapat memilih ' + MAX_FILES + ' gambar produk.');
+                    imageInput.value = '';
                     return;
                 }
 
-                filesArray = [...filesArray, ...selectedFiles].slice(0, 3);
-                updatePreviews();
+                if (accepted.length > 0) {
+                    // Kompres gambar yang masih besar agar tetap di bawah batas 5MB,
+                    // namun tetap aman di-limit upload php.ini (2MB) agar tidak ditolak server.
+                    Promise.all(accepted.map(async (f) => {
+                        if (f.size <= SAFE_UPLOAD_BYTES) {
+                            console.log('[change] skip compress for', f.name, 'size:', f.size);
+                            return f;
+                        }
+                        // Coba compress bertahap: pertama ke quality 0.7, lalu 0.4 jika masih > 2MB
+                        let result = await compressImage(f, 0.7);
+                        if (result.size > SAFE_UPLOAD_BYTES) {
+                            result = await compressImage(f, 0.4);
+                        }
+                        return result;
+                    })).then((compressed) => {
+                        console.log('[change] compressed', compressed.length, 'files:', compressed.map(f => f.name));
+                        filesArray = [...filesArray, ...compressed].slice(0, MAX_FILES);
+                        console.log('[change] filesArray now has', filesArray.length, 'files');
+                        updatePreviews();
+                    }).catch((err) => {
+                        console.error('[change] compress error:', err);
+                        showError('Gagal memproses gambar. Coba gambar lain.');
+                    });
+                }
+
+                if (rejected) showError(rejected);
             });
+
+            /**
+             * Kompres gambar via Canvas API ke JPEG.
+             * @param {File} file File asli
+             * @param {number} quality Kualitas JPEG 0-1 (default 0.7)
+             * @param {number} maxSide Max dimension pixel (default 1920)
+             * @returns {Promise<File>}
+             */
+            function compressImage(file, quality = 0.7, maxSide = 1920) {
+                console.log('[compress] starting for', file.name, 'size:', file.size);
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        console.log('[compress] onload for', file.name, 'dims:', img.naturalWidth, 'x', img.naturalHeight);
+                        const canvas = document.createElement('canvas');
+                        let w = img.width, h = img.height;
+                        if (w > maxSide) { h = (maxSide / w) * h; w = maxSide; }
+                        if (h > maxSide) { w = (maxSide / h) * w; h = maxSide; }
+                        canvas.width = Math.round(w);
+                        canvas.height = Math.round(h);
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, w, h);
+                        canvas.toBlob((blob) => {
+                            if (blob) {
+                                console.log('[compress] done for', file.name, 'new size:', blob.size);
+                                resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+                            } else {
+                                console.log('[compress] blob null for', file.name, 'return original');
+                                resolve(file);
+                            }
+                        }, 'image/jpeg', quality);
+                    };
+                    img.onerror = () => {
+                        console.log('[compress] onerror for', file.name, 'return original');
+                        resolve(file);
+                    };
+                    img.src = URL.createObjectURL(file);
+                });
+            }
 
             function updatePreviews() {
                 previewContainer.innerHTML = '';
@@ -291,7 +485,7 @@
                     itemDiv.innerHTML = `
                                 <img src="${objectUrl}" alt="Preview ${index + 1}" class="h-full w-full object-cover pointer-events-none select-none">
 
-                                <button type="button" onclick="removeImage(${index})" 
+                                <button type="button" onclick="removeImage(${index})"
                                         class="absolute top-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-red-600 z-10 pointer-events-auto">
                                     &times;
                                 </button>
@@ -346,7 +540,40 @@
                     previewContainer.appendChild(itemDiv);
                 });
 
+                // Sync ke native input file (untuk enctype="multipart/form-data")
                 imageInput.files = dt.files;
+            }
+
+            /**
+             * Buang FormData(form) lalu susun ulang dari fields + filesArray secara manual.
+             * Ini menghindari bug browser di mana assignment `input.files = FileList` tidak
+             * terbaca saat `new FormData(form)` dipanggil setelahnya.
+             */
+            function buildFormData() {
+                const fd = new FormData();
+                // Salin semua field text/number/textarea/select
+                for (const el of form.querySelectorAll('input, textarea, select')) {
+                    if (el.name === 'images[]') continue; // lewati input file
+                    if (el.type === 'radio') {
+                        if (el.checked) fd.append(el.name, el.value);
+                    } else {
+                        fd.append(el.name, el.value);
+                    }
+                }
+                // Tambahkan file menggunakan key 'images[]' — format HTML standar
+                // untuk multiple file input. Laravel otomatis mengurai ini sebagai array.
+                filesArray.forEach((f) => fd.append('images[]', f, f.name));
+
+                // Debug: verifikasi isi FormData
+                console.log('[buildFormData] filesArray.length =', filesArray.length);
+                console.log('[buildFormData] keys:', [...fd.keys()].join(', '));
+                const imageEntries = [...fd.entries()].filter(([k]) => k.startsWith('images'));
+                console.log('[buildFormData] images entries:', imageEntries.length);
+                imageEntries.forEach(([k, v]) => {
+                    console.log(`  - ${k}: File(${v.name}, ${v.size}b)`);
+                });
+
+                return fd;
             }
 
             window.removeImage = function (index) {
@@ -354,6 +581,71 @@
                 filesArray.splice(index, 1);
                 updatePreviews();
             };
+
+            // Submit via AJAX agar gambar & isian tetap ada saat gagal
+            form.addEventListener('submit', (ev) => {
+                console.log('[submit] form submitted');
+                ev.preventDefault();
+                hideError();
+                showFormError('');
+
+                const first = validateAll();
+                if (first) {
+                    console.log('[submit] validation failed, first:', first);
+                    focusInvalid(first);
+                    return;
+                }
+
+                console.log('[submit] validation passed, filesArray.length:', filesArray.length);
+                submitBtn.disabled = true;
+
+                fetch(form.action, {
+                    method: 'POST',
+                    body: buildFormData(),
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                    credentials: 'same-origin',
+                }).then((resp) => {
+                    if (resp.status === 419) {
+                        window.location.reload();
+                        return;
+                    }
+                    if (resp.status === 413) {
+                        showError('File terlalu besar. Maksimal 5MB per gambar.');
+                        throw { generic: true };
+                    }
+                    if (resp.status === 422) {
+                        return resp.json().then((data) => { throw { validation: data.errors || {} }; });
+                    }
+                    if (resp.ok) {
+                        return resp.json().then((data) => {
+                            if (data && data.redirect) {
+                                window.location.assign(data.redirect);
+                            } else {
+                                window.location.reload();
+                            }
+                        });
+                    }
+                    throw { generic: true };
+                }).catch((err) => {
+                    submitBtn.disabled = false;
+                    if (err && err.validation) {
+                        let firstField = null;
+                        Object.entries(err.validation).forEach(([key, msgs]) => {
+                            const msg = Array.isArray(msgs) ? msgs[0] : msgs;
+                            if (key.startsWith('images')) {
+                                showError(msg);
+                                if (firstField === null) firstField = 'images';
+                            } else {
+                                setFieldError(key, msg);
+                                if (firstField === null) firstField = key;
+                            }
+                        });
+                        if (firstField) focusInvalid(firstField);
+                        return;
+                    }
+                    showFormError('Terjadi kesalahan saat mengunggah. Silakan coba lagi atau gunakan gambar lain.');
+                });
+            });
         });
     </script>
 @endpush

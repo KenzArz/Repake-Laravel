@@ -99,3 +99,50 @@ test('product requires kota, valid kondisi, and at least one image', function ()
     $response->assertSessionHasErrors(['kondisi', 'kota', 'images']);
     expect(Product::count())->toBe(0);
 });
+
+test('ajax request returns json success payload', function () {
+    $response = $this->post(route('products.store'), [
+        'judul' => 'Barang Via Ajax',
+        'category_id' => $this->category->id,
+        'kondisi' => 'Seperti baru',
+        'harga' => 200000,
+        'deskripsi' => 'Dikirim lewat fetch untuk menjaga gambar tetap.',
+        'kota' => 'Karawang',
+        'images' => [UploadedFile::fake()->image('satu.jpg')],
+    ], ['X-Requested-With' => 'XMLHttpRequest', 'Accept' => 'application/json']);
+
+    $response->assertOk()
+        ->assertJson(['redirect' => route('profile.catalog')]);
+
+    expect(Product::where('judul', 'Barang Via Ajax')->exists())->toBeTrue();
+});
+
+test('ajax request returns 422 json for invalid input', function () {
+    $response = $this->post(route('products.store'), [
+        'judul' => 'Barang Tidak Valid',
+        'category_id' => $this->category->id,
+        'kondisi' => 'Seperti baru',
+        'harga' => 200000,
+        'deskripsi' => 'Deskripsi cukup panjang.',
+        'kota' => '',
+        'images' => [UploadedFile::fake()->image('satu.jpg')],
+    ], ['X-Requested-With' => 'XMLHttpRequest', 'Accept' => 'application/json']);
+
+    $response->assertStatus(422)
+        ->assertJsonStructure(['errors' => ['kota']]);
+
+    expect(Product::where('judul', 'Barang Tidak Valid')->exists())->toBeFalse();
+});
+
+test('home page shows category icons from the database', function () {
+    Category::factory()->create([
+        'name' => 'Perangkat Audio',
+        'slug' => 'perangkat-audio',
+        'icon' => 'https://example.com/audio.svg',
+    ]);
+
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertSee('Perangkat Audio')
+        ->assertSee('https://example.com/audio.svg');
+});

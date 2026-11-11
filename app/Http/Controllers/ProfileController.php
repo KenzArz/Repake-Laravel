@@ -4,8 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateProfileRequest;
 use App\Models\Product;
+use App\Models\Review;
+use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
@@ -15,101 +19,65 @@ class ProfileController extends Controller
      */
     public function catalog(Request $request): View
     {
+        $user = $request->user();
         $profile = $this->getProfile();
         $tab = $request->query('tab', 'dijual');
-        $allProducts = Product::dummyCatalog();
 
-        // Produk yang dijual oleh pengguna (8 produk seperti di wireframe)
-        $soldProducts = $allProducts->take(8)->map(function (object $product) use ($profile): object {
-            $clone = clone $product;
-            $clone->penjual = $profile['name'] ?? $profile['username'] ?? 'Midou Wijaya';
-            $clone->kota = $profile['kota'] ?? 'Bekasi';
+        // Produk yang dijual oleh pengguna (dari database)
+        $soldProducts = Product::with(['primaryImage', 'user'])
+            ->where('user_id', $user->id)
+            ->latest()
+            ->get();
 
-            return $clone;
-        });
-
-        // Produk yang difavoritkan oleh pengguna
-        $favoriteIds = session()->get('favorites', []);
-        $favoriteProducts = $allProducts
-            ->filter(fn (object $p): bool => in_array($p->id, $favoriteIds, true))
-            ->values();
+        // Produk yang difavoritkan oleh pengguna (dari tabel favorites)
+        $favoriteProducts = Product::with(['primaryImage', 'user'])
+            ->whereHas('favorites', fn ($q) => $q->where('user_id', $user->id))
+            ->latest()
+            ->get();
 
         // Tentukan produk sesuai tab aktif
         $products = $tab === 'favorit' ? $favoriteProducts : $soldProducts;
 
-        // Data ulasan dari pembeli tentang barang yang sudah terjual
-        $reviews = $this->getDummyReviews();
+        // Ulasan pembeli tentang barang yang sudah terjual (dari database)
+        $reviews = $this->getReviews($user);
+
+        // Statistik profile dihitung dari data nyata, bukan hardcode
+        $profile['rating'] = round((float) ($reviews->avg(fn (array $r): int => $r['rating']) ?? 0), 1);
+        $profile['reviews_count'] = $reviews->count();
+        $profile['sold_count'] = $soldProducts->count();
 
         return view('profile.catalog', [
             'profile' => $profile,
             'tab' => $tab,
             'products' => $products,
-            'reviews' => $reviews,
+            'reviews' => $reviews->all(),
             'soldCount' => $soldProducts->count(),
             'favoriteCount' => $favoriteProducts->count(),
-            'reviewCount' => count($reviews),
+            'reviewCount' => $reviews->count(),
         ]);
     }
 
     /**
-     * Data ulasan dummy pembeli tentang barang yang sudah terjual (sesuai wireframe).
+     * Ulasan dari pembeli untuk produk pemilik profile (dari database).
      *
-     * @return array<int, array<string, mixed>>
+     * @return Collection<int, array<string, mixed>>
      */
-    private function getDummyReviews(): array
+    private function getReviews(User $user): Collection
     {
-        return [
-            [
-                'id' => 1,
-                'reviewer_name' => 'Aleww_kun',
-                'time_ago' => '2 jam lalu',
-                'rating' => 5,
-                'comment' => 'Penjual fast respon, bass nya mendut mendut, puas dipake seharian',
-                'product_title' => 'Figur anime lucu',
-                'product_price' => 'Rp 100.000',
-                'product_image' => 'images/products/samsung-buds-review.png',
-            ],
-            [
-                'id' => 2,
-                'reviewer_name' => 'Aleww_kun',
-                'time_ago' => '2 jam lalu',
-                'rating' => 5,
-                'comment' => 'Penjual fast respon, bass nya mendut mendut, puas dipake seharian',
-                'product_title' => 'Samsung galaxy ear buds',
-                'product_price' => 'Rp 100.000',
-                'product_image' => 'images/products/samsung-buds-review.png',
-            ],
-            [
-                'id' => 3,
-                'reviewer_name' => 'Aleww_kun',
-                'time_ago' => '2 jam lalu',
-                'rating' => 5,
-                'comment' => 'Penjual fast respon, bass nya mendut mendut, puas dipake seharian',
-                'product_title' => 'Samsung galaxy ear buds',
-                'product_price' => 'Rp 100.000',
-                'product_image' => 'images/products/samsung-buds-review.png',
-            ],
-            [
-                'id' => 4,
-                'reviewer_name' => 'Rian_FT_Unsika',
-                'time_ago' => '1 hari lalu',
-                'rating' => 5,
-                'comment' => 'Keyboard mechanical nya empuk dan mulus banget. COD di depan GSG Unsika aman & ramah!',
-                'product_title' => 'Keyboard pemda bekas reza auditore asli no hoax',
-                'product_price' => 'Rp 670.000',
-                'product_image' => 'https://images.unsplash.com/photo-1595225476474-87563907a212?w=200&auto=format&fit=crop&q=80',
-            ],
-            [
-                'id' => 5,
-                'reviewer_name' => 'Siti_Nurhaliza',
-                'time_ago' => '3 hari lalu',
-                'rating' => 5,
-                'comment' => 'Kemeja flanelnya bersih dan wangi, pas banget ukurannya. Recommended seller buat anak kampus.',
-                'product_title' => 'Kemeja pria warna merah motif kotak lengan panjang',
-                'product_price' => 'Rp 170.000',
-                'product_image' => 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=200&auto=format&fit=crop&q=80',
-            ],
-        ];
+        return Review::with(['product.primaryImage', 'reviewer'])
+            ->where('seller_id', $user->id)
+            ->latest()
+            ->get()
+            ->map(fn (Review $review): array => [
+                'id' => $review->id,
+                'reviewer_name' => $review->reviewer?->name ?? 'Pembeli',
+                'time_ago' => $review->created_at?->locale('id')->diffForHumans(['syntax' => CarbonInterface::DIFF_ABSOLUTE]).' lalu',
+                'rating' => $review->rating,
+                'comment' => $review->komentar ?? '',
+                'product_title' => $review->product?->judul ?? '',
+                'product_price' => 'Rp '.number_format($review->product?->harga ?? 0, 0, ',', '.'),
+                'product_image' => $review->product?->gambar ?? 'images/default-avatar.png',
+            ]);
     }
 
     /**
@@ -191,11 +159,6 @@ class ProfileController extends Controller
             'kota' => $user->kota ?: 'Karawang',
             'bio' => $user->bio,
             'avatar' => $user->avatar,
-            'rating' => 4.5,
-            'reviews_count' => 67,
-            'sold_count' => 10,
-            'online_status' => 'Online 10 menit lalu',
-            'is_verified' => true,
         ];
     }
 }

@@ -27,7 +27,7 @@
                 Kembali ke Profil
             </a>
             <button type="submit" form="profile-form"
-                    class="rounded-xl bg-[#B8E639] px-5 py-2.5 text-xs font-bold text-neutral-900 shadow-2xs transition hover:bg-lime-500 cursor-pointer">
+                    class="rounded-xl bg-lime-400 px-5 py-2.5 text-xs font-bold text-neutral-900 shadow-2xs transition hover:bg-lime-500 cursor-pointer">
                 Simpan Perubahan
             </button>
         </div>
@@ -79,7 +79,7 @@
 
                         {{-- Floating Camera Button --}}
                         <label for="avatar-input"
-                               class="absolute bottom-1 right-1 grid size-9 cursor-pointer place-items-center rounded-full bg-[#B8E639] text-neutral-900 shadow-md transition hover:bg-lime-500 hover:scale-105"
+                               class="absolute bottom-1 right-1 grid size-9 cursor-pointer place-items-center rounded-full bg-lime-400 text-neutral-900 shadow-md transition hover:bg-lime-500 hover:scale-105"
                                title="Pilih Foto Baru">
                             <svg viewBox="0 0 24 24" class="size-4.5 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]">
                                 <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>
@@ -258,7 +258,7 @@
                     <div class="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-neutral-100 pt-6">
                         <div class="flex items-center gap-3">
                             <button type="submit"
-                                    class="rounded-xl bg-[#B8E639] px-6 py-2.5 text-xs font-bold text-neutral-900 shadow-2xs transition hover:bg-lime-500 cursor-pointer">
+                                    class="rounded-xl bg-lime-400 px-6 py-2.5 text-xs font-bold text-neutral-900 shadow-2xs transition hover:bg-lime-500 cursor-pointer">
                                 Simpan Perubahan
                             </button>
                             <a href="{{ route('profile.catalog') }}"

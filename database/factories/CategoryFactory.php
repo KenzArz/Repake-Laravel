@@ -19,6 +19,7 @@ class CategoryFactory extends Factory
             'name' => $name,
             'slug' => Str::slug($name),
             'icon' => null,
+            'sort_order' => fake()->numberBetween(1, 100),
         ];
     }
 }

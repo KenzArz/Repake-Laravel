@@ -31,7 +31,7 @@ class StoreProductRequest extends FormRequest
             'deskripsi' => ['required', 'string', 'min:10'],
             'kota' => ['required', 'string', 'max:255'],
             'patokan_lokasi' => ['nullable', 'string', 'max:255'],
-            'images' => ['required', 'array', 'min:1', 'max:3'],
+            'images' => ['required'],
             'images.*' => ['image', 'mimes:jpeg,png,jpg,webp', 'max:5120'],
         ];
     }
@@ -40,7 +40,6 @@ class StoreProductRequest extends FormRequest
     {
         return [
             'images.required' => 'Wajib mengunggah minimal 1 gambar produk.',
-            'images.max' => 'Maksimal gambar yang dapat diunggah adalah 3 gambar.',
             'category_id.required' => 'Pilih kategori produk terlebih dahulu.',
             'kondisi.required' => 'Pilih kondisi produk.',
             'kota.required' => 'Isi kota / area produk.',
