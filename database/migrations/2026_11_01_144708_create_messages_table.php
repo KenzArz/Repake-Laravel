@@ -13,6 +13,11 @@ return new class extends Migration
     {
         Schema::create('messages', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('conversation_id')->constrained('conversations')->cascadeOnDelete();
+            $table->foreignId('sender_id')->constrained('users')->cascadeOnDelete();
+            $table->text('body')->nullable();
+            $table->string('image_path')->nullable();
+            $table->timestamp('read_at')->nullable();
             $table->timestamps();
         });
     }

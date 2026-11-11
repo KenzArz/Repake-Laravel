@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreReportRequest;
 use App\Models\Product;
+use App\Models\Report;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class ProductDetailController extends Controller
@@ -14,22 +16,21 @@ class ProductDetailController extends Controller
      */
     public function show(int|string $id): View
     {
-        $product = Product::findDummy($id);
+        $product = Product::with(['user', 'primaryImage', 'images', 'codAreas', 'category'])
+            ->where('moderation_status', 'active')
+            ->findOrFail($id);
 
-        if (! $product) {
-            abort(404, 'Produk tidak ditemukan');
-        }
-
-        // Produk serupa / rekomendasi lainnya
-        $similarProducts = Product::dummyCatalog()
-            ->filter(fn (object $p): bool => (int) $p->id !== (int) $id)
+        // Rekomendasi produk serupa berdasarkan kategori yang sama
+        $similarProducts = Product::with(['user', 'primaryImage', 'images', 'codAreas', 'category'])
+            ->where('category_id', $product->category_id)
+            ->where('id', '!=', $product->id)
+            ->where('moderation_status', 'active')
             ->take(4)
-            ->values();
+            ->get();
 
-        // Data penjual
         $seller = (object) [
-            'name' => $product->penjual,
-            'kota' => $product->kota,
+            'name' => $product->user->name ?? 'Mahasiswa UNSIKA',
+            'kota' => $product->user->city ?? 'Karawang',
             'rating' => 4.8,
             'reviews_count' => 32,
             'online_status' => 'Aktif 15 menit lalu',
@@ -50,21 +51,18 @@ class ProductDetailController extends Controller
     public function report(StoreReportRequest $request, int|string $id): RedirectResponse
     {
         $validated = $request->validated();
-        $product = Product::findDummy($id);
+        $product = Product::findOrFail($id);
 
-        if (! $product) {
-            abort(404, 'Produk tidak ditemukan');
+        if (Auth::check()) {
+            Report::create([
+                'reporter_id' => Auth::id(),
+                'reported_user_id' => $product->user_id,
+                'product_id' => $product->id,
+                'reason' => $validated['alasan'],
+                'description' => $validated['keterangan'],
+                'status' => 'pending',
+            ]);
         }
-
-        $reports = session()->get('reports', []);
-        $reports[] = [
-            'id' => count($reports) + 1,
-            'product_id' => (int) $id,
-            'alasan' => $validated['alasan'],
-            'keterangan' => $validated['keterangan'],
-            'created_at' => now()->toDateTimeString(),
-        ];
-        session()->put('reports', $reports);
 
         return back()->with('report_success', 'Laporan Anda berhasil dikirim. Tim RePake akan segera meninjau barang ini.');
     }

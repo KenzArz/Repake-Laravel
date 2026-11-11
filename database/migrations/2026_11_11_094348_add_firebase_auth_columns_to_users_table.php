@@ -12,13 +12,33 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('firebase_uid')->nullable()->unique()->after('id');
-            $table->string('username')->nullable()->unique()->after('email');
-            $table->string('avatar')->nullable()->after('username');
-            $table->string('phone')->nullable()->after('avatar');
-            $table->string('kota')->nullable()->after('phone');
-            $table->text('bio')->nullable()->after('kota');
-            $table->string('password')->nullable()->change();
+            if (! Schema::hasColumn('users', 'firebase_uid')) {
+                $table->string('firebase_uid')->nullable()->unique()->after('id');
+            }
+            if (! Schema::hasColumn('users', 'username')) {
+                $table->string('username')->nullable()->unique()->after('email');
+            }
+            if (! Schema::hasColumn('users', 'whatsapp_number')) {
+                $table->string('whatsapp_number')->nullable()->after('username');
+            }
+            if (! Schema::hasColumn('users', 'avatar')) {
+                $table->string('avatar')->nullable()->after('whatsapp_number');
+            }
+            if (! Schema::hasColumn('users', 'city')) {
+                $table->string('city')->nullable()->after('avatar');
+            }
+            if (! Schema::hasColumn('users', 'province')) {
+                $table->string('province')->nullable()->after('city');
+            }
+            if (! Schema::hasColumn('users', 'bio')) {
+                $table->text('bio')->nullable()->after('province');
+            }
+            if (! Schema::hasColumn('users', 'role')) {
+                $table->enum('role', ['user', 'admin'])->default('user')->after('bio');
+            }
+            if (! Schema::hasColumn('users', 'status')) {
+                $table->enum('status', ['active', 'suspended', 'blocked'])->default('active')->after('role');
+            }
         });
     }
 
@@ -28,10 +48,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('password')->nullable(false)->change();
-            $table->dropUnique(['firebase_uid']);
-            $table->dropUnique(['username']);
-            $table->dropColumn(['firebase_uid', 'username', 'avatar', 'phone', 'kota', 'bio']);
+            // No action needed if columns were created in base migration
         });
     }
 };

@@ -17,27 +17,43 @@ class ProfileController extends Controller
     {
         $profile = $this->getProfile();
         $tab = $request->query('tab', 'dijual');
-        $allProducts = Product::dummyCatalog();
+        $user = auth()->user();
 
-        // Produk yang dijual oleh pengguna (8 produk seperti di wireframe)
-        $soldProducts = $allProducts->take(8)->map(function (object $product) use ($profile): object {
-            $clone = clone $product;
-            $clone->penjual = $profile['name'] ?? $profile['username'] ?? 'Midou Wijaya';
-            $clone->kota = $profile['kota'] ?? 'Bekasi';
+        // 1. Produk yang dijual oleh pengguna
+        $dbSold = $user ? Product::with(['primaryImage', 'images', 'codAreas'])->where('user_id', $user->id)->get() : collect();
 
-            return $clone;
-        });
+        if ($dbSold->isNotEmpty()) {
+            $soldProducts = $dbSold;
+        } else {
+            // Fallback dummy
+            $allProducts = Product::dummyCatalog();
+            $soldProducts = $allProducts->take(8)->map(function (object $product) use ($profile): object {
+                $clone = clone $product;
+                $clone->penjual = $profile['name'] ?? $profile['username'] ?? 'Midou Wijaya';
+                $clone->kota = $profile['kota'] ?? 'Bekasi';
 
-        // Produk yang difavoritkan oleh pengguna
-        $favoriteIds = session()->get('favorites', []);
-        $favoriteProducts = $allProducts
-            ->filter(fn (object $p): bool => in_array($p->id, $favoriteIds, true))
-            ->values();
+                return $clone;
+            });
+        }
+
+        // 2. Produk yang difavoritkan oleh pengguna
+        $dbFavorites = $user
+            ? Product::with(['user', 'primaryImage', 'images', 'codAreas'])->whereHas('favorites', fn ($q) => $q->where('user_id', $user->id))->get()
+            : collect();
+
+        if ($dbFavorites->isNotEmpty()) {
+            $favoriteProducts = $dbFavorites;
+        } else {
+            $favoriteIds = session()->get('favorites', []);
+            $favoriteProducts = Product::dummyCatalog()
+                ->filter(fn (object $p): bool => in_array($p->id, $favoriteIds, true))
+                ->values();
+        }
 
         // Tentukan produk sesuai tab aktif
         $products = $tab === 'favorit' ? $favoriteProducts : $soldProducts;
 
-        // Data ulasan dari pembeli tentang barang yang sudah terjual
+        // Data ulasan dari pembeli
         $reviews = $this->getDummyReviews();
 
         return view('profile.catalog', [
@@ -52,7 +68,7 @@ class ProfileController extends Controller
     }
 
     /**
-     * Data ulasan dummy pembeli tentang barang yang sudah terjual (sesuai wireframe).
+     * Data ulasan dummy pembeli tentang barang yang sudah terjual.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -61,53 +77,30 @@ class ProfileController extends Controller
         return [
             [
                 'id' => 1,
-                'reviewer_name' => 'Aleww_kun',
-                'time_ago' => '2 jam lalu',
+                'author' => 'Sarah Amalia',
+                'author_avatar' => null,
                 'rating' => 5,
-                'comment' => 'Penjual fast respon, bass nya mendut mendut, puas dipake seharian',
-                'product_title' => 'Figur anime lucu',
-                'product_price' => 'Rp 100.000',
-                'product_image' => 'images/products/samsung-buds-review.png',
+                'date' => '3 hari lalu',
+                'product_title' => 'TWS Earbuds Bluetooth Wireless Second',
+                'comment' => 'Penjual ramah banget! COD di kampus unsika langsung dites barangnya dan masih berfungsi normal 100%. Recommended seller pokoknya!',
             ],
             [
                 'id' => 2,
-                'reviewer_name' => 'Aleww_kun',
-                'time_ago' => '2 jam lalu',
+                'author' => 'Budi Pratama',
+                'author_avatar' => null,
                 'rating' => 5,
-                'comment' => 'Penjual fast respon, bass nya mendut mendut, puas dipake seharian',
-                'product_title' => 'Samsung galaxy ear buds',
-                'product_price' => 'Rp 100.000',
-                'product_image' => 'images/products/samsung-buds-review.png',
+                'date' => '1 minggu lalu',
+                'product_title' => 'Buku Pemrograman Web Dasar Laravel',
+                'comment' => 'Barang sesuai deskripsi, masih sangat mulus tanpa coretan. Harganya jauh lebih murah dari toko buku. Makasih mas!',
             ],
             [
                 'id' => 3,
-                'reviewer_name' => 'Aleww_kun',
-                'time_ago' => '2 jam lalu',
-                'rating' => 5,
-                'comment' => 'Penjual fast respon, bass nya mendut mendut, puas dipake seharian',
-                'product_title' => 'Samsung galaxy ear buds',
-                'product_price' => 'Rp 100.000',
-                'product_image' => 'images/products/samsung-buds-review.png',
-            ],
-            [
-                'id' => 4,
-                'reviewer_name' => 'Rian_FT_Unsika',
-                'time_ago' => '1 hari lalu',
-                'rating' => 5,
-                'comment' => 'Keyboard mechanical nya empuk dan mulus banget. COD di depan GSG Unsika aman & ramah!',
-                'product_title' => 'Keyboard pemda bekas reza auditore asli no hoax',
-                'product_price' => 'Rp 670.000',
-                'product_image' => 'https://images.unsplash.com/photo-1595225476474-87563907a212?w=200&auto=format&fit=crop&q=80',
-            ],
-            [
-                'id' => 5,
-                'reviewer_name' => 'Siti_Nurhaliza',
-                'time_ago' => '3 hari lalu',
-                'rating' => 5,
-                'comment' => 'Kemeja flanelnya bersih dan wangi, pas banget ukurannya. Recommended seller buat anak kampus.',
-                'product_title' => 'Kemeja pria warna merah motif kotak lengan panjang',
-                'product_price' => 'Rp 170.000',
-                'product_image' => 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=200&auto=format&fit=crop&q=80',
+                'author' => 'Rian Kurniawan',
+                'author_avatar' => null,
+                'rating' => 4,
+                'date' => '2 minggu lalu',
+                'product_title' => 'Mouse Gaming Logitech G102 Bekas',
+                'comment' => 'Pengiriman cepat, packing aman. Cuma ada baret halus pemakaian wajar tapi klik masih enak dan responsif.',
             ],
         ];
     }
@@ -125,20 +118,17 @@ class ProfileController extends Controller
     }
 
     /**
-     * Simpan perubahan profil pengguna.
+     * Simpan pembaruan profil pengguna.
      */
     public function update(UpdateProfileRequest $request): RedirectResponse
     {
-        $validated = $request->validated();
         $user = auth()->user();
+        $validated = $request->validated();
 
-        // Perbarui data utama profil
         $user->name = trim($validated['name']);
-        if (! empty($validated['username'])) {
-            $user->username = ltrim(trim($validated['username']), '@');
-        }
-        $user->phone = ! empty($validated['phone']) ? trim($validated['phone']) : null;
-        $user->kota = ! empty($validated['kota']) ? trim($validated['kota']) : 'Karawang';
+        $user->username = trim($validated['username']);
+        $user->whatsapp_number = ! empty($validated['phone']) ? trim($validated['phone']) : null;
+        $user->city = ! empty($validated['kota']) ? trim($validated['kota']) : 'Karawang';
         $user->bio = ! empty($validated['bio']) ? trim($validated['bio']) : null;
 
         // Upload foto profil jika pengguna memilih gambar baru
@@ -166,7 +156,7 @@ class ProfileController extends Controller
             'name' => $user->name,
             'email' => $user->email,
             'username' => $user->username,
-            'kota' => $user->kota ?: 'Karawang',
+            'kota' => $user->city ?: 'Karawang',
             'avatar' => $user->avatar,
             'is_verified' => true,
         ]);
@@ -184,13 +174,13 @@ class ProfileController extends Controller
         $user = auth()->user();
 
         return [
-            'name' => $user->name,
-            'username' => $user->username ?: str($user->email)->before('@')->replace('.', '_')->toString(),
-            'email' => $user->email,
-            'phone' => $user->phone,
-            'kota' => $user->kota ?: 'Karawang',
-            'bio' => $user->bio,
-            'avatar' => $user->avatar,
+            'name' => $user?->name ?? 'Midou Wijaya',
+            'username' => $user?->username ?: str($user?->email ?? 'midou@student.unsika.ac.id')->before('@')->replace('.', '_')->toString(),
+            'email' => $user?->email ?? 'midou@student.unsika.ac.id',
+            'phone' => $user?->whatsapp_number ?? '081299887766',
+            'kota' => $user?->city ?: 'Bekasi',
+            'bio' => $user?->bio ?? 'Jual apa aja demi bisa nikahin hiura',
+            'avatar' => $user?->avatar,
             'rating' => 4.5,
             'reviews_count' => 67,
             'sold_count' => 10,

@@ -19,18 +19,18 @@ class Favorite extends Model
     ];
 
     /**
-     * Relasi ke user pemilik favorit.
+     * Relasi ke user yang memfavoritkan
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     /**
-     * Relasi ke produk yang difavoritkan.
+     * Relasi ke produk yang difavoritkan
      */
     public function product(): BelongsTo
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(Product::class, 'product_id');
     }
 }

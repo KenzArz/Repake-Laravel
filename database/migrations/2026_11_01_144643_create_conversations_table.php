@@ -13,6 +13,11 @@ return new class extends Migration
     {
         Schema::create('conversations', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
+            $table->foreignId('buyer_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('seller_id')->constrained('users')->cascadeOnDelete();
+            $table->timestamp('last_message_at')->nullable();
+            $table->unique(['product_id', 'buyer_id']);
             $table->timestamps();
         });
     }
