@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Favorite;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -11,16 +12,14 @@ use Illuminate\View\View;
 class FavoriteController extends Controller
 {
     /**
-     * Tampilkan halaman daftar produk favorit.
+     * Tampilkan halaman daftar produk favorit dari database.
      */
     public function index(Request $request): View
     {
-        $favoriteIds = session()->get('favorites', []);
-
-        // Filter produk yang ada di daftar favorit
-        $favorites = Product::dummyCatalog()
-            ->filter(fn (object $product): bool => in_array($product->id, $favoriteIds, true))
-            ->values();
+        $favorites = Product::with(['primaryImage', 'user'])
+            ->whereHas('favorites', fn ($q) => $q->where('user_id', $request->user()->id))
+            ->latest()
+            ->get();
 
         return view('favorites.index', [
             'favorites' => $favorites,
@@ -29,34 +28,36 @@ class FavoriteController extends Controller
     }
 
     /**
-     * Toggle status favorit untuk suatu produk.
+     * Toggle status favorit suatu produk untuk user yang login (tabel favorites).
      */
     public function toggle(Request $request, int|string $id): JsonResponse|RedirectResponse
     {
-        $id = (int) $id;
-        $favorites = session()->get('favorites', []);
+        $userId = $request->user()->id;
 
-        if (in_array($id, $favorites, true)) {
-            // Hapus dari favorit
-            $favorites = array_values(array_filter($favorites, fn ($favId): bool => (int) $favId !== $id));
+        if (! Product::whereKey($id)->exists()) {
+            abort(404, 'Produk tidak ditemukan');
+        }
+
+        $existing = Favorite::where('user_id', $userId)->where('product_id', $id)->first();
+
+        if ($existing) {
+            $existing->delete();
             $isFavorite = false;
             $message = 'Produk dihapus dari favorit.';
         } else {
-            // Tambahkan ke favorit
-            $favorites[] = $id;
-            $favorites = array_values(array_unique($favorites));
+            Favorite::create(['user_id' => $userId, 'product_id' => (int) $id]);
             $isFavorite = true;
             $message = 'Produk berhasil ditambahkan ke favorit.';
         }
 
-        session()->put('favorites', $favorites);
+        $count = Product::whereHas('favorites', fn ($q) => $q->where('user_id', $userId))->count();
 
-        if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+        if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
                 'is_favorite' => $isFavorite,
-                'product_id' => $id,
-                'count' => count($favorites),
+                'product_id' => (int) $id,
+                'count' => $count,
                 'message' => $message,
             ]);
         }

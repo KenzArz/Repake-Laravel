@@ -1,5 +1,8 @@
 <?php
 
+use App\Models\Order;
+use App\Models\Product;
+use App\Models\Review;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -120,7 +123,27 @@ test('user can switch between dijual and favorit tabs in profile catalog', funct
     $response->assertSee('Favorit');
 });
 
-test('user can view ulasan tab with buyer reviews and sold products in catalog', function () {
+test('user can view ulasan tab with buyer reviews from the database', function () {
+    $reviewer = User::factory()->create(['name' => 'Aleww_kun']);
+    $product = Product::factory()->create([
+        'user_id' => $this->profileUser->id,
+        'harga' => 100000,
+        'judul' => 'Figur anime lucu',
+    ]);
+    $order = Order::factory()->selesai()->create([
+        'seller_id' => $this->profileUser->id,
+        'buyer_id' => $reviewer->id,
+        'product_id' => $product->id,
+    ]);
+    Review::create([
+        'order_id' => $order->id,
+        'product_id' => $product->id,
+        'reviewer_id' => $reviewer->id,
+        'seller_id' => $this->profileUser->id,
+        'rating' => 5,
+        'komentar' => 'Penjual fast respon, bass nya mendut mendut, puas dipake seharian',
+    ]);
+
     $response = $this->get(route('profile.catalog', ['tab' => 'ulasan']));
 
     $response->assertStatus(200);
@@ -129,7 +152,6 @@ test('user can view ulasan tab with buyer reviews and sold products in catalog',
     $response->assertSee('Penjual fast respon, bass nya mendut mendut, puas dipake seharian');
     $response->assertSee('Figur anime lucu');
     $response->assertSee('Rp 100.000');
-    $response->assertSee('images/default-avatar.png');
 });
 
 test('default silhouette avatar is displayed across profile and cards when avatar is null', function () {

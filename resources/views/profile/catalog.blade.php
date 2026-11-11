@@ -102,7 +102,7 @@
                         <span>Edit Profil</span>
                     </a>
                     <a href="{{ Route::has('chat.index') ? route('chat.index') : '#' }}"
-                       class="flex items-center justify-center gap-2 rounded-lg bg-[#B8E639] px-6 py-2.5 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 shadow-2xs w-full sm:w-auto">
+                       class="flex items-center justify-center gap-2 rounded-lg bg-lime-400 px-6 py-2.5 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 shadow-2xs w-full sm:w-auto">
                         <svg viewBox="0 0 24 24" class="size-4 fill-none stroke-current stroke-2">
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                         </svg>

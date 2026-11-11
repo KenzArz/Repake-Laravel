@@ -18,7 +18,7 @@ class CategoryController extends Controller
     {
         $categories = Category::query()
             ->withCount('products')
-            ->orderBy('name')
+            ->urut()
             ->get();
 
         return view('admin.categories.index', ['categories' => $categories]);
@@ -31,13 +31,14 @@ class CategoryController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100', 'unique:categories,name'],
-            'icon' => ['nullable', 'string', 'max:50'],
+            'icon' => ['nullable', 'string', 'max:100'],
         ]);
 
         Category::create([
             'name' => $data['name'],
             'slug' => Str::slug($data['name']),
             'icon' => $data['icon'] ?? null,
+            'sort_order' => ((int) Category::max('sort_order')) + 1,
         ]);
 
         return back()->with('info', "Kategori {$data['name']} ditambahkan.");
@@ -50,7 +51,7 @@ class CategoryController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100', 'unique:categories,name,'.$category->id],
-            'icon' => ['nullable', 'string', 'max:50'],
+            'icon' => ['nullable', 'string', 'max:100'],
         ]);
 
         $category->update([

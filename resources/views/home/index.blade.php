@@ -10,18 +10,19 @@
         <x-banner-slider :images="$banners" />
     </section>
 
-    {{-- Mau cari apa? (8 Kategori Sesuai Wireframe) --}}
+    {{-- Mau cari apa? (8 Kategori) --}}
     <section class="mt-10">
         <h2 class="text-xl font-bold text-neutral-900 mb-4">Mau cari apa?</h2>
-        <div class="grid grid-cols-4 gap-3 sm:grid-cols-8 sm:gap-4">
+        <div class="grid grid-cols-4 gap-x-3 gap-y-5 sm:grid-cols-8 sm:gap-4">
             @foreach ($categories as $category)
+                @php $isActive = $activeCategory && $category->slug === $activeCategory->slug; @endphp
                 <a href="{{ route('home', ['kategori' => $category->slug]) }}" class="group flex flex-col items-center">
-                    <div class="aspect-square w-full overflow-hidden rounded-xl bg-neutral-300 transition group-hover:bg-neutral-400">
+                    <div class="flex size-16 shrink-0 items-center justify-center rounded-full bg-neutral-200 transition-all duration-200 ease-out group-hover:scale-110 group-hover:bg-lime-100 group-hover:ring-2 group-hover:ring-lime-500 group-hover:shadow-lg group-hover:shadow-neutral-900/10 sm:size-20 {{ $isActive ? 'bg-lime-100 ring-2 ring-lime-500' : '' }}">
                         @if ($category->icon_url)
-                            <img src="{{ $category->icon_url }}" alt="" class="size-full object-cover" onerror="this.remove()">
+                            <img src="{{ $category->icon_url }}" alt="" class="size-8 object-contain transition-transform duration-200 ease-out group-hover:scale-105 sm:size-9" onerror="this.remove()">
                         @endif
                     </div>
-                    <p class="mt-2 text-center text-xs font-semibold text-neutral-800">{{ $category->name }}</p>
+                    <p class="mt-2.5 text-center text-xs font-medium text-neutral-800 transition-colors duration-200 group-hover:text-neutral-900 sm:text-sm">{{ $category->name }}</p>
                 </a>
             @endforeach
         </div>
@@ -47,7 +48,7 @@
         </div>
 
         <div class="mt-8 flex justify-center">
-            <a href="#" class="rounded-lg border-2 border-neutral-900 bg-white px-6 py-2 text-xs font-bold text-neutral-900 transition hover:bg-neutral-900 hover:text-white">
+            <a href="{{ route('products.index') }}" class="rounded-lg border-2 border-neutral-900 bg-white px-6 py-2 text-xs font-bold text-neutral-900 transition hover:bg-neutral-900 hover:text-white">
                 Lihat Lebih Banyak
             </a>
         </div>
@@ -63,7 +64,7 @@
         </p>
         <a href="{{ Route::has('products.create') ? route('products.create') : '#' }}"
            @guest data-open-login @endguest
-           class="mt-6 inline-flex rounded-lg bg-[#B8E639] px-5 py-2.5 text-xs font-bold text-neutral-900 transition hover:bg-lime-500">
+           class="mt-6 inline-flex rounded-lg bg-lime-400 px-5 py-2.5 text-xs font-bold text-neutral-900 transition hover:bg-lime-500">
             Jual Barang
         </a>
     </section>
