@@ -24,16 +24,14 @@ _ide_helper_models.php
 .phpstorm.meta.php
 
 # AI Agent / Assistant Files
-/.claude/
+# Catatan: .claude/, .mcp.json, CLAUDE.md, AGENTS.md, boost.json TIDAK di-ignore
+# (sudah di-commit sebagai bagian proyek; boost:update mengubahnya).
 /.opencode/
 /.ai/
-/.mcp.json
 /opencode.json
-/CLAUDE.md
-/AGENTS.md
-/boost.json
 
 # Internal Documentation (rencana, referensi desain, catatan setup Firebase)
+# docs/ sengaja TIDAK di-commit (berisi nilai konfigurasi Firebase asli).
 /docs/
 
 # Testing
@@ -45,11 +43,9 @@ _ide_helper_models.php
 # Composer
 /vendor
 /auth.json
-composer.lock
 
 # Node / NPM
 /node_modules
-package-lock.json
 yarn.lock
 pnpm-lock.yaml
 .pnpm-debug.log

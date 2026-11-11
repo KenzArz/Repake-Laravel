@@ -70,7 +70,7 @@ class FirebaseAuthController extends Controller
             'email' => $user->email,
             'username' => $user->username,
             'kota' => $user->kota ?: 'Karawang',
-            'avatar' => $user->avatar,
+            'avatar' => $user->avatar_url,
             'is_verified' => true,
         ]);
 

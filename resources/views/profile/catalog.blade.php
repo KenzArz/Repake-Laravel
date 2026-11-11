@@ -24,8 +24,8 @@
             <div class="flex items-start sm:items-center gap-5">
                 {{-- Lingkaran Avatar Siluet Default Sesuai Permintaan User --}}
                 <div class="size-24 shrink-0 rounded-full bg-neutral-200 overflow-hidden border border-neutral-300 grid place-items-center select-none shadow-inner">
-                    @if (!empty($profile['avatar']))
-                        <img src="{{ asset($profile['avatar']) }}" alt="{{ $profile['name'] }}" class="size-full object-cover">
+                    @if (!empty($profile['avatar_url']))
+                        <img src="{{ $profile['avatar_url'] }}" alt="{{ $profile['name'] }}" class="size-full object-cover">
                     @else
                         <img src="{{ asset('images/default-avatar.png') }}" alt="{{ $profile['name'] ?? 'Profil' }}" class="size-full object-cover">
                     @endif

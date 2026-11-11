@@ -94,4 +94,8 @@ Route::get('/products', [ProductController::class, 'index'])->name('products.ind
 
 // Detail Barang & Laporan (wildcard /{id} — ditaruh paling bawah rute produk)
 Route::get('/products/{id}', [ProductDetailController::class, 'show'])->name('products.show');
-Route::post('/products/{id}/report', [ProductDetailController::class, 'report'])->name('products.report');
+
+// Laporan produk (wajib login)
+Route::post('/products/{id}/report', [ProductDetailController::class, 'report'])
+    ->middleware(['auth', 'banned'])
+    ->name('products.report');

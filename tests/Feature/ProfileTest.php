@@ -6,6 +6,7 @@ use App\Models\Review;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -25,6 +26,18 @@ test('user can view profile catalog page', function () {
     $response->assertStatus(200);
     $response->assertSee('Midou_kun');
     $response->assertSee('Semua Produk');
+});
+
+test('profile catalog renders product cards for owned products', function () {
+    Product::factory()->create([
+        'user_id' => $this->profileUser->id,
+        'judul' => 'Keyboard mekanik custom',
+    ]);
+
+    $response = $this->get(route('profile.catalog'));
+
+    $response->assertStatus(200);
+    $response->assertSee('Keyboard mekanik custom');
 });
 
 test('user can view profile edit form', function () {
@@ -86,6 +99,8 @@ test('username must be unique', function () {
 });
 
 test('user can upload avatar and remove avatar', function () {
+    Storage::fake('public');
+
     $file = UploadedFile::fake()->image('avatar.jpg', 200, 200);
 
     $response = $this->put(route('profile.update'), [
@@ -97,12 +112,7 @@ test('user can upload avatar and remove avatar', function () {
 
     $user = $this->profileUser->refresh();
     expect($user->avatar)->not->toBeNull();
-    expect(file_exists(public_path($user->avatar)))->toBeTrue();
-
-    // Hapus file buatan pengujian
-    if (file_exists(public_path($user->avatar))) {
-        unlink(public_path($user->avatar));
-    }
+    expect(Storage::disk('public')->exists($user->avatar))->toBeTrue();
 
     // Hapus avatar via remove_avatar = 1
     $responseRemove = $this->put(route('profile.update'), [

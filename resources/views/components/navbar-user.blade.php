@@ -77,7 +77,11 @@
                         {{-- Lingkaran Foto Avatar --}}
                         <div class="size-8 rounded-full overflow-hidden border border-neutral-300 bg-neutral-100 shrink-0 shadow-2xs">
                             @if (!empty($userAvatar))
-                                <img src="{{ asset($userAvatar) }}" alt="{{ auth()->user()->name }}" class="size-full object-cover">
+                                @if (str_starts_with($userAvatar, 'http'))
+                                    <img src="{{ $userAvatar }}" alt="{{ auth()->user()->name }}" class="size-full object-cover">
+                                @else
+                                    <img src="{{ asset($userAvatar) }}" alt="{{ auth()->user()->name }}" class="size-full object-cover">
+                                @endif
                             @else
                                 <img src="{{ asset('images/default-avatar.png') }}" alt="{{ auth()->user()->name }}" class="size-full object-cover" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ urlencode(auth()->user()->name) }}&background=B8E639&color=1c1917';">
                             @endif

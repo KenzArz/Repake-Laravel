@@ -213,11 +213,8 @@ class Product extends Model
                     return $value;
                 }
 
-                if (Auth::check()) {
-                    return $this->favorites()->where('user_id', Auth::id())->exists();
-                }
-
-                return in_array($this->id, session()->get('favorites', []), true);
+                return Auth::check()
+                    && $this->favorites()->where('user_id', Auth::id())->exists();
             }
         );
     }
