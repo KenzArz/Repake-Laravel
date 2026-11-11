@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\EnsureUserIsNotBanned;
+use App\Http\Middleware\IsAdmin;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -17,6 +19,11 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return route('home');
         });
+
+        $middleware->alias([
+            'admin' => IsAdmin::class,
+            'banned' => EnsureUserIsNotBanned::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

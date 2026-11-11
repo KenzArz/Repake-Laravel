@@ -23,7 +23,7 @@
         $gallery = [
             $product->gambar,
             'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=600&auto=format&fit=crop&q=80',
-            'https://images.unsplash.com/photo-1541140532154-b024d705b909?w=600&auto=format&fit=crop&q=80',
+            'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=600&auto=format&fit=crop&q=80',
         ];
     @endphp
 
@@ -126,28 +126,37 @@
 
             {{-- Tombol Aksi: Chat Penjual & Bar Tawar Harga --}}
             <div class="mt-6 space-y-3">
-                {{-- Tombol Chat Penjual --}}
-                <a href="{{ Route::has('chat.index') ? route('chat.index', ['seller' => $product->penjual]) : '#' }}"
-                   class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#B8E639] py-3 text-xs sm:text-sm font-bold text-neutral-900 transition hover:bg-lime-500">
-                    <svg viewBox="0 0 24 24" class="size-4.5 fill-none stroke-current stroke-2">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                    </svg>
-                    <span>Chat Penjual</span>
-                </a>
+                {{-- Tombol Chat Penjual: langsung buka percakapan produk ini [ALDI] --}}
+                <form method="POST" action="{{ Route::has('chat.store') ? route('chat.store') : '#' }}">
+                    @csrf
+                    <input type="hidden" name="product_id" value="{{ $product->id }}">
+                    <button type="submit"
+                            class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#B8E639] py-3 text-xs sm:text-sm font-bold text-neutral-900 transition hover:bg-lime-500">
+                        <svg viewBox="0 0 24 24" class="size-4.5 fill-none stroke-current stroke-2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <span>Chat Penjual</span>
+                    </button>
+                </form>
 
-                {{-- Input & Tombol Tawar Harga Sesuai Wireframe --}}
-                <div class="flex items-center w-full">
-                    <input type="text"
+                {{-- Input & Tombol Tawar Harga: kirim tawaran + buka chat [ALDI] --}}
+                <form method="POST" action="{{ Route::has('chat.store') ? route('chat.store') : '#' }}"
+                      class="flex items-center w-full">
+                    @csrf
+                    <input type="hidden" name="product_id" value="{{ $product->id }}">
+                    <input type="number"
+                           name="offer_amount"
                            id="tawar-input"
-                           value="Rp. {{ number_format($product->harga, 0, ',', '.') }}"
+                           value="{{ $product->harga }}"
+                           min="1"
+                           required
                            placeholder="Masukkan tawaran harga..."
                            class="h-10 flex-1 rounded-l-lg border border-r-0 border-neutral-300 bg-white px-3 text-xs sm:text-sm font-medium text-neutral-800 outline-none focus:border-neutral-900">
-                    <button type="button"
-                            onclick="submitTawarPrice()"
+                    <button type="submit"
                             class="h-10 rounded-r-lg bg-[#B8E639] px-5 text-xs sm:text-sm font-bold text-neutral-900 transition hover:bg-lime-500 whitespace-nowrap">
                         Tawar Harga
                     </button>
-                </div>
+                </form>
             </div>
 
         </div>
@@ -243,11 +252,6 @@
         });
         btn.classList.add('border-amber-400', 'ring-2', 'ring-amber-400/50');
         btn.classList.remove('border-white/80');
-    }
-
-    function submitTawarPrice() {
-        const val = document.getElementById('tawar-input').value;
-        alert('Tawaran harga ' + val + ' berhasil diajukan ke penjual!');
     }
 </script>
 @endsection

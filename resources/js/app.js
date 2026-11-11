@@ -1,4 +1,5 @@
 import "./bootstrap";
+import { initLocationDetect } from "./location-detect";
 
 /* Firebase SDK dimuat dinamis hanya saat login modal dipakai,
    agar semua halaman tidak ikut membawa bundle Firebase. */
@@ -65,8 +66,7 @@ document.addEventListener("click", async (e) => {
     }
 });
 
-/* Autoplay banner (setara Timer 4 detik di Flutter) */
-document.querySelectorAll("[data-banner-slider]").forEach((el) => {
+/* Autoplay banner (setara Timer 4 detik di Flutter) */document.querySelectorAll("[data-banner-slider]").forEach((el) => {
     const items = [...el.children];
     if (items.length < 2 || el.scrollWidth <= el.clientWidth + 1) return; // muat semua, tidak perlu geser
 
@@ -84,3 +84,6 @@ document.querySelectorAll("[data-banner-slider]").forEach((el) => {
         });
     }, 4000);
 });
+
+/* Deteksi kota [ALDI] — hanya aktif bila ada pemicunya di halaman */
+initLocationDetect();

@@ -54,7 +54,7 @@
         {{-- Right Actions (Sesuai Wireframe: Heart, Mail, Masuk/Avatar, +Jual) --}}
         <div class="flex items-center gap-3 sm:gap-4 shrink-0">
             {{-- Heart (Favorit) --}}
-            <a href="{{ route('favorites.index') }}" class="text-neutral-700 hover:text-neutral-900 transition" aria-label="Favorit">
+            <a href="{{ route('favorites.index') }}" {{ $needLogin }} class="text-neutral-700 hover:text-neutral-900 transition" aria-label="Favorit">
                 <svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]">
                     <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
                 </svg>
@@ -240,7 +240,7 @@ function selectLocation(loc) {
         </a>
 
         {{-- Favorite --}}
-        <a href="{{ route('favorites.index') }}" class="{{ $itemCls }} {{ $isFav ? $activeCls : $inactiveCls }}">
+        <a href="{{ route('favorites.index') }}" {{ $needLogin }} class="{{ $itemCls }} {{ $isFav ? $activeCls : $inactiveCls }}">
             <svg viewBox="0 0 24 24" class="size-6 {{ $isFav ? 'fill-current stroke-current' : 'fill-none stroke-current' }} stroke-[1.8]" aria-hidden="true">
                 <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
             </svg>

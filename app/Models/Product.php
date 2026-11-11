@@ -3,11 +3,117 @@
 namespace App\Models;
 
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 
 class Product extends Model
 {
+    use HasFactory, SoftDeletes;
+
+    public const STATUS_DRAFT = 'draft';
+
+    public const STATUS_DIJUAL = 'dijual';
+
+    public const STATUS_TERJUAL = 'terjual';
+
+    public const STATUS_DITINJAU = 'ditinjau';
+
+    /**
+     * @var array<int, string>
+     */
+    protected $fillable = [
+        'user_id',
+        'category_id',
+        'judul',
+        'slug',
+        'harga',
+        'kondisi',
+        'status',
+        'deskripsi',
+        'kota',
+        'patokan_lokasi',
+        'is_negotiable',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'harga' => 'integer',
+            'is_negotiable' => 'boolean',
+        ];
+    }
+
+    /**
+     * Produk yang masih ditawarkan.
+     */
+    #[Scope]
+    protected function dijual(Builder $query): Builder
+    {
+        return $query->where('status', self::STATUS_DIJUAL);
+    }
+
+    /**
+     * Filter teks pada judul dan deskripsi.
+     */
+    #[Scope]
+    protected function cari(Builder $query, ?string $term): Builder
+    {
+        $term = trim((string) $term);
+
+        return $query->when($term !== '', fn (Builder $q): Builder => $q->where(
+            fn (Builder $inner): Builder => $inner
+                ->where('judul', 'like', "%{$term}%")
+                ->orWhere('deskripsi', 'like', "%{$term}%")
+        ));
+    }
+
+    public function seller(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
+
+    public function images(): HasMany
+    {
+        return $this->hasMany(ProductImage::class)->orderBy('urutan');
+    }
+
+    public function coverImage(): HasOne
+    {
+        return $this->hasOne(ProductImage::class)->ofMany('urutan', 'MIN');
+    }
+
+    public function favorites(): HasMany
+    {
+        return $this->hasMany(Favorite::class);
+    }
+
+    public function reports(): HasMany
+    {
+        return $this->hasMany(Report::class);
+    }
+
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
     /**
      * Data sampel produk yang konsisten di seluruh aplikasi.
      *

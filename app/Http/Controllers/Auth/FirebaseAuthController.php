@@ -47,6 +47,10 @@ class FirebaseAuthController extends Controller
 
         $user = User::firstOrNew(['firebase_uid' => $account['localId']]);
 
+        if ($user->exists && $user->is_banned) {
+            return $this->reject($request);
+        }
+
         if (! $user->exists) {
             $user->name = $account['displayName']
                 ?? str($email)->before('@')->replace('.', ' ')->title()->toString();

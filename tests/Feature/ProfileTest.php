@@ -111,7 +111,7 @@ test('user can upload avatar and remove avatar', function () {
 
     $user->refresh();
     expect($user->avatar)->toBeNull();
-})->skip(! extension_loaded('gd'), 'Ekstensi GD belum terpasang.');
+});
 
 test('user can switch between dijual and favorit tabs in profile catalog', function () {
     $response = $this->get(route('profile.catalog', ['tab' => 'favorit']));
