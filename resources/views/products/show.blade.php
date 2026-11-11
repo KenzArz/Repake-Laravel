@@ -3,7 +3,7 @@
 @php
     $title = $product->title ?? 'Detail Produk';
     $price = $product->price ?? 0;
-    $description = $product->description ?? '';
+    $rawDescription = $product->description ?? '';
     $statusText = match ($product->status ?? 'tersedia') {
         'tersedia' => 'Tersedia',
         'terjual' => 'Terjual',
@@ -14,6 +14,18 @@
     $sellerAvatar = $product->user->avatar_url ?? asset('images/default-avatar.png');
     $sellerCity = $seller->kota ?? $product->user->city ?? 'Karawang';
     $categoryName = $product->category->name ?? 'Umum';
+
+    // Pengolahan Lokasi COD & Patokan
+    $codLocation = $product->cod_location ?? $product->lokasi ?? $sellerCity;
+    $locationNotes = $product->location_notes ?? null;
+
+    // Pemisahan otomatis jika 'Patokan Lokasi:' sebelumnya tergabung di deskripsi
+    $description = $rawDescription;
+    if (!$locationNotes && Str::contains($rawDescription, 'Patokan Lokasi:')) {
+        $parts = explode("Patokan Lokasi:", $rawDescription);
+        $description = trim($parts[0]);
+        $locationNotes = trim($parts[1] ?? '');
+    }
 
     $ago = is_string($product->created_at)
         ? $product->created_at
@@ -63,10 +75,9 @@
 
         <div class="grid grid-cols-1 items-start gap-8 md:grid-cols-12">
 
-            {{-- Kolom Kiri: Galeri Foto dengan Thumbnail --}}
+            {{-- Kolom Kiri: Galeri Foto Utama dengan Thumbnail --}}
             <div class="md:col-span-6">
                 <div class="relative aspect-4/3 w-full overflow-hidden rounded-2xl bg-neutral-200 sm:aspect-square">
-                    {{-- Tanpa onerror="this.remove()" --}}
                     <img id="main-product-img" src="{{ $galleryUrls[0] }}" alt="{{ $title }}"
                         class="size-full object-cover transition duration-300">
 
@@ -84,10 +95,11 @@
                 </div>
             </div>
 
-            {{-- Kolom Kanan: Info Produk, Penjual & Aksi --}}
+            {{-- Kolom Kanan: Info Produk, Penjual, Lokasi & Aksi --}}
             <div class="flex flex-col justify-between md:col-span-6">
 
                 <div>
+                    {{-- Penjual Header --}}
                     <div class="flex items-start justify-between">
                         <div class="flex items-center gap-3">
                             <div
@@ -143,6 +155,7 @@
                         </div>
                     </div>
 
+                    {{-- Judul & Harga --}}
                     <h1 class="mt-3 text-2xl font-black leading-tight text-neutral-900 sm:text-[28px]">
                         {{ $title }}
                     </h1>
@@ -151,6 +164,7 @@
                         Rp {{ number_format($price, 0, ',', '.') }}
                     </p>
 
+                    {{-- Badges --}}
                     <div class="mt-3 flex flex-wrap items-center gap-2">
                         <span class="rounded bg-[#B8E639] px-2.5 py-0.5 text-xs font-bold text-neutral-900">
                             {{ $statusText }}
@@ -163,14 +177,37 @@
                         </span>
                     </div>
 
+
+                    {{-- Deskripsi Produk dengan "Lihat Selengkapnya" --}}
                     <div class="mt-5">
-                        <h3 class="text-sm font-bold text-neutral-900">Deskripsi</h3>
-                        <p class="mt-2 whitespace-pre-line text-xs font-medium leading-relaxed text-neutral-600 sm:text-sm">
-                            {{ $description }}
-                        </p>
+                        <h3 class="text-sm font-bold text-neutral-900">Deskripsi Produk</h3>
+
+                        <div id="description-container"
+                            class="relative mt-2 max-h-24 overflow-hidden transition-all duration-300">
+                            <p id="description-text"
+                                class="whitespace-pre-line text-xs font-medium leading-relaxed text-neutral-600 sm:text-sm">
+                                {{ $description }}
+                            </p>
+
+                            {{-- Gradien Fade Overlay saat Terlipat --}}
+                            <div id="description-gradient"
+                                class="pointer-events-none absolute bottom-0 left-0 right-0 h-10">
+                            </div>
+                        </div>
+
+                        {{-- Tombol Toggle Lihat Selengkapnya --}}
+                        <button type="button" id="btn-toggle-description" onclick="toggleDescription()"
+                            class="mt-1.5 hidden items-center gap-1 text-xs font-bold text-lime-700 hover:text-lime-800 hover:underline cursor-pointer">
+                            <span id="toggle-description-text">Lihat Selengkapnya</span>
+                            <svg id="toggle-description-icon" class="size-4 transition-transform duration-200"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m6 9 6 6 6-6" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
 
+                {{-- Action Buttons: Chat & Tawar --}}
                 <div class="mt-6 space-y-3">
                     <a href="{{ Route::has('chat.index') ? route('chat.index', ['seller' => $product->user_id]) : '#' }}"
                         class="flex w-full items-center justify-center gap-2 rounded-lg bg-[#B8E639] py-3 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 sm:text-sm">
@@ -195,6 +232,7 @@
 
         </div>
 
+        {{-- Produk Mirip --}}
         @if(isset($similarProducts) && count($similarProducts) > 0)
             <section class="mt-14">
                 <h2 class="mb-4 text-lg font-bold text-neutral-900 sm:text-xl">Produk yang Mirip</h2>
@@ -290,5 +328,65 @@
             const val = document.getElementById('tawar-input').value;
             alert('Tawaran harga ' + val + ' berhasil diajukan ke penjual!');
         }
+
+        function copyCodLocation(text) {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('Alamat & Patokan COD berhasil disalin!');
+                });
+            } else {
+                alert('Alamat COD: ' + text);
+            }
+        }
+
+        // --- Logika Dynamic Toggle "Lihat Selengkapnya" ---
+        function initDescriptionToggle() {
+            const container = document.getElementById('description-container');
+            const text = document.getElementById('description-text');
+            const btn = document.getElementById('btn-toggle-description');
+            const gradient = document.getElementById('description-gradient');
+
+            if (!container || !text || !btn) return;
+
+            // Cek jika tinggi teks lebih besar dari batas lipatan (96px)
+            if (text.scrollHeight > 100) {
+                btn.classList.remove('hidden');
+                btn.classList.add('flex');
+            } else {
+                container.classList.remove('max-h-24');
+                if (gradient) gradient.classList.add('hidden');
+            }
+        }
+
+        function toggleDescription() {
+            const container = document.getElementById('description-container');
+            const btnText = document.getElementById('toggle-description-text');
+            const btnIcon = document.getElementById('toggle-description-icon');
+            const gradient = document.getElementById('description-gradient');
+
+            if (container.classList.contains('max-h-24')) {
+                // Melebarkan (Expand)
+                container.classList.remove('max-h-24');
+                container.style.maxHeight = container.scrollHeight + 'px';
+                if (gradient) gradient.classList.add('opacity-0');
+                setTimeout(() => {
+                    if (gradient) gradient.classList.add('hidden');
+                }, 200);
+                btnText.textContent = 'Sembunyikan';
+                btnIcon.classList.add('rotate-180');
+            } else {
+                // Melipat (Collapse)
+                if (gradient) {
+                    gradient.classList.remove('hidden');
+                    setTimeout(() => gradient.classList.remove('opacity-0'), 10);
+                }
+                container.style.maxHeight = '';
+                container.classList.add('max-h-24');
+                btnText.textContent = 'Lihat Selengkapnya';
+                btnIcon.classList.remove('rotate-180');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', initDescriptionToggle);
     </script>
 @endsection

@@ -10,9 +10,6 @@ class CodArea extends Model
 {
     use HasFactory;
 
-    /**
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'city',
@@ -20,9 +17,6 @@ class CodArea extends Model
         'boundary',
     ];
 
-    /**
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
@@ -30,12 +24,22 @@ class CodArea extends Model
         ];
     }
 
-    /**
-     * Relasi ke produk yang melayani area COD ini
-     */
     public function products(): BelongsToMany
     {
         return $this->belongsToMany(Product::class, 'product_cod_areas', 'cod_area_id', 'product_id');
     }
-}
 
+    /**
+     * URL Google Maps dari data koordinat boundary [lng, lat]
+     */
+    public function getGmapsUrlAttribute(): string
+    {
+        $coords = $this->boundary['coordinates'] ?? null;
+        if (is_array($coords) && count($coords) === 2) {
+            // Reverse [lng, lat] -> lat,lng
+            return "https://www.google.com/maps?q={$coords[1]},{$coords[0]}";
+        }
+
+        return "https://www.google.com/maps/search/?api=1&query=" . urlencode($this->name . ' ' . $this->city);
+    }
+}

@@ -6,6 +6,7 @@ use App\Http\Requests\UpdateProfileRequest;
 use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
@@ -15,46 +16,34 @@ class ProfileController extends Controller
      */
     public function catalog(Request $request): View
     {
+        $user = Auth::user();
         $profile = $this->getProfile();
         $tab = $request->query('tab', 'dijual');
-        $user = auth()->user();
 
-        // 1. Produk yang dijual oleh pengguna
-        $dbSold = $user ? Product::with(['primaryImage', 'images', 'codAreas'])->where('user_id', $user->id)->get() : collect();
-
-        if ($dbSold->isNotEmpty()) {
-            $soldProducts = $dbSold;
-        } else {
-            // Fallback dummy
-            $allProducts = Product::dummyCatalog();
-            $soldProducts = $allProducts->take(8)->map(function (object $product) use ($profile): object {
-                $clone = clone $product;
-                $clone->penjual = $profile['name'] ?? $profile['username'] ?? 'Midou Wijaya';
-                $clone->kota = $profile['kota'] ?? 'Bekasi';
-
-                return $clone;
-            });
-        }
-
-        // 2. Produk yang difavoritkan oleh pengguna
-        $dbFavorites = $user
-            ? Product::with(['user', 'primaryImage', 'images', 'codAreas'])->whereHas('favorites', fn ($q) => $q->where('user_id', $user->id))->get()
+        // 1. Produk yang dijual oleh pengguna (dari Database)
+        $soldProducts = $user
+            ? Product::with(['user', 'primaryImage', 'images', 'category'])
+            ->where('user_id', $user->id)
+            ->latest()
+            ->get()
             : collect();
 
-        if ($dbFavorites->isNotEmpty()) {
-            $favoriteProducts = $dbFavorites;
-        } else {
-            $favoriteIds = session()->get('favorites', []);
-            $favoriteProducts = Product::dummyCatalog()
-                ->filter(fn (object $p): bool => in_array($p->id, $favoriteIds, true))
-                ->values();
-        }
-
-        // Tentukan produk sesuai tab aktif
-        $products = $tab === 'favorit' ? $favoriteProducts : $soldProducts;
+        // 2. Produk yang difavoritkan oleh pengguna (dari Database)
+        $favoriteProducts = $user
+            ? Product::with(['user', 'primaryImage', 'images', 'category'])
+            ->whereHas('favorites', fn($q) => $q->where('user_id', $user->id))
+            ->latest()
+            ->get()
+            : collect();
 
         // Data ulasan dari pembeli
         $reviews = $this->getDummyReviews();
+
+        // Tentukan produk sesuai tab aktif
+        $products = match ($tab) {
+            'favorit' => $favoriteProducts,
+            default => $soldProducts,
+        };
 
         return view('profile.catalog', [
             'profile' => $profile,
@@ -68,7 +57,7 @@ class ProfileController extends Controller
     }
 
     /**
-     * Data ulasan dummy pembeli tentang barang yang sudah terjual.
+     * Data ulasan pembeli tentang barang yang sudah terjual.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -77,29 +66,32 @@ class ProfileController extends Controller
         return [
             [
                 'id' => 1,
-                'author' => 'Sarah Amalia',
-                'author_avatar' => null,
+                'reviewer_name' => 'Sarah Amalia',
                 'rating' => 5,
-                'date' => '3 hari lalu',
+                'time_ago' => '3 hari lalu',
                 'product_title' => 'TWS Earbuds Bluetooth Wireless Second',
+                'product_price' => 'Rp 150.000',
+                'product_image' => 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=200&auto=format&fit=crop&q=80',
                 'comment' => 'Penjual ramah banget! COD di kampus unsika langsung dites barangnya dan masih berfungsi normal 100%. Recommended seller pokoknya!',
             ],
             [
                 'id' => 2,
-                'author' => 'Budi Pratama',
-                'author_avatar' => null,
+                'reviewer_name' => 'Budi Pratama',
                 'rating' => 5,
-                'date' => '1 minggu lalu',
+                'time_ago' => '1 minggu lalu',
                 'product_title' => 'Buku Pemrograman Web Dasar Laravel',
+                'product_price' => 'Rp 75.000',
+                'product_image' => 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=200&auto=format&fit=crop&q=80',
                 'comment' => 'Barang sesuai deskripsi, masih sangat mulus tanpa coretan. Harganya jauh lebih murah dari toko buku. Makasih mas!',
             ],
             [
                 'id' => 3,
-                'author' => 'Rian Kurniawan',
-                'author_avatar' => null,
+                'reviewer_name' => 'Rian Kurniawan',
                 'rating' => 4,
-                'date' => '2 minggu lalu',
+                'time_ago' => '2 minggu lalu',
                 'product_title' => 'Mouse Gaming Logitech G102 Bekas',
+                'product_price' => 'Rp 120.000',
+                'product_image' => 'https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=200&auto=format&fit=crop&q=80',
                 'comment' => 'Pengiriman cepat, packing aman. Cuma ada baret halus pemakaian wajar tapi klik masih enak dan responsif.',
             ],
         ];
@@ -122,7 +114,7 @@ class ProfileController extends Controller
      */
     public function update(UpdateProfileRequest $request): RedirectResponse
     {
-        $user = auth()->user();
+        $user = Auth::user();
         $validated = $request->validated();
 
         $user->name = trim($validated['name']);
@@ -134,7 +126,7 @@ class ProfileController extends Controller
         // Upload foto profil jika pengguna memilih gambar baru
         if ($request->hasFile('avatar')) {
             $avatarFile = $request->file('avatar');
-            $filename = 'avatar_'.time().'_'.uniqid().'.'.$avatarFile->getClientOriginalExtension();
+            $filename = 'avatar_' . time() . '_' . uniqid() . '.' . $avatarFile->getClientOriginalExtension();
             $destinationPath = public_path('images/avatars');
 
             if (! file_exists($destinationPath)) {
@@ -142,7 +134,7 @@ class ProfileController extends Controller
             }
 
             $avatarFile->move($destinationPath, $filename);
-            $user->avatar = 'images/avatars/'.$filename;
+            $user->avatar = 'images/avatars/' . $filename;
         }
 
         // Hapus foto jika diminta
@@ -171,20 +163,20 @@ class ProfileController extends Controller
      */
     private function getProfile(): array
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
         return [
-            'name' => $user?->name ?? 'Midou Wijaya',
-            'username' => $user?->username ?: str($user?->email ?? 'midou@student.unsika.ac.id')->before('@')->replace('.', '_')->toString(),
-            'email' => $user?->email ?? 'midou@student.unsika.ac.id',
-            'phone' => $user?->whatsapp_number ?? '081299887766',
-            'kota' => $user?->city ?: 'Bekasi',
-            'bio' => $user?->bio ?? 'Jual apa aja demi bisa nikahin hiura',
+            'name' => $user?->name ?? 'Mahasiswa UNSIKA',
+            'username' => $user?->username ?: str($user?->email ?? 'user')->before('@')->replace('.', '_')->toString(),
+            'email' => $user?->email ?? '',
+            'phone' => $user?->whatsapp_number ?? '',
+            'kota' => $user?->city ?: 'Karawang',
+            'bio' => $user?->bio ?? 'Belum ada bio.',
             'avatar' => $user?->avatar,
-            'rating' => 4.5,
-            'reviews_count' => 67,
-            'sold_count' => 10,
-            'online_status' => 'Online 10 menit lalu',
+            'rating' => 4.8,
+            'reviews_count' => 3,
+            'sold_count' => Product::where('user_id', $user?->id)->count(),
+            'online_status' => 'Aktif sekarang',
             'is_verified' => true,
         ];
     }
