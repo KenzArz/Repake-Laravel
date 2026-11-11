@@ -15,8 +15,21 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
 </head>
-<body class="min-h-screen bg-neutral-100/60 text-neutral-900 antialiased selection:bg-lime-300 selection:text-neutral-900">
+<body class="min-h-screen bg-neutral-100/60 text-neutral-900 antialiased selection:bg-lime-300 selection:text-neutral-900" data-authed="{{ auth()->check() ? '1' : '0' }}">
     <x-navbar-user />
+
+    {{-- Pemicu deteksi lokasi [ALDI]; label kota di navbar tetap milik RAFIS --}}
+    @if (auth()->check())
+        <span data-location-detect data-location-url="{{ route('location.store') }}" hidden></span>
+    @endif
+
+    @if (session('info'))
+        <div class="mx-auto mt-3 max-w-6xl px-4 sm:px-6">
+            <div class="rounded-xl border border-lime-300 bg-lime-50 p-3 text-xs font-semibold text-neutral-800" role="status">
+                {{ session('info') }}
+            </div>
+        </div>
+    @endif
 
     <div class="min-h-[calc(100vh-200px)]">
         <main>

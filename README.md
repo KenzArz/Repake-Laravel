@@ -1,6 +1,8 @@
 # Repake - Laravel Marketplace Platform
 
-A comprehensive marketplace application built with Laravel 13, designed for buying and selling second-hand goods with integrated real-time chat, favorites system, and product reporting functionality.
+A marketplace application built with Laravel 13 for buying and selling second-hand goods among UNSIKA students, with Firebase Google authentication, favorites, and product reporting.
+
+> **Status proyek**: sebagian fitur masih dalam pengembangan. Lihat bagian [Status Fitur](#status-fitur) di bawah sebelum menilai klaim pada bagian Features.
 
 ## Table of Contents
 
@@ -16,6 +18,25 @@ A comprehensive marketplace application built with Laravel 13, designed for buyi
 10. [Deployment](#deployment)
 11. [Contributing](#contributing)
 12. [License](#license)
+
+---
+
+## Status Fitur
+
+| Fitur | Status |
+|---|---|
+| Login Firebase (Google, domain UNSIKA) | ✅ Selesai |
+| Halaman home, detail produk, favorit, profil, edit profil | ✅ Selesai (data demo) |
+| Favorit & laporan tersimpan | 🟡 Belum — masih di session, bukan database |
+| Profil dengan data nyata (produk, rating, ulasan) | ❌ Belum — masih dummy |
+| Jual produk (CRUD + upload foto) | ❌ Belum |
+| Pencarian & filter | ❌ Belum |
+| Chat & tawar harga | ❌ Belum |
+| Notifikasi | ❌ Belum |
+| Admin & moderasi | ❌ Belum |
+| API untuk Flutter | ❌ Belum |
+
+Rencana lengkap: `docs/plan/` (jika tersedia) — lihat rencana induk untuk urutan pengerjaan.
 
 ---
 
@@ -117,12 +138,14 @@ Repake is a marketplace platform specifically designed for the second-hand goods
 - **Composer:** Version 2.0 or higher
 - **Node.js:** Version 18.x or higher
 - **NPM:** Version 9.x or higher
-- **MySQL:** Version 8.0 or higher (MariaDB 10.3+ also supported)
+- **MySQL:** Version 8.0 or higher, or **MariaDB 10.6+** (proyek ini memakai MariaDB; SQLite tidak didukung)
+- **GD PHP Extension** (untuk upload & pemrosesan gambar)
 - **Git:** Version 2.x or higher
 
 ### Required PHP Extensions
 
-- PDO PHP Extension
+- PDO PHP Extension (driver `pdo_mysql` + `mysqli`)
+- GD PHP Extension
 - Mbstring PHP Extension
 - OpenSSL PHP Extension
 - Tokenizer PHP Extension
@@ -142,8 +165,6 @@ Repake is a marketplace platform specifically designed for the second-hand goods
 
 ## Installation
 
-For complete installation instructions, please refer to [INSTALLATION.md](INSTALLATION.md).
-
 ### Quick Setup
 
 ```bash
@@ -161,7 +182,8 @@ npm install
 cp .env.example .env
 php artisan key:generate
 
-# Setup database
+# Setup database (MariaDB/MySQL)
+mysql -u root -e "CREATE DATABASE IF NOT EXISTS repake_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 # Configure database credentials in .env file
 php artisan migrate
 php artisan db:seed

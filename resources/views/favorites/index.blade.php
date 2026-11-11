@@ -3,7 +3,7 @@
 @section('title', 'Produk Favorit - RePake')
 
 @section('content')
-<div class="mx-auto max-w-7xl px-4 py-6 md:px-8 lg:px-12">
+<div class="mx-auto max-w-6xl px-4 py-6 sm:px-6">
     {{-- Header Halaman Favorit --}}
     <div class="mb-6">
         <h1 class="text-h2 md:text-h1 font-bold tracking-tight text-neutral-900">Produk Favorit</h1>

@@ -9,6 +9,7 @@ Thumbs.db
 .env.production
 .env.local
 .env.*.local
+.env.testing
 
 # IDE Configuration
 .phpactor.json
@@ -64,6 +65,8 @@ yarn-error.log*
 
 # Storage
 /public/storage
+/public/images/avatars/*
+!/public/images/avatars/.gitkeep
 /storage/*.key
 /storage/pail
 /storage/logs/*.log

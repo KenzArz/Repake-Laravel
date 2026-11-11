@@ -1,0 +1,84 @@
+{
+    "object": "list",
+    "data": [
+        {
+            "id": "qwen3.6-35b",
+            "name": "Qwen3.6 35B (high speed)",
+            "object": "model",
+            "created": 1794287117,
+            "owned_by": "vllm",
+            "input_modalities": ["text", "image", "video"],
+            "output_modalities": ["text"],
+            "quantization": "mixed",
+            "context_length": 262144,
+            "max_output_length": 8192,
+            "pricing": {
+                "prompt": "0.08",
+                "completion": "0.28",
+                "image": "0",
+                "request": "0",
+                "input_cache_reads": "0.01",
+                "input_cache_writes": "0"
+            },
+            "supported_sampling_parameters": [
+                "max_tokens",
+                "stop",
+                "stream",
+                "temperature",
+                "top_p"
+            ],
+            "supported_features": ["tools", "json_mode", "structured_outputs"],
+            "on_demand": false,
+            "openrouter": null
+        },
+        {
+            "id": "deepseek-v4-flash",
+            "name": "DeepSeek V4 Flash (high speed)",
+            "object": "model",
+            "created": 1794287117,
+            "owned_by": "sglang",
+            "input_modalities": ["text"],
+            "output_modalities": ["text"],
+            "quantization": "none",
+            "context_length": 1000000,
+            "max_output_length": 393216,
+            "pricing": {
+                "prompt": "0.44",
+                "completion": "1.32",
+                "image": "0",
+                "request": "0",
+                "input_cache_reads": "0.014",
+                "input_cache_writes": "0"
+            },
+            "supported_sampling_parameters": [
+                "max_tokens",
+                "reasoning_effort",
+                "stop",
+                "stream",
+                "temperature",
+                "thinking",
+                "top_p"
+            ],
+            "supported_features": ["tools", "json_mode", "structured_outputs"],
+            "on_demand": false,
+            "openrouter": null
+        },
+        {
+            "id": "bge-m3",
+            "name": "BGE-M3",
+            "object": "model",
+            "created": 1794287117,
+            "owned_by": "sglang",
+            "input_modalities": ["text"],
+            "output_modalities": ["embedding"],
+            "quantization": "fp16",
+            "context_length": 8192,
+            "max_output_length": 0,
+            "pricing": { "prompt": "0", "completion": "0" },
+            "supported_sampling_parameters": [],
+            "supported_features": ["embeddings"],
+            "on_demand": false,
+            "openrouter": null
+        }
+    ]
+}
