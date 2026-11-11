@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class Product extends Model
 {
@@ -73,6 +74,23 @@ class Product extends Model
                 ->where('judul', 'like', "%{$term}%")
                 ->orWhere('deskripsi', 'like', "%{$term}%")
         ));
+    }
+
+    /**
+     * Slug unik dari judul; diberi suffix angka bila sudah dipakai produk lain.
+     */
+    public static function uniqueSlug(string $judul): string
+    {
+        $slug = Str::slug($judul);
+        $candidate = $slug;
+        $suffix = 2;
+
+        while (self::withTrashed()->where('slug', $candidate)->exists()) {
+            $candidate = $slug.'-'.$suffix;
+            $suffix++;
+        }
+
+        return $candidate;
     }
 
     public function seller(): BelongsTo

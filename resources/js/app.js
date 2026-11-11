@@ -87,3 +87,8 @@ document.addEventListener("click", async (e) => {
 
 /* Deteksi kota [ALDI] — hanya aktif bila ada pemicunya di halaman */
 initLocationDetect();
+
+/* Form jual barang — hanya dimuat bila halamannya memang punya form tersebut */
+if (document.getElementById("productForm")) {
+    import("./product-create").then((module) => module.initProductCreate());
+}
