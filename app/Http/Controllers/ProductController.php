@@ -4,41 +4,371 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreProductRequest;
 use App\Models\Category;
+use App\Models\CodArea;
 use App\Models\Product;
 use App\Services\ProductImageStorage;
 use App\Services\ProductPublisher;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ProductController extends Controller
 {
+    /**
+     * Koordinat referensi & alias kelurahan/kecamatan untuk lokasi populer.
+     *
+     * @var array<string, array{lat: float, lng: float, keywords: array<int, string>}>
+     */
+    private const LOCATION_PRESETS = [
+        'kampus 1 unsika' => [
+            'lat' => -6.3236,
+            'lng' => 107.3065,
+            'keywords' => ['unsika', 'telukjambe', 'sukaharja', 'ronggowaluyo', 'karawang'],
+        ],
+        'kampus 2 unsika' => [
+            'lat' => -6.3298,
+            'lng' => 107.3112,
+            'keywords' => ['unsika', 'telukjambe', 'puseurjaya', 'sukaharja', 'karawang'],
+        ],
+        'galuh mas' => [
+            'lat' => -6.3269,
+            'lng' => 107.2896,
+            'keywords' => ['galuh mas', 'sukaharja', 'telukjambe', 'karawang'],
+        ],
+        'telukjambe' => [
+            'lat' => -6.3250,
+            'lng' => 107.3010,
+            'keywords' => ['telukjambe', 'sukaharja', 'puseurjaya', 'sirnabaya', 'karawang'],
+        ],
+        'klari' => [
+            'lat' => -6.3489,
+            'lng' => 107.3514,
+            'keywords' => ['klari', 'kosambi', 'gintungkerta', 'karawang'],
+        ],
+        'karawang' => [
+            'lat' => -6.3023,
+            'lng' => 107.2952,
+            'keywords' => ['karawang', 'adiarsa', 'nagasari', 'tanjungpura', 'telukjambe'],
+        ],
+        'bekasi' => [
+            'lat' => -6.2383,
+            'lng' => 106.9756,
+            'keywords' => ['bekasi', 'tambun', 'cikarang'],
+        ],
+    ];
+
     public function __construct(
         private readonly ProductImageStorage $images,
         private readonly ProductPublisher $publisher,
     ) {}
 
-    public function index(Request $request): View
+    /**
+     * Endpoint JSON untuk rekomendasi pencarian di navbar (Desktop & Mobile).
+     * Mengembalikan kata kunci menuju halaman pencarian (bukan halaman detail produk).
+     */
+    public function suggestions(Request $request): JsonResponse
     {
-        $q = trim((string) $request->query('q'));
-        $kategori = (string) $request->query('kategori');
-        $kota = trim((string) $request->query('kota'));
+        $q = trim((string) $request->query('q', ''));
 
-        $products = Product::with(['primaryImage', 'user', 'category'])
-            ->when($q !== '', fn($query) => $query->cari($q))
-            ->when($kota !== '', fn($query) => $query->where('kota', $kota))
-            ->when($kategori !== '', fn($query) => $query->whereHas('category', fn($cq) => $cq->where('slug', $kategori)))
+        if (mb_strlen($q) < 2) {
+            return response()->json([
+                'categories' => [],
+                'products' => [],
+            ]);
+        }
+
+        $categories = Category::urut()
+            ->where('name', 'like', "%{$q}%")
+            ->take(3)
+            ->get()
+            ->map(fn(Category $cat): array => [
+                'name' => $cat->name,
+                'slug' => $cat->slug,
+                'url' => route('products.index', ['kategori' => [$cat->slug]]),
+            ])
+            ->values();
+
+        $products = Product::with('category')
             ->dijual()
+            ->cari($q)
             ->latest()
-            ->paginate(12)
-            ->withQueryString();
+            ->take(6)
+            ->get()
+            ->map(fn(Product $product): array => [
+                'id' => $product->id,
+                'judul' => $product->judul,
+                'harga' => 'Rp ' . number_format((int) $product->harga, 0, ',', '.'),
+                'kota' => $product->kota ?: 'Sekitar Kampus',
+                'kondisi' => $product->kondisi,
+                'category' => $product->category?->name ?? 'Produk',
+                'search_url' => route('products.index', ['q' => $product->judul]),
+            ])
+            ->values();
+
+        return response()->json([
+            'categories' => $categories,
+            'products' => $products,
+        ]);
+    }
+
+    public function index(Request $request): View|string
+    {
+        $q = trim((string) $request->query('q', ''));
+        $selectedKategori = array_values(array_filter((array) $request->query('kategori', [])));
+        $selectedKondisi = array_values(array_filter((array) $request->query('kondisi', [])));
+        $minPrice = $request->query('min_price');
+        $maxPrice = $request->query('max_price');
+        $radiusKm = is_numeric($request->query('radius')) ? (float) $request->query('radius') : null;
+        $negoOnly = $request->boolean('nego');
+
+        // Resolve & sinkronkan lokasi dari query parameter atau session navbar
+        $userLocation = $this->resolveUserLocation($request);
+        $activeKota = $userLocation['kota'] ?? '';
+        $targetLat = $userLocation['lat'];
+        $targetLng = $userLocation['lng'];
+
+        $defaultSort = 'terbaru';
+        $sort = (string) $request->query('sort', $defaultSort);
+
+        $locationTarget = ($activeKota !== '' || $targetLat !== null)
+            ? $this->resolveLocationTarget($userLocation)
+            : ['lat' => null, 'lng' => null, 'keywords' => []];
+
+        $targetLat = $locationTarget['lat'];
+        $targetLng = $locationTarget['lng'];
+        $locationKeywords = $locationTarget['keywords'];
+
+        $query = Product::with(['primaryImage', 'user', 'category', 'codAreas'])
+            ->dijual()
+            ->when($q !== '', fn(Builder $qb) => $qb->cari($q))
+            ->when($selectedKategori !== [], function (Builder $qb) use ($selectedKategori): void {
+                $qb->whereHas('category', fn(Builder $cq) => $cq->whereIn('slug', $selectedKategori));
+            })
+            ->when($selectedKondisi !== [], function (Builder $qb) use ($selectedKondisi): void {
+                $lowered = array_map('mb_strtolower', $selectedKondisi);
+                $qb->whereIn(DB::raw('LOWER(kondisi)'), $lowered);
+            })
+            ->when($minPrice !== null && $minPrice !== '' && is_numeric($minPrice), fn(Builder $qb) => $qb->where('harga', '>=', (int) $minPrice))
+            ->when($maxPrice !== null && $maxPrice !== '' && is_numeric($maxPrice), fn(Builder $qb) => $qb->where('harga', '<=', (int) $maxPrice))
+            ->when($negoOnly, fn(Builder $qb) => $qb->where('is_negotiable', true));
+
+        // Jika lokasi aktif atau urutkan terdekat dipilih
+        if ($activeKota !== '' || $radiusKm !== null || ($sort === 'terdekat' && $targetLat !== null && $targetLng !== null)) {
+            $maxRadius = $radiusKm ?? 15.0;
+
+            $all = $query->latest()->get()->map(function (Product $product) use ($targetLat, $targetLng): Product {
+                $product->distance_km = ($targetLat !== null && $targetLng !== null)
+                    ? $this->calculateDistanceKm($product, $targetLat, $targetLng)
+                    : null;
+
+                return $product;
+            });
+
+            if ($activeKota !== '' || $radiusKm !== null) {
+                $all = $all->filter(function (Product $p) use ($locationKeywords, $maxRadius): bool {
+                    $keywordMatch = $this->matchesLocationKeywords($p, $locationKeywords);
+                    $distanceMatch = $p->distance_km !== null && $p->distance_km <= $maxRadius;
+
+                    return $keywordMatch || $distanceMatch;
+                });
+            }
+
+            $sorted = match ($sort) {
+                'termurah' => $all->sortBy('harga'),
+                'termahal' => $all->sortByDesc('harga'),
+                'terdekat' => $all->sortBy(fn(Product $p): array => [
+                    $p->distance_km ?? 9999.0,
+                    - ($p->created_at?->timestamp ?? 0),
+                ]),
+                default => $all->sortByDesc('created_at'),
+            };
+
+            $products = $this->paginateCollection($sorted->values(), 12, $request);
+        } else {
+            match ($sort) {
+                'termurah' => $query->orderBy('harga', 'asc')->latest(),
+                'termahal' => $query->orderBy('harga', 'desc')->latest(),
+                default => $query->latest(),
+            };
+
+            $products = $query->paginate(12)->withQueryString();
+        }
+
+        if ($request->ajax()) {
+            return view('products.partials.results', compact('products'))->render();
+        }
 
         $categories = Category::urut()->get();
+        $kondisiOptions = [
+            'Baru',
+            'Seperti baru',
+            'Dirawat dengan baik',
+            'Layak pakai',
+        ];
 
-        return view('products.index', compact('products', 'categories', 'q', 'kategori', 'kota'));
+        return view('products.index', compact(
+            'products',
+            'categories',
+            'kondisiOptions',
+            'q',
+            'selectedKategori',
+            'selectedKondisi',
+            'activeKota',
+            'sort',
+            'defaultSort',
+            'targetLat',
+            'targetLng',
+        ));
+    }
+
+    /**
+     * @return array{kota: ?string, lat: ?float, lng: ?float}
+     */
+    private function resolveUserLocation(Request $request): array
+    {
+        if ($request->has('kota')) {
+            $rawCity = trim((string) $request->query('kota', ''));
+
+            if ($rawCity === '' || strcasecmp($rawCity, 'Pilih Lokasimu') === 0) {
+                session()->forget('user_location');
+
+                return ['kota' => null, 'lat' => null, 'lng' => null];
+            }
+
+            $lat = is_numeric($request->query('lat')) ? (float) $request->query('lat') : null;
+            $lng = is_numeric($request->query('lng')) ? (float) $request->query('lng') : null;
+
+            $saved = ['kota' => $rawCity, 'lat' => $lat, 'lng' => $lng];
+            session()->put('user_location', $saved);
+
+            return $saved;
+        }
+
+        if (session()->has('user_location')) {
+            return session('user_location');
+        }
+
+        $fallbackCity = $request->user()?->kota ?? session('user_profile.kota');
+        $fallbackCity = is_string($fallbackCity) ? trim($fallbackCity) : '';
+
+        if ($fallbackCity === '' || strcasecmp($fallbackCity, 'Pilih Lokasimu') === 0) {
+            return ['kota' => null, 'lat' => null, 'lng' => null];
+        }
+
+        return ['kota' => $fallbackCity, 'lat' => null, 'lng' => null];
+    }
+
+    /**
+     * @param array{kota: ?string, lat: ?float, lng: ?float} $location
+     * @return array{lat: ?float, lng: ?float, keywords: array<int, string>}
+     */
+    private function resolveLocationTarget(array $location): array
+    {
+        $city = (string) ($location['kota'] ?? '');
+        $normalized = mb_strtolower($city);
+        $keywords = $normalized !== '' ? [$normalized] : [];
+
+        if (preg_match('/\(([^)]+)\)/', $normalized, $matches)) {
+            $inside = trim($matches[1]);
+            if ($inside !== '') {
+                $keywords[] = $inside;
+            }
+        }
+
+        $withoutParens = trim((string) preg_replace('/\([^)]*\)/', '', $normalized));
+        if ($withoutParens !== '') {
+            $keywords[] = $withoutParens;
+        }
+
+        // Pecah jika label berformat "Kecamatan, Kabupaten/Kota" dari OpenStreetMap
+        foreach (explode(',', $withoutParens) as $part) {
+            $clean = trim(str_replace(['kabupaten ', 'kota '], '', trim($part)));
+            if ($clean !== '') {
+                $keywords[] = $clean;
+            }
+        }
+
+        $lat = $location['lat'];
+        $lng = $location['lng'];
+
+        foreach (self::LOCATION_PRESETS as $key => $preset) {
+            if (str_contains($normalized, $key) || in_array($withoutParens, $preset['keywords'], true)) {
+                $lat ??= $preset['lat'];
+                $lng ??= $preset['lng'];
+                $keywords = array_merge($keywords, $preset['keywords']);
+                break;
+            }
+        }
+
+        return [
+            'lat' => $lat,
+            'lng' => $lng,
+            'keywords' => array_values(array_unique(array_filter($keywords))),
+        ];
+    }
+
+    /**
+     * @param array<int, string> $keywords
+     */
+    private function matchesLocationKeywords(Product $product, array $keywords): bool
+    {
+        $codAreaNames = $product->codAreas->pluck('name')->implode(' ');
+        $haystack = mb_strtolower(trim("{$product->kota} {$product->patokan_lokasi} {$codAreaNames}"));
+
+        foreach ($keywords as $word) {
+            if ($word !== '' && str_contains($haystack, $word)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function calculateDistanceKm(Product $product, float $targetLat, float $targetLng): ?float
+    {
+        $coords = data_get($product->codAreas->first(), 'boundary.coordinates', []);
+
+        if (! is_array($coords) || count($coords) < 2) {
+            return null;
+        }
+
+        $prodLng = (float) $coords[0];
+        $prodLat = (float) $coords[1];
+
+        if ($prodLat === 0.0 && $prodLng === 0.0) {
+            return null;
+        }
+
+        $earthRadiusKm = 6371.0;
+        $dLat = deg2rad($prodLat - $targetLat);
+        $dLng = deg2rad($prodLng - $targetLng);
+
+        $a = sin($dLat / 2) ** 2
+            + cos(deg2rad($targetLat)) * cos(deg2rad($prodLat)) * sin($dLng / 2) ** 2;
+
+        return round($earthRadiusKm * (2 * atan2(sqrt($a), sqrt(1 - $a))), 1);
+    }
+
+    private function paginateCollection(Collection $items, int $perPage, Request $request): LengthAwarePaginator
+    {
+        $page = max(1, (int) $request->query('page', 1));
+        $sliced = $items->slice(($page - 1) * $perPage, $perPage)->values();
+
+        return (new LengthAwarePaginator(
+            $sliced,
+            $items->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url()]
+        ))->withQueryString();
     }
 
     public function create(): View
@@ -84,7 +414,7 @@ class ProductController extends Controller
             if ($product instanceof Product && $request->filled(['cod_lat', 'cod_lng'])) {
                 $placeName = $request->cod_place_name ?: $request->kota;
 
-                $codArea = \App\Models\CodArea::firstOrCreate(
+                $codArea = CodArea::firstOrCreate(
                     ['name' => $placeName, 'city' => $request->kota],
                     [
                         'province' => $request->province ?? 'Jawa Barat',
@@ -210,7 +540,7 @@ class ProductController extends Controller
         if ($request->filled(['cod_lat', 'cod_lng'])) {
             $placeName = $validated['cod_place_name'] ?: $validated['kota'];
 
-            $codArea = \App\Models\CodArea::firstOrCreate(
+            $codArea = CodArea::firstOrCreate(
                 ['name' => $placeName, 'city' => $validated['kota']],
                 [
                     'province' => $validated['province'] ?? 'Jawa Barat',
@@ -231,13 +561,12 @@ class ProductController extends Controller
                 $rawPath = $img->getAttributes()['path'] ?? $img->getAttributes()['path_url'] ?? null;
                 if ($rawPath) {
                     $diskPath = preg_replace('#^/?storage/#', '', $rawPath);
-                    \Illuminate\Support\Facades\Storage::disk('public')->delete($diskPath);
+                    Storage::disk('public')->delete($diskPath);
                 }
                 $img->delete();
             }
         }
 
-        // Simpan foto baru yang diunggah
         // Simpan foto baru yang diunggah
         $sampleAttrs = $product->images()->first()?->getAttributes() ?? [];
         $pathColumn = array_key_exists('path', $sampleAttrs) ? 'path' : 'path_url';
@@ -324,7 +653,6 @@ class ProductController extends Controller
 
         $message = "Produk \"{$judul}\" berhasil dihapus dari katalog.";
 
-        // Jika dihapus dari halaman detail produk, arahkan ke katalog profil agar tidak 404
         if (url()->previous() === $detailUrl) {
             return redirect()
                 ->route('profile.catalog')
