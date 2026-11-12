@@ -40,7 +40,7 @@
                     Dijual oleh {{ $seller?->name ?? '—' }}
                 </p>
                 @if ($productExists)
-                    <a href="{{ route('products.show', $product) }}" target="_blank" rel="noopener noreferrer"
+                    <a href="{{ $product->detailUrl() }}" target="_blank" rel="noopener noreferrer"
                         class="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-neutral-700 underline underline-offset-2 hover:text-neutral-900">
                         Lihat produk
                         <svg viewBox="0 0 24 24" class="size-3 fill-none stroke-current stroke-2" aria-hidden="true">

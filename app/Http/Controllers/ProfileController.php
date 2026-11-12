@@ -10,74 +10,66 @@ use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
 {
     /**
+     * Tab di profil pemilik (termasuk daftar favorit pribadi).
+     *
+     * @var array<int, string>
+     */
+    private const OWNER_TABS = ['dijual', 'favorit', 'ulasan'];
+
+    /**
+     * Tab di profil publik penjual lain (tanpa favorit).
+     *
+     * @var array<int, string>
+     */
+    private const PUBLIC_TABS = ['dijual', 'ulasan'];
+
+    /**
      * Tampilkan halaman profil dan katalog produk pengguna.
      */
     public function catalog(Request $request): View
     {
-        $user = $request->user();
-        $profile = $this->getProfile();
-        $tab = $request->query('tab', 'dijual');
+        $tab = $this->resolveTab($request, self::OWNER_TABS);
 
-        // Produk yang dijual oleh pengguna (dari database)
-        $soldProducts = Product::with(['primaryImage', 'user'])
-            ->where('user_id', $user->id)
-            ->latest()
-            ->get();
-
-        // Produk yang difavoritkan oleh pengguna (dari tabel favorites)
-        $favoriteProducts = Product::with(['primaryImage', 'user'])
-            ->whereHas('favorites', fn ($q) => $q->where('user_id', $user->id))
-            ->latest()
-            ->get();
-
-        // Tentukan produk sesuai tab aktif
-        $products = $tab === 'favorit' ? $favoriteProducts : $soldProducts;
-
-        // Ulasan pembeli tentang barang yang sudah terjual (dari database)
-        $reviews = $this->getReviews($user);
-
-        // Statistik profile dihitung dari data nyata, bukan hardcode
-        $profile['rating'] = round((float) ($reviews->avg(fn (array $r): int => $r['rating']) ?? 0), 1);
-        $profile['reviews_count'] = $reviews->count();
-        $profile['sold_count'] = $soldProducts->count();
-
-        return view('profile.catalog', [
-            'profile' => $profile,
-            'tab' => $tab,
-            'products' => $products,
-            'reviews' => $reviews->all(),
-            'soldCount' => $soldProducts->count(),
-            'favoriteCount' => $favoriteProducts->count(),
-            'reviewCount' => $reviews->count(),
-        ]);
+        return view('profile.catalog', $this->catalogPayload($request->user(), $tab, true));
     }
 
     /**
-     * Ulasan dari pembeli untuk produk pemilik profile (dari database).
+     * Tampilkan profil publik penjual lain.
      *
-     * @return Collection<int, array<string, mixed>>
+     * Hanya produk berstatus "dijual" yang tampil, sehingga produk yang
+     * ditangguhkan admin atau masih draft tidak bocor lewat halaman ini.
+     * Penjual yang dibanned tidak bisa diakses, sama seperti detail produknya.
      */
-    private function getReviews(User $user): Collection
+    public function show(Request $request, string $seller): View|RedirectResponse
     {
-        return Review::with(['product.primaryImage', 'reviewer'])
-            ->where('seller_id', $user->id)
-            ->latest()
-            ->get()
-            ->map(fn (Review $review): array => [
-                'id' => $review->id,
-                'reviewer_name' => $review->reviewer?->name ?? 'Pembeli',
-                'time_ago' => $review->created_at?->locale('id')->diffForHumans(['syntax' => CarbonInterface::DIFF_ABSOLUTE]).' lalu',
-                'rating' => $review->rating,
-                'comment' => $review->komentar ?? '',
-                'product_title' => $review->product?->judul ?? '',
-                'product_price' => 'Rp '.number_format($review->product?->harga ?? 0, 0, ',', '.'),
-                'product_image' => $review->product?->gambar ?? 'images/default-avatar.png',
-            ]);
+        $user = $this->findSeller($request, $seller);
+
+        abort_if($user->is_banned, 404);
+
+        if ($request->user()?->id === $user->id) {
+            return redirect()->route('profile.catalog');
+        }
+
+        // Kanonis: username bila ada, selain itu UUID. `?id={uuid}` selalu
+        // disertakan untuk akun ber-username agar identitas tetap stabil
+        // meski username berubah.
+        $canonicalKey = $user->username ?: $user->id;
+        $needsQueryId = filled($user->username);
+
+        if ($seller !== $canonicalKey || ($needsQueryId && ! $request->filled('id'))) {
+            return redirect()->to($user->profileUrl(), 301);
+        }
+
+        $tab = $this->resolveTab($request, self::PUBLIC_TABS);
+
+        return view('profile.catalog', $this->catalogPayload($user, $tab, false));
     }
 
     /**
@@ -85,10 +77,8 @@ class ProfileController extends Controller
      */
     public function edit(): View
     {
-        $profile = $this->getProfile();
-
         return view('profile.edit', [
-            'profile' => $profile,
+            'profile' => $this->profileData(auth()->user()),
         ]);
     }
 
@@ -102,20 +92,26 @@ class ProfileController extends Controller
 
         // Perbarui data utama profil
         $user->name = trim($validated['name']);
-        if (! empty($validated['username'])) {
-            $user->username = ltrim(trim($validated['username']), '@');
-        }
+
+        // Username kosong berarti akun memakai UUID pada URL profil,
+        // jadi pengguna tetap boleh menghapus username-nya.
+        $user->username = filled($validated['username'] ?? null)
+            ? ltrim(trim((string) $validated['username']), '@')
+            : null;
+
         $user->phone = ! empty($validated['phone']) ? trim($validated['phone']) : null;
         $user->kota = ! empty($validated['kota']) ? trim($validated['kota']) : 'Karawang';
         $user->bio = ! empty($validated['bio']) ? trim($validated['bio']) : null;
 
         // Upload foto profil jika pengguna memilih gambar baru
         if ($request->hasFile('avatar')) {
+            $this->deleteStoredAvatar($user->avatar);
             $user->avatar = $request->file('avatar')->store('avatars', 'public');
         }
 
         // Hapus foto jika diminta
         if ($request->filled('remove_avatar') && $request->input('remove_avatar') == '1') {
+            $this->deleteStoredAvatar($user->avatar);
             $user->avatar = null;
         }
 
@@ -134,14 +130,149 @@ class ProfileController extends Controller
     }
 
     /**
-     * Ambil data profil dari user yang sedang login.
+     * Hapus berkas avatar lama dari disk publik tanpa menyentuh URL eksternal
+     * (mis. foto Google) atau aset bawaan yang tersimpan di public/.
+     */
+    private function deleteStoredAvatar(?string $path): void
+    {
+        if (! $path
+            || str_starts_with($path, 'http://')
+            || str_starts_with($path, 'https://')
+            || str_starts_with($path, '/')) {
+            return;
+        }
+
+        if (file_exists(public_path($path))) {
+            return;
+        }
+
+        Storage::disk('public')->delete($path);
+    }
+
+    /**
+     * Data siap-render yang dipakai bersama oleh profil sendiri dan profil publik.
      *
      * @return array<string, mixed>
      */
-    private function getProfile(): array
+    private function catalogPayload(User $user, string $tab, bool $isOwner): array
     {
-        $user = auth()->user();
+        $products = $this->productsFor($user, $tab, $isOwner);
+        $reviews = $this->reviewsFor($user);
 
+        // Statistik profile dihitung dari data nyata, bukan hardcode
+        $profile = $this->profileData($user);
+        $profile['rating'] = round((float) ($reviews->avg(fn (array $review): int => $review['rating']) ?? 0), 1);
+        $profile['reviews_count'] = $reviews->count();
+        $profile['sold_count'] = $this->productCount($user, $isOwner);
+
+        return [
+            'profile' => $profile,
+            'seller' => $user,
+            'isOwner' => $isOwner,
+            'tab' => $tab,
+            'products' => $products,
+            'reviews' => $reviews->all(),
+            'reviewCount' => $reviews->count(),
+            'favoriteCount' => $isOwner ? $this->favoriteCount($user) : 0,
+            'chatProducts' => $isOwner ? collect() : $this->activeProducts($user),
+            'profileUrl' => $isOwner ? route('profile.catalog') : $user->profileUrl(),
+        ];
+    }
+
+    /**
+     * Produk sesuai tab yang sedang aktif.
+     *
+     * @return Collection<int, Product>
+     */
+    private function productsFor(User $user, string $tab, bool $isOwner): Collection
+    {
+        if ($tab === 'ulasan') {
+            return collect();
+        }
+
+        if ($isOwner && $tab === 'favorit') {
+            // Samakan dengan katalog: produk yang disuspend/draft atau milik
+            // penjual yang dibanned tidak ditampilkan agar tidak menuju 404.
+            return Product::with(['primaryImage', 'user'])
+                ->dijual()
+                ->whereHas('favorites', fn ($query) => $query->where('user_id', $user->id))
+                ->latest()
+                ->get();
+        }
+
+        return Product::with(['primaryImage', 'user'])
+            ->where('user_id', $user->id)
+            ->when(! $isOwner, fn ($query) => $query->where('status', Product::STATUS_DIJUAL))
+            ->latest()
+            ->get();
+    }
+
+    /**
+     * Jumlah produk untuk angka "Terjual" pada kartu profil.
+     */
+    private function productCount(User $user, bool $isOwner): int
+    {
+        return Product::query()
+            ->where('user_id', $user->id)
+            ->when(! $isOwner, fn ($query) => $query->where('status', Product::STATUS_DIJUAL))
+            ->count();
+    }
+
+    /**
+     * Jumlah produk yang difavoritkan pemilik profil (tab Favorit).
+     */
+    private function favoriteCount(User $user): int
+    {
+        return Product::query()
+            ->dijual()
+            ->whereHas('favorites', fn ($query) => $query->where('user_id', $user->id))
+            ->count();
+    }
+
+    /**
+     * Produk aktif penjual untuk modal "Chat Penjual" di profil publik.
+     *
+     * @return Collection<int, Product>
+     */
+    private function activeProducts(User $user): Collection
+    {
+        return Product::with('primaryImage')
+            ->where('user_id', $user->id)
+            ->where('status', Product::STATUS_DIJUAL)
+            ->latest()
+            ->get();
+    }
+
+    /**
+     * Ulasan dari pembeli untuk produk pemilik profil (dari database).
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function reviewsFor(User $user): Collection
+    {
+        return Review::with(['product.primaryImage', 'reviewer'])
+            ->where('seller_id', $user->id)
+            ->latest()
+            ->get()
+            ->map(fn (Review $review): array => [
+                'id' => $review->id,
+                'reviewer_name' => $review->reviewer?->name ?? 'Pembeli',
+                'time_ago' => $review->created_at?->locale('id')->diffForHumans(['syntax' => CarbonInterface::DIFF_ABSOLUTE]).' lalu',
+                'rating' => $review->rating,
+                'comment' => $review->komentar ?? '',
+                'product_title' => $review->product?->judul ?? '',
+                'product_price' => 'Rp '.number_format($review->product?->harga ?? 0, 0, ',', '.'),
+                'product_image' => $review->product?->gambar ?? 'images/default-avatar.png',
+            ]);
+    }
+
+    /**
+     * Data profil dari user yang diberikan (bukan hanya user yang login).
+     *
+     * @return array<string, mixed>
+     */
+    private function profileData(User $user): array
+    {
         return [
             'name' => $user->name,
             'username' => $user->username ?: str($user->email)->before('@')->replace('.', '_')->toString(),
@@ -152,5 +283,40 @@ class ProfileController extends Controller
             'avatar' => $user->avatar,
             'avatar_url' => $user->avatar_url,
         ];
+    }
+
+    /**
+     * Cari penjual dari query `id` (UUID) atau dari segmen path (username/UUID).
+     *
+     * Fallback nomor urut sudah dihapus agar akun tidak bisa dienumerasi.
+     */
+    private function findSeller(Request $request, string $seller): User
+    {
+        $id = $request->query('id');
+
+        if (filled($id)) {
+            abort_unless(is_string($id) && Str::isUuid($id), 404);
+
+            $user = User::query()->find($id);
+        } else {
+            $user = User::query()->where('username', $seller)->first()
+                ?? (Str::isUuid($seller) ? User::query()->find($seller) : null);
+        }
+
+        abort_if($user === null, 404);
+
+        return $user;
+    }
+
+    /**
+     * Tab yang dipakai, dibatasi ke daftar tab yang tersedia.
+     *
+     * @param  array<int, string>  $allowed
+     */
+    private function resolveTab(Request $request, array $allowed): string
+    {
+        $tab = (string) $request->query('tab', 'dijual');
+
+        return in_array($tab, $allowed, true) ? $tab : 'dijual';
     }
 }

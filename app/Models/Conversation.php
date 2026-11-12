@@ -68,7 +68,7 @@ class Conversation extends Model
     /**
      * Apakah user ini peserta percakapan (buyer atau seller).
      */
-    public function involves(int $userId): bool
+    public function involves(string $userId): bool
     {
         return $this->buyer_id === $userId || $this->seller_id === $userId;
     }
@@ -76,7 +76,7 @@ class Conversation extends Model
     /**
      * Lawan bicara dari sudut pandang user tertentu.
      */
-    public function counterpartFor(int $userId): ?User
+    public function counterpartFor(string $userId): ?User
     {
         return $this->buyer_id === $userId ? $this->seller : $this->buyer;
     }

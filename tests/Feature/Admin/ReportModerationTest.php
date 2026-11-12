@@ -91,14 +91,14 @@ test('suspending a product hides it from the catalog and resolves the report', f
 
     $this->app['auth']->forgetGuards();
 
-    $this->get(route('products.show', $this->product))->assertNotFound();
+    $this->get($this->product->detailUrl())->assertNotFound();
 });
 
 test('product owner can still see a suspended product', function () {
     $this->product->update(['status' => Product::STATUS_DITANGGUIHKAN]);
 
     $this->actingAs($this->seller)
-        ->get(route('products.show', $this->product))
+        ->get($this->product->detailUrl())
         ->assertOk()
         ->assertSee('Ditangguhkan');
 });
@@ -136,7 +136,7 @@ test('banning a seller hides all of their products', function () {
         ->assertDontSee('Produk Yang Dilaporkan')
         ->assertDontSee('Produk Lain Penjual');
 
-    $this->get(route('products.show', $otherProduct))->assertNotFound();
+    $this->get($otherProduct->detailUrl())->assertNotFound();
 });
 
 test('unbanning a seller restores their catalog visibility', function () {

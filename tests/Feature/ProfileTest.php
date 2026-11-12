@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Favorite;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Review;
@@ -98,6 +99,54 @@ test('username must be unique', function () {
     ])->assertSessionHasErrors('username');
 });
 
+test('username with url-breaking characters is rejected', function () {
+    $this->put(route('profile.update'), [
+        'name' => 'Midou Updated',
+        'username' => 'toko/saya',
+    ])->assertSessionHasErrors('username');
+
+    expect($this->profileUser->refresh()->username)->toBe('Midou_kun');
+});
+
+test('user can clear username and fall back to uuid profile url', function () {
+    $this->put(route('profile.update'), [
+        'name' => 'Midou Tanpa Handle',
+        'username' => '',
+    ])->assertRedirect(route('profile.catalog'));
+
+    $user = $this->profileUser->refresh();
+
+    expect($user->username)->toBeNull()
+        ->and($user->profileUrl())->toContain($user->id);
+
+    $this->actingAs(User::factory()->create());
+
+    $this->get($user->profileUrl())->assertOk();
+});
+
+test('replacing an avatar deletes the previous file', function () {
+    Storage::fake('public');
+
+    $this->put(route('profile.update'), [
+        'name' => 'Midou With Avatar',
+        'avatar' => UploadedFile::fake()->image('first.jpg', 200, 200),
+    ])->assertRedirect(route('profile.catalog'));
+
+    $oldPath = $this->profileUser->refresh()->avatar;
+    expect(Storage::disk('public')->exists($oldPath))->toBeTrue();
+
+    $this->put(route('profile.update'), [
+        'name' => 'Midou With New Avatar',
+        'avatar' => UploadedFile::fake()->image('second.jpg', 200, 200),
+    ])->assertRedirect(route('profile.catalog'));
+
+    $newPath = $this->profileUser->refresh()->avatar;
+
+    expect($newPath)->not->toBe($oldPath)
+        ->and(Storage::disk('public')->exists($oldPath))->toBeFalse()
+        ->and(Storage::disk('public')->exists($newPath))->toBeTrue();
+});
+
 test('user can upload avatar and remove avatar', function () {
     Storage::fake('public');
 
@@ -131,6 +180,24 @@ test('user can switch between dijual and favorit tabs in profile catalog', funct
 
     $response->assertStatus(200);
     $response->assertSee('Favorit');
+});
+
+test('profile favorit tab hides products that are no longer for sale', function () {
+    $hidden = Product::factory()->create([
+        'user_id' => $this->profileUser->id,
+        'judul' => 'Produk ditangguhkan admin',
+        'status' => Product::STATUS_DITANGGUIHKAN,
+    ]);
+
+    Favorite::create([
+        'user_id' => $this->profileUser->id,
+        'product_id' => $hidden->id,
+    ]);
+
+    $response = $this->get(route('profile.catalog', ['tab' => 'favorit']));
+
+    $response->assertStatus(200);
+    $response->assertDontSee('Produk ditangguhkan admin');
 });
 
 test('user can view ulasan tab with buyer reviews from the database', function () {

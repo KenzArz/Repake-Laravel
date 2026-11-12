@@ -217,7 +217,8 @@ export function initChat() {
 
     if (!box || !form || !input) return;
 
-    const myId = Number(app.dataset.myId);
+    // ID user sekarang UUID (string) — jangan diubah ke Number().
+    const myId = app.dataset.myId ?? "";
     const sendUrl = app.dataset.sendUrl;
     const pollUrl = app.dataset.pollUrl;
     const readUrl = app.dataset.readUrl;
@@ -696,7 +697,7 @@ export function initChat() {
         const deliveredUpto = Number(receipts.delivered_upto) || 0;
 
         box.querySelectorAll("[data-message-id]").forEach((node) => {
-            if (Number(node.dataset.senderId) !== myId) return;
+            if ((node.dataset.senderId ?? "") !== myId) return;
 
             const badge = node.querySelector("[data-receipt]");
             if (!badge) return;

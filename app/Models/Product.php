@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,7 +18,7 @@ use Illuminate\Support\Str;
 
 class Product extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasUuids, SoftDeletes;
 
     public const STATUS_DRAFT = 'draft';
 
@@ -83,7 +84,7 @@ class Product extends Model
      * Slug unik dari judul. Bila slug dasar sudah dipakai, tambahkan
      * sufiks angka (2, 3, ...) agar URL tetap rapi dan mudah dibaca.
      */
-    public static function uniqueSlug(string $judul, ?int $id = null): string
+    public static function uniqueSlug(string $judul, ?string $id = null): string
     {
         $base = Str::slug($judul) ?: 'produk';
         $slug = $base;
@@ -104,6 +105,21 @@ class Product extends Model
     public function getRouteKeyName(): string
     {
         return 'slug';
+    }
+
+    /**
+     * URL kanonis halaman detail produk.
+     *
+     * Slug di path hanya untuk keterbacaan; UUID di query `id` adalah
+     * identitas yang sebenarnya. Dengan begitu produk berjudul sama tetap
+     * punya URL berbeda, dan rename judul tidak mematikan link yang beredar.
+     */
+    public function detailUrl(): string
+    {
+        return route('products.show', [
+            'slug' => $this->slug,
+            'id' => $this->id,
+        ]);
     }
 
     protected static function booted(): void

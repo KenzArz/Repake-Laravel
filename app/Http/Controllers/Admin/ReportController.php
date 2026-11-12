@@ -117,7 +117,7 @@ class ReportController extends Controller
             return 'Akun admin tidak bisa dibanned.';
         }
 
-        if ((int) $seller->id === (int) auth()->id()) {
+        if ($seller->id === auth()->id()) {
             return 'Anda tidak bisa membanned akun sendiri.';
         }
 

@@ -463,7 +463,7 @@ class ProductController extends Controller
      */
     public function edit(Product $product): View
     {
-        abort_if((int) $product->user_id !== (int) Auth::id(), 403);
+        abort_if($product->user_id !== Auth::id(), 403);
 
         $product->load(['images', 'codAreas', 'category']);
 
@@ -478,7 +478,7 @@ class ProductController extends Controller
      */
     public function update(Request $request, Product $product): RedirectResponse|JsonResponse
     {
-        abort_if((int) $product->user_id !== (int) Auth::id(), 403);
+        abort_if($product->user_id !== Auth::id(), 403);
 
         $validated = $request->validate([
             'judul' => ['required', 'string', 'max:255'],
@@ -540,7 +540,7 @@ class ProductController extends Controller
 
         // Update titik lokasi COD jika tersedia
         if ($request->filled(['cod_lat', 'cod_lng'])) {
-            $placeName = $validated['cod_place_name'] ?: $validated['kota'];
+            $placeName = ($validated['cod_place_name'] ?? null) ?: $validated['kota'];
 
             $codArea = CodArea::firstOrCreate(
                 ['name' => $placeName, 'city' => $validated['kota']],
@@ -634,11 +634,11 @@ class ProductController extends Controller
         if ($request->wantsJson()) {
             session()->flash('success', $toastMessage);
 
-            return response()->json(['redirect' => route('products.show', $product)]);
+            return response()->json(['redirect' => $product->detailUrl()]);
         }
 
         return redirect()
-            ->route('products.show', $product)
+            ->to($product->detailUrl())
             ->with('success', $toastMessage);
     }
 
@@ -647,10 +647,10 @@ class ProductController extends Controller
      */
     public function destroy(Product $product): RedirectResponse
     {
-        abort_if((int) $product->user_id !== (int) Auth::id(), 403);
+        abort_if($product->user_id !== Auth::id(), 403);
 
         $judul = $product->judul;
-        $detailUrl = route('products.show', $product);
+        $detailUrl = $product->detailUrl();
         $product->delete();
 
         $message = "Produk \"{$judul}\" berhasil dihapus dari katalog.";

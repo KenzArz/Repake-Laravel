@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('product_images', function (Blueprint $table) {
-            $table->foreignId('product_id')->after('id')->constrained('products')->cascadeOnDelete();
+            $table->foreignUuid('product_id')->after('id')->constrained('products')->cascadeOnDelete();
             $table->string('path')->after('product_id');
             $table->boolean('is_cover')->default(false)->after('path');
             $table->unsignedTinyInteger('urutan')->default(0)->after('is_cover');

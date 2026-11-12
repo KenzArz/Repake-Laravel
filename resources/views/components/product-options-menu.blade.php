@@ -6,23 +6,12 @@
 
 @php
     $isOwner = \Illuminate\Support\Facades\Auth::check()
-        && (int) \Illuminate\Support\Facades\Auth::id() === (int) $product->user_id;
+        && \Illuminate\Support\Facades\Auth::id() === $product->user_id;
 
-    $detailUrl = Route::has('products.show')
-        ? route('products.show', $product)
-        : url("/products/{$product->id}");
-
-    $editUrl = Route::has('products.edit')
-        ? route('products.edit', $product)
-        : url("/products/{$product->id}/edit");
-
-    $deleteUrl = Route::has('products.destroy')
-        ? route('products.destroy', $product)
-        : url("/products/{$product->id}");
-
-    $reportUrl = Route::has('products.report')
-        ? route('products.report', $product->id)
-        : url("/products/{$product->id}/report");
+    $detailUrl = $product->detailUrl();
+    $editUrl = route('products.edit', $product);
+    $deleteUrl = route('products.destroy', $product);
+    $reportUrl = route('products.report', $product->id);
 @endphp
 
 <div {{ $attributes->merge(['class' => 'relative z-20 shrink-0']) }} data-options-wrapper>

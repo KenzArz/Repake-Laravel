@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('product_cod_areas', function (Blueprint $table) {
-            $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
+            $table->foreignUuid('product_id')->constrained('products')->cascadeOnDelete();
             $table->foreignId('cod_area_id')->constrained('cod_areas')->cascadeOnDelete();
             $table->primary(['product_id', 'cod_area_id']);
         });

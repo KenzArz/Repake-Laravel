@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Notifications\NewMessage;
 use App\Notifications\OfferDecided;
 use App\Notifications\OfferReceived;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -32,7 +33,7 @@ class ChatController extends Controller
      */
     public function index(Request $request): View
     {
-        $userId = (int) Auth::id();
+        $userId = (string) Auth::id();
 
         return view('chat.index', [
             'conversations' => $this->conversationsFor($userId, $this->filterFrom($request)),
@@ -57,7 +58,7 @@ class ChatController extends Controller
             ->reverse()
             ->values();
 
-        $other = $conversation->counterpartFor((int) Auth::id());
+        $other = $conversation->counterpartFor((string) Auth::id());
         $latestOffer = $conversation->latestOffer()->first();
 
         // Membuka ruang chat berarti pesan lawan sudah terbaca.
@@ -68,7 +69,7 @@ class ChatController extends Controller
             'messages' => $messages,
             'other' => $other,
             'latestOffer' => $latestOffer,
-            'sidebarConversations' => $this->conversationsFor((int) Auth::id()),
+            'sidebarConversations' => $this->conversationsFor((string) Auth::id()),
             'filter' => 'semua',
         ]);
     }
@@ -79,19 +80,24 @@ class ChatController extends Controller
     public function start(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'product_id' => ['required', 'integer', 'exists:products,id'],
+            'product_id' => ['required', 'uuid', 'exists:products,id'],
             'offer_amount' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $product = Product::query()->findOrFail($data['product_id']);
         abort_if(
-            $product->user_id === (int) Auth::id(),
+            $product->user_id === (string) Auth::id(),
             403,
             'Tidak bisa memulai chat pada produk milik sendiri.',
         );
 
+        // Produk yang ditangguhkan/draft dan penjual yang dibanned tidak boleh
+        // dimulai percakapan baru, sama seperti detail produknya yang 404.
+        abort_if($product->status !== Product::STATUS_DIJUAL, 404);
+        abort_if($product->user?->is_banned, 404);
+
         $attributes = [
-            'buyer_id' => (int) Auth::id(),
+            'buyer_id' => (string) Auth::id(),
             'seller_id' => $product->user_id,
             'product_id' => $product->id,
         ];
@@ -109,7 +115,7 @@ class ChatController extends Controller
         // Tawaran langsung dari halaman detail produk: buat pesan tawaran pertama.
         if (($offerAmount = $data['offer_amount'] ?? null) !== null) {
             $offer = $conversation->messages()->create([
-                'sender_id' => (int) Auth::id(),
+                'sender_id' => (string) Auth::id(),
                 'type' => Message::TYPE_OFFER,
                 'offer_amount' => $offerAmount,
                 'offer_status' => Message::OFFER_PENDING,
@@ -140,7 +146,7 @@ class ChatController extends Controller
         if ($isOffer) {
             // Tawaran hanya dari pembeli; keputusan ada di tangan penjual.
             abort_unless(
-                $conversation->buyer_id === (int) Auth::id(),
+                $conversation->buyer_id === (string) Auth::id(),
                 403,
                 'Hanya pembeli yang bisa mengirim tawaran.',
             );
@@ -163,7 +169,7 @@ class ChatController extends Controller
 
         try {
             $message = $conversation->messages()->create([
-                'sender_id' => (int) Auth::id(),
+                'sender_id' => (string) Auth::id(),
                 'client_id' => $clientId,
                 'body' => $validated['body'] ?? null,
                 'image' => $imagePath,
@@ -196,7 +202,7 @@ class ChatController extends Controller
     {
         $this->authorizeParticipant($conversation);
 
-        $myId = (int) Auth::id();
+        $myId = (string) Auth::id();
         $conversation->loadMissing(['buyer', 'seller']);
 
         $after = max(0, (int) $request->query('after', 0));
@@ -268,8 +274,8 @@ class ChatController extends Controller
         $this->markMessagesRead($conversation);
 
         return response()->json([
-            'receipts' => $this->receipts($conversation, (int) Auth::id()),
-            'unread_total' => $this->unreadTotal((int) Auth::id()),
+            'receipts' => $this->receipts($conversation, (string) Auth::id()),
+            'unread_total' => $this->unreadTotal((string) Auth::id()),
         ]);
     }
 
@@ -279,7 +285,7 @@ class ChatController extends Controller
     public function unreadCount(): JsonResponse
     {
         return response()->json([
-            'total' => $this->unreadTotal((int) Auth::id()),
+            'total' => $this->unreadTotal((string) Auth::id()),
         ]);
     }
 
@@ -373,7 +379,7 @@ class ChatController extends Controller
      */
     public function destroy(Message $message): RedirectResponse
     {
-        abort_unless($message->sender_id === (int) Auth::id(), 403);
+        abort_unless($message->sender_id === (string) Auth::id(), 403);
 
         $path = $message->image;
         $message->delete();
@@ -400,7 +406,7 @@ class ChatController extends Controller
                 'message' => $this->messageMeta($message),
                 'html' => $this->renderMessage($conversation, $message),
                 'offer_summary' => $this->offerSummaryHtml($conversation),
-                'receipts' => $this->receipts($conversation, (int) Auth::id()),
+                'receipts' => $this->receipts($conversation, (string) Auth::id()),
             ]);
         }
 
@@ -412,7 +418,7 @@ class ChatController extends Controller
      */
     private function notifyCounterpart(Conversation $conversation, bool $isOffer, Message $message): void
     {
-        $recipientId = $conversation->buyer_id === (int) Auth::id()
+        $recipientId = $conversation->buyer_id === (string) Auth::id()
             ? $conversation->seller_id
             : $conversation->buyer_id;
 
@@ -440,9 +446,9 @@ class ChatController extends Controller
     /**
      * Semua percakapan user beserta data pendukung daftar chat.
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, Conversation>
+     * @return Collection<int, Conversation>
      */
-    private function conversationsFor(int $userId, string $filter = 'semua')
+    private function conversationsFor(string $userId, string $filter = 'semua')
     {
         return Conversation::query()
             ->where(fn ($query) => $query
@@ -481,7 +487,7 @@ class ChatController extends Controller
      */
     private function authorizeParticipant(Conversation $conversation): void
     {
-        abort_unless($conversation->involves((int) Auth::id()), 404);
+        abort_unless($conversation->involves((string) Auth::id()), 404);
     }
 
     /**
@@ -491,7 +497,7 @@ class ChatController extends Controller
     {
         $this->authorizeParticipant($conversation);
         abort_unless($message->conversation_id === $conversation->id, 404);
-        abort_unless($message->sender_id === (int) Auth::id(), 403, 'Hanya pengirim tawaran yang bisa mengubahnya.');
+        abort_unless($message->sender_id === (string) Auth::id(), 403, 'Hanya pengirim tawaran yang bisa mengubahnya.');
         abort_unless($message->type === Message::TYPE_OFFER, 404);
         abort_if($message->offer_status !== Message::OFFER_PENDING, 409, 'Tawaran ini sudah diproses.');
     }
@@ -502,7 +508,7 @@ class ChatController extends Controller
     private function authorizeOfferDecision(Conversation $conversation, Message $message): void
     {
         $this->authorizeParticipant($conversation);
-        abort_unless($conversation->seller_id === (int) Auth::id(), 403, 'Hanya penjual yang bisa memutuskan tawaran.');
+        abort_unless($conversation->seller_id === (string) Auth::id(), 403, 'Hanya penjual yang bisa memutuskan tawaran.');
         abort_unless($message->conversation_id === $conversation->id, 404);
         abort_unless($message->type === Message::TYPE_OFFER, 404);
         abort_if($message->offer_status !== Message::OFFER_PENDING, 409, 'Tawaran ini sudah diproses.');
@@ -542,7 +548,7 @@ class ChatController extends Controller
     private function systemMessage(Conversation $conversation, string $body): Message
     {
         $message = $conversation->messages()->create([
-            'sender_id' => (int) Auth::id(),
+            'sender_id' => (string) Auth::id(),
             'body' => $body,
             'type' => Message::TYPE_SYSTEM,
         ]);
@@ -560,7 +566,7 @@ class ChatController extends Controller
         $now = now();
 
         $query = $conversation->messages()
-            ->where('sender_id', '!=', (int) Auth::id());
+            ->where('sender_id', '!=', (string) Auth::id());
 
         (clone $query)->whereNull('delivered_at')->update(['delivered_at' => $now]);
         (clone $query)->whereNull('read_at')->update(['read_at' => $now]);
@@ -571,7 +577,7 @@ class ChatController extends Controller
      *
      * @return array{read_upto: int, delivered_upto: int}
      */
-    private function receipts(Conversation $conversation, int $myId): array
+    private function receipts(Conversation $conversation, string $myId): array
     {
         $mine = $conversation->messages()->where('sender_id', $myId);
 
@@ -586,7 +592,7 @@ class ChatController extends Controller
      *
      * @return array{online: bool, last_seen_at: string|null, label: string}
      */
-    private function presencePayload(Conversation $conversation, int $myId): array
+    private function presencePayload(Conversation $conversation, string $myId): array
     {
         $other = $conversation->counterpartFor($myId);
 
@@ -604,7 +610,7 @@ class ChatController extends Controller
     /**
      * Total pesan belum dibaca dari seluruh percakapan.
      */
-    private function unreadTotal(int $userId): int
+    private function unreadTotal(string $userId): int
     {
         return Message::query()
             ->whereNull('read_at')
@@ -635,7 +641,7 @@ class ChatController extends Controller
         return view('chat.partials.message', [
             'message' => $message,
             'conversation' => $conversation,
-            'myId' => (int) Auth::id(),
+            'myId' => (string) Auth::id(),
         ])->render();
     }
 

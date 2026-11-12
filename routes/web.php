@@ -54,6 +54,10 @@ Route::middleware(['auth', 'banned'])->group(function () {
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
 });
 
+// Profil publik penjual lain (dibuka dari detail produk, kartu produk, dan header chat).
+// Sengaja di luar middleware auth agar tamu yang melihat detail produk tetap bisa membukanya.
+Route::get('/penjual/{seller}', [ProfileController::class, 'show'])->name('sellers.show');
+
 // Admin (wajib login + allowlist email admin)
 Route::prefix('admin')
     ->name('admin.')
@@ -123,11 +127,15 @@ Route::middleware(['auth', 'banned'])->group(function () {
     Route::post('/notifications/read', [NotificationController::class, 'markAllRead'])->name('notifications.readAll');
 });
 
-// Listing & pencarian produk (statis, sebelum wildcard /{id})
+// Listing & pencarian produk (statis, sebelum wildcard /{slug})
 Route::get('/products', [ProductController::class, 'index'])->name('products.index');
 
-// Detail Barang & Laporan (wildcard /{id} — ditaruh paling bawah rute produk)
-Route::get('/products/{slug}', [ProductDetailController::class, 'show'])->name('products.show');
+// Detail Barang & Laporan.
+// Slug di path hanya kosmetik; identitas produk ada di query `?id={uuid}`.
+Route::get('/produk/{slug}', [ProductDetailController::class, 'show'])->name('products.show');
+
+// URL lama tetap hidup: dialihkan permanen ke URL kanonis berbasis UUID.
+Route::get('/products/{slug}', [ProductDetailController::class, 'legacy'])->name('products.legacy');
 
 Route::get('/api/search/suggestions', [ProductController::class, 'suggestions'])
     ->name('api.search.suggestions');

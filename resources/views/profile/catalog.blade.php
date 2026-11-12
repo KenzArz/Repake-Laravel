@@ -1,8 +1,22 @@
 @extends('layouts.app')
 
 @section('title', ($profile['name'] ?? 'Midou Wijaya') . ' - Detail User | RePake')
+@section('canonical', $profileUrl ?? route('profile.catalog'))
 
 @section('content')
+@php
+    // Profil sendiri dan profil publik penjual lain memakai markup yang sama.
+    // $isOwner membedakan aksi (edit profil vs chat penjual) dan tab favorit.
+    $isOwner = $isOwner ?? true;
+    $chatProducts = $chatProducts ?? collect();
+    $profileUrl = $profileUrl ?? route('profile.catalog');
+    // $profileUrl sudah membawa `?id={uuid}` pada profil penjual publik,
+    // jadi pemisah query harus dipilih agar tidak menjadi `?id=...?tab=`.
+    $tabUrl = fn (string $value): string => $profileUrl
+        .(str_contains($profileUrl, '?') ? '&' : '?')
+        .http_build_query(['tab' => $value]);
+@endphp
+
 <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6">
 
     {{-- Flash Message Sukses --}}
@@ -61,7 +75,7 @@
             <div class="flex flex-col items-start md:items-end justify-between gap-4">
                 <div class="flex items-center gap-4">
                     <div class="text-left md:text-right">
-                        <a href="{{ route('profile.catalog', ['tab' => 'ulasan']) }}" class="group block">
+                        <a href="{{ $tabUrl('ulasan') }}" class="group block">
                             <p class="flex items-center gap-1 text-xs font-bold text-neutral-900 group-hover:text-lime-700 transition">
                                 <span class="text-amber-500">★</span>
                                 <span>{{ number_format($profile['rating'] ?? 4.5, 1) }} ({{ $profile['reviews_count'] ?? 67 }} ulasan) · {{ $profile['sold_count'] ?? 10 }} Terjual</span>
@@ -70,64 +84,80 @@
                         </a>
                     </div>
 
-                    {{-- 3 Vertical Dots (Menu Opsi / Edit Profil) --}}
-                    <div class="relative">
-                        <button type="button" id="profile-options-toggle"
-                                class="grid size-8 place-items-center rounded-full text-neutral-700 transition hover:bg-neutral-100 cursor-pointer" aria-label="Menu Opsi">
-                            <svg viewBox="0 0 24 24" class="size-4.5 fill-current">
-                                <circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/>
-                            </svg>
-                        </button>
-                        <div id="profile-options-menu" class="absolute right-0 top-9 z-20 hidden w-44 rounded-xl border border-neutral-200 bg-white py-1.5 shadow-xl ring-1 ring-black/5">
-                            <a href="{{ route('profile.edit') }}" class="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 transition">
-                                <svg viewBox="0 0 24 24" class="size-4 stroke-current stroke-2 fill-none"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
-                                <span>Edit Profil</span>
-                            </a>
-                            <form action="{{ route('logout') }}" method="POST">
-                                @csrf
-                                <button type="submit" class="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition cursor-pointer">
-                                    <svg viewBox="0 0 24 24" class="size-4 stroke-current stroke-2 fill-none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-                                    <span>Keluar</span>
-                                </button>
-                            </form>
+                    {{-- 3 Vertical Dots (Menu Opsi / Edit Profil) — hanya untuk pemilik profil --}}
+                    @if ($isOwner)
+                        <div class="relative">
+                            <button type="button" id="profile-options-toggle"
+                                    class="grid size-8 place-items-center rounded-full text-neutral-700 transition hover:bg-neutral-100 cursor-pointer" aria-label="Menu Opsi">
+                                <svg viewBox="0 0 24 24" class="size-4.5 fill-current">
+                                    <circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/>
+                                </svg>
+                            </button>
+                            <div id="profile-options-menu" class="absolute right-0 top-9 z-20 hidden w-44 rounded-xl border border-neutral-200 bg-white py-1.5 shadow-xl ring-1 ring-black/5">
+                                <a href="{{ route('profile.edit') }}" class="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 transition">
+                                    <svg viewBox="0 0 24 24" class="size-4 stroke-current stroke-2 fill-none"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                                    <span>Edit Profil</span>
+                                </a>
+                                <form action="{{ route('logout') }}" method="POST">
+                                    @csrf
+                                    <button type="submit" class="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition cursor-pointer">
+                                        <svg viewBox="0 0 24 24" class="size-4 stroke-current stroke-2 fill-none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                                        <span>Keluar</span>
+                                    </button>
+                                </form>
+                            </div>
                         </div>
-                    </div>
+                    @endif
                 </div>
 
-                {{-- Tombol Aksi: Edit Profil & Chat Penjual --}}
+                {{-- Tombol Aksi: pemilik bisa edit profil, pengunjung hanya bisa chat penjual --}}
                 <div class="flex items-center gap-2 w-full sm:w-auto">
-                    <a href="{{ route('profile.edit') }}"
-                       class="flex items-center justify-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-4 py-2.5 text-xs font-bold text-neutral-800 transition hover:bg-neutral-100 shadow-2xs w-full sm:w-auto">
-                        <svg viewBox="0 0 24 24" class="size-3.5 stroke-current stroke-2 fill-none"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                        <span>Edit Profil</span>
-                    </a>
-                    <a href="{{ Route::has('chat.index') ? route('chat.index') : '#' }}"
-                       class="flex items-center justify-center gap-2 rounded-lg bg-lime-400 px-6 py-2.5 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 shadow-2xs w-full sm:w-auto">
-                        <svg viewBox="0 0 24 24" class="size-4 fill-none stroke-current stroke-2">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                        </svg>
-                        <span>Chat Penjual</span>
-                    </a>
+                    @if ($isOwner)
+                        <a href="{{ route('profile.edit') }}"
+                           class="flex items-center justify-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-4 py-2.5 text-xs font-bold text-neutral-800 transition hover:bg-neutral-100 shadow-2xs w-full sm:w-auto">
+                            <svg viewBox="0 0 24 24" class="size-3.5 stroke-current stroke-2 fill-none"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                            <span>Edit Profil</span>
+                        </a>
+                        <a href="{{ Route::has('chat.index') ? route('chat.index') : '#' }}"
+                           class="flex items-center justify-center gap-2 rounded-lg bg-lime-400 px-6 py-2.5 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 shadow-2xs w-full sm:w-auto">
+                            <svg viewBox="0 0 24 24" class="size-4 fill-none stroke-current stroke-2">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                            </svg>
+                            <span>Chat Penjual</span>
+                        </a>
+                    @else
+                        <button type="button" id="seller-chat-open"
+                                @guest data-open-login @endguest
+                                @if (auth()->check() && $chatProducts->isEmpty()) disabled title="Penjual belum punya produk aktif" @endif
+                                class="flex items-center justify-center gap-2 rounded-lg bg-lime-400 px-6 py-2.5 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 shadow-2xs w-full sm:w-auto disabled:cursor-not-allowed disabled:bg-neutral-200 disabled:text-neutral-500 disabled:hover:bg-neutral-200">
+                            <svg viewBox="0 0 24 24" class="size-4 fill-none stroke-current stroke-2">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                            </svg>
+                            <span>Chat Penjual</span>
+                        </button>
+                    @endif
                 </div>
             </div>
 
         </div>
     </div>
 
-    {{-- Tabs (Produk, Favorit, Ulasan Sesuai Wireframe) --}}
+    {{-- Tabs: Produk & Ulasan (profil sendiri menambah tab Favorit) --}}
     <div class="mt-8 border-b border-neutral-200">
         <div class="flex items-center gap-6">
-            <a href="{{ route('profile.catalog', ['tab' => 'dijual']) }}"
+            <a href="{{ $tabUrl('dijual') }}"
                class="pb-2.5 text-xs font-bold transition {{ $tab === 'dijual' || empty($tab) ? 'border-b-2 border-neutral-900 text-neutral-900' : 'text-neutral-500 hover:text-neutral-800' }}">
                 Produk
             </a>
 
-            <a href="{{ route('profile.catalog', ['tab' => 'favorit']) }}"
-               class="pb-2.5 text-xs font-bold transition {{ $tab === 'favorit' ? 'border-b-2 border-neutral-900 text-neutral-900' : 'text-neutral-500 hover:text-neutral-800' }}">
-                Favorit ({{ $favoriteCount }})
-            </a>
+            @if ($isOwner)
+                <a href="{{ $tabUrl('favorit') }}"
+                   class="pb-2.5 text-xs font-bold transition {{ $tab === 'favorit' ? 'border-b-2 border-neutral-900 text-neutral-900' : 'text-neutral-500 hover:text-neutral-800' }}">
+                    Favorit ({{ $favoriteCount }})
+                </a>
+            @endif
 
-            <a href="{{ route('profile.catalog', ['tab' => 'ulasan']) }}"
+            <a href="{{ $tabUrl('ulasan') }}"
                class="pb-2.5 text-xs font-bold transition {{ $tab === 'ulasan' ? 'border-b-2 border-[#8EAE36] text-neutral-900' : 'text-neutral-500 hover:text-neutral-800' }}">
                 Ulasan ({{ $reviewCount }})
             </a>
@@ -233,6 +263,53 @@
         </section>
     @endif
 
+    {{-- Modal pilih produk sebelum memulai chat dengan penjual --}}
+    @unless ($isOwner)
+        <div id="seller-chat-modal"
+             class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/60 p-4 backdrop-blur-sm"
+             role="dialog" aria-modal="true" aria-labelledby="seller-chat-title">
+            <div class="mx-auto mt-[10vh] flex w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+                <div class="flex items-center justify-between gap-3 border-b border-neutral-200 p-4">
+                    <div class="min-w-0">
+                        <h2 id="seller-chat-title" class="truncate text-sm font-bold text-neutral-900">
+                            Chat dengan {{ $profile['name'] }}
+                        </h2>
+                        <p class="mt-0.5 text-[11px] text-neutral-500">Pilih produk yang ingin ditanyakan.</p>
+                    </div>
+                    <button type="button" id="seller-chat-close"
+                            class="grid size-8 shrink-0 place-items-center rounded-full text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
+                            aria-label="Tutup pilihan produk">
+                        <svg viewBox="0 0 24 24" class="size-4 fill-none stroke-current stroke-2"><path d="M18 6 6 18M6 6l12 12" stroke-linecap="round"/></svg>
+                    </button>
+                </div>
+
+                <div class="max-h-[55vh] overflow-y-auto p-2">
+                    @forelse ($chatProducts as $chatProduct)
+                        <form method="POST" action="{{ route('chat.store') }}">
+                            @csrf
+                            <input type="hidden" name="product_id" value="{{ $chatProduct->id }}">
+                            <button type="submit"
+                                    class="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-neutral-100 cursor-pointer">
+                                <div class="size-12 shrink-0 overflow-hidden rounded-lg bg-neutral-200">
+                                    @if ($chatProduct->gambar)
+                                        <img src="{{ asset($chatProduct->gambar) }}" alt="" class="size-full object-cover">
+                                    @endif
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-xs font-bold text-neutral-900">{{ $chatProduct->judul }}</p>
+                                    <p class="mt-0.5 text-xs font-extrabold text-neutral-900">Rp {{ number_format($chatProduct->harga, 0, ',', '.') }}</p>
+                                </div>
+                                <svg viewBox="0 0 24 24" class="size-4 shrink-0 fill-none stroke-current stroke-2 text-neutral-400"><path d="m9 18 6-6-6-6" stroke-linecap="round"/></svg>
+                            </button>
+                        </form>
+                    @empty
+                        <p class="px-3 py-6 text-center text-xs text-neutral-500">Penjual belum punya produk aktif.</p>
+                    @endforelse
+                </div>
+            </div>
+        </div>
+    @endunless
+
 </div>
 @endsection
 
@@ -251,6 +328,39 @@ document.addEventListener('DOMContentLoaded', function () {
         document.addEventListener('click', function (e) {
             if (!menu.contains(e.target) && !toggle.contains(e.target)) {
                 menu.classList.add('hidden');
+            }
+        });
+    }
+
+    // Modal "Chat Penjual" di profil publik: pilih produk dulu, baru masuk chat.
+    const chatOpen = document.getElementById('seller-chat-open');
+    const chatModal = document.getElementById('seller-chat-modal');
+    const chatClose = document.getElementById('seller-chat-close');
+
+    if (chatOpen && chatModal) {
+        chatOpen.addEventListener('click', function () {
+            // Tamu diarahkan ke modal login oleh listener [data-open-login].
+            if (chatOpen.hasAttribute('data-open-login')) return;
+
+            chatModal.classList.remove('hidden');
+            chatClose?.focus();
+        });
+
+        chatClose?.addEventListener('click', function () {
+            chatModal.classList.add('hidden');
+            chatOpen.focus();
+        });
+
+        chatModal.addEventListener('click', function (e) {
+            if (e.target === chatModal) {
+                chatModal.classList.add('hidden');
+            }
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && !chatModal.classList.contains('hidden')) {
+                chatModal.classList.add('hidden');
+                chatOpen.focus();
             }
         });
     }

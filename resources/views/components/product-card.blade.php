@@ -1,7 +1,7 @@
 @props(['product'])
 
 @php
-    $detailUrl = Route::has('products.show') ? route('products.show', $product) : '#';
+    $detailUrl = Route::has('products.show') ? $product->detailUrl() : '#';
     $favUrl = Route::has('favorites.toggle') ? route('favorites.toggle', $product->id) : '';
     $badge = $product->status_label === 'Dijual'
         ? 'bg-lime-500/90 text-neutral-900'
@@ -11,6 +11,7 @@
         : ($product->created_at?->locale('id')->diffForHumans(['syntax' => \Carbon\CarbonInterface::DIFF_ABSOLUTE]) . ' lalu' ?? 'Baru saja');
 
     $sellerName = $product->user?->name ?? $product->penjual ?? 'Penjual';
+    $sellerUrl = $product->user?->profileUrl();
     $sellerAvatar = $product->user?->avatar ?? $product->avatar ?? null;
     $defaultAvatarUrl = asset('images/default-avatar.png');
     $fallbackUiAvatar = 'https://ui-avatars.com/api/?name=' . urlencode($sellerName) . '&background=B8E639&color=1c1917';
@@ -21,15 +22,30 @@
 
 <article
     class="relative flex h-full flex-col rounded-xl border border-neutral-200/80 bg-white p-2.5 shadow-2xs transition hover:shadow-sm">
-    {{-- Header penjual --}}
+    {{-- Header penjual: avatar & nama menuju profil publik penjual (z-10 agar di atas stretched link) --}}
     <div class="flex items-center gap-2 pb-2">
-        <div class="size-7 shrink-0 rounded-full overflow-hidden bg-neutral-200 border border-neutral-300">
-            <img src="{{ $product->penjual_avatar }}" alt="{{ $product->penjual }}" referrerpolicy="no-referrer"
-                class="size-full object-cover"
-                onerror="this.onerror=null; this.src='{{ asset('images/default-avatar.png') }}';">
-        </div>
+        @if ($sellerUrl)
+            <a href="{{ $sellerUrl }}" title="Lihat profil {{ $sellerName }}"
+               class="relative z-10 block size-7 shrink-0 overflow-hidden rounded-full border border-neutral-300 bg-neutral-200 transition hover:ring-2 hover:ring-lime-400">
+                <img src="{{ $product->penjual_avatar }}" alt="{{ $product->penjual }}" referrerpolicy="no-referrer"
+                    class="size-full object-cover"
+                    onerror="this.onerror=null; this.src='{{ asset('images/default-avatar.png') }}';">
+            </a>
+        @else
+            <div class="size-7 shrink-0 rounded-full overflow-hidden bg-neutral-200 border border-neutral-300">
+                <img src="{{ $product->penjual_avatar }}" alt="{{ $product->penjual }}" referrerpolicy="no-referrer"
+                    class="size-full object-cover"
+                    onerror="this.onerror=null; this.src='{{ asset('images/default-avatar.png') }}';">
+            </div>
+        @endif
         <div class="min-w-0 flex-1 leading-tight">
-            <p class="truncate text-xs font-bold text-neutral-900">{{ $product->penjual }}</p>
+            <p class="truncate text-xs font-bold text-neutral-900">
+                @if ($sellerUrl)
+                    <a href="{{ $sellerUrl }}" class="relative z-10 hover:underline">{{ $product->penjual }}</a>
+                @else
+                    {{ $product->penjual }}
+                @endif
+            </p>
             <p class="truncate text-[11px] text-neutral-500">{{ $product->kota }} · {{ $ago }}</p>
         </div>
         <x-product-options-menu :product="$product" />

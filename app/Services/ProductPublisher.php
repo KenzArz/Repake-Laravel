@@ -22,7 +22,7 @@ class ProductPublisher
      *
      * @throws RuntimeException bila tidak ada gambar yang berhasil disimpan
      */
-    public function publish(int $userId, array $attributes, Collection $files): Product
+    public function publish(string $userId, array $attributes, Collection $files): Product
     {
         $stored = [];
 

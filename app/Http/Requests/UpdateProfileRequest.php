@@ -37,7 +37,15 @@ class UpdateProfileRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:100'],
-            'username' => ['nullable', 'string', 'max:50', Rule::unique('users', 'username')->ignore($this->user()?->id)],
+            // Tanpa batasan karakter, username berisi "/" akan memecah segmen
+            // URL /penjual/{seller} dan membuat profil tidak bisa dibuka.
+            'username' => [
+                'nullable',
+                'string',
+                'max:50',
+                'regex:/^[a-z0-9._-]+$/i',
+                Rule::unique('users', 'username')->ignore($this->user()?->id),
+            ],
             'phone' => ['nullable', 'string', 'max:30'],
             'kota' => ['nullable', 'string', 'max:100'],
             'bio' => ['nullable', 'string', 'max:500'],
@@ -57,6 +65,7 @@ class UpdateProfileRequest extends FormRequest
             'name.required' => 'Nama lengkap / username wajib diisi.',
             'name.max' => 'Nama tidak boleh melebihi 100 karakter.',
             'username.max' => 'Username tidak boleh melebihi 50 karakter.',
+            'username.regex' => 'Username hanya boleh berisi huruf, angka, titik, garis bawah, dan tanda hubung.',
             'username.unique' => 'Username sudah dipakai pengguna lain.',
             'phone.max' => 'Nomor telepon tidak boleh melebihi 30 karakter.',
             'kota.max' => 'Lokasi tidak boleh melebihi 100 karakter.',
