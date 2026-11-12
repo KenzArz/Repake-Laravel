@@ -1,4 +1,5 @@
 import "./bootstrap";
+import Alpine from "alpinejs";
 import { initLocationDetect } from "./location-detect";
 
 /* Firebase SDK dimuat dinamis hanya saat login modal dipakai,
@@ -14,6 +15,14 @@ document.addEventListener("click", (e) => {
     e.preventDefault();
     window.dispatchEvent(new CustomEvent("open-login"));
 });
+
+import productFilter from "./product-filter";
+
+import { initNavbarLocation } from "./navbar-location";
+
+// ... di bagian inisialisasi:
+initLocationDetect();
+initNavbarLocation();
 
 /* Toggle favorit */
 document.addEventListener("click", async (e) => {
@@ -141,3 +150,7 @@ if (
 ) {
     import("./product-detail").then((module) => module.initProductDetail());
 }
+
+window.Alpine = Alpine;
+Alpine.data("productFilter", productFilter);
+Alpine.start();

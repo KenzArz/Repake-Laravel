@@ -31,6 +31,11 @@ Route::middleware(['auth', 'banned'])->group(function () {
     Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
     Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
     Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+
+    // Laporan produk (wajib login)
+    Route::post('/products/{id}/report', [ProductDetailController::class, 'report'])
+        ->middleware(['auth', 'banned'])
+        ->name('products.report');
 });
 
 // Favorit (wajib login)
@@ -99,7 +104,5 @@ Route::get('/products', [ProductController::class, 'index'])->name('products.ind
 // Detail Barang & Laporan (wildcard /{id} — ditaruh paling bawah rute produk)
 Route::get('/products/{slug}', [ProductDetailController::class, 'show'])->name('products.show');
 
-// Laporan produk (wajib login)
-Route::post('/products/{id}/report', [ProductDetailController::class, 'report'])
-    ->middleware(['auth', 'banned'])
-    ->name('products.report');
+Route::get('/api/search/suggestions', [ProductController::class, 'suggestions'])
+    ->name('api.search.suggestions');
