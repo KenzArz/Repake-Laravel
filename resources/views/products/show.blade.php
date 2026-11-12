@@ -102,7 +102,7 @@
                         $favCount = (int) ($product->favorites_count ?? 0);
                     @endphp
 
-                    <button type="button" aria-label="Favorit"
+                    <button type="button" aria-label="Favorit" @guest data-open-login @endguest
                         aria-pressed="{{ !empty($product->is_favorite) ? 'true' : 'false' }}" data-favorite-toggle
                         data-url="{{ $favUrl }}"
                         class="group/fav absolute right-4 top-4 z-10 inline-flex h-9 min-w-9 items-center justify-center gap-1.5 rounded-full bg-neutral-900/55 px-2.5 text-white backdrop-blur-xs transition hover:bg-neutral-900/80 cursor-pointer aria-pressed:text-lime-400 aria-pressed:[&>svg]:fill-lime-400 aria-pressed:[&>svg]:stroke-lime-400">
@@ -161,42 +161,7 @@
                             </div>
                         </div>
 
-                        {{-- 3 Vertical Dots (Menu Opsi / Laporkan) --}}
-                        <div class="relative">
-                            <button type="button"
-                                onclick="document.getElementById('product-options-menu').classList.toggle('hidden')"
-                                class="grid size-8 place-items-center rounded-full text-neutral-600 transition hover:bg-neutral-100"
-                                aria-label="Opsi">
-                                <svg viewBox="0 0 24 24" class="size-4.5 fill-current">
-                                    <circle cx="12" cy="5" r="1.6" />
-                                    <circle cx="12" cy="12" r="1.6" />
-                                    <circle cx="12" cy="19" r="1.6" />
-                                </svg>
-                            </button>
-                            <div id="product-options-menu"
-                                class="absolute right-0 top-9 z-20 hidden w-44 rounded-xl border border-neutral-200 bg-white py-1.5 shadow-lg">
-                                <button type="button"
-                                    onclick="document.getElementById('report-modal').classList.remove('hidden'); document.getElementById('product-options-menu').classList.add('hidden');"
-                                    class="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
-                                    <svg viewBox="0 0 24 24" class="size-4 fill-none stroke-current stroke-2">
-                                        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7" />
-                                    </svg>
-                                    <span>Laporkan</span>
-                                </button>
-                                <button type="button"
-                                    onclick="navigator.clipboard?.writeText(window.location.href); document.getElementById('product-options-menu').classList.add('hidden');"
-                                    class="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-100">
-                                    <svg viewBox="0 0 24 24" class="size-4 fill-none stroke-current stroke-2">
-                                        <circle cx="18" cy="5" r="3" />
-                                        <circle cx="6" cy="12" r="3" />
-                                        <circle cx="18" cy="19" r="3" />
-                                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-                                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-                                    </svg>
-                                    <span>Bagikan</span>
-                                </button>
-                            </div>
-                        </div>
+                        <x-product-options-menu :product="$product" button-class="size-8" menu-class="top-9" />
                     </div>
 
                     {{-- Judul Produk --}}

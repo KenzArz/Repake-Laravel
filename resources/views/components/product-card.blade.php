@@ -32,14 +32,7 @@
             <p class="truncate text-xs font-bold text-neutral-900">{{ $product->penjual }}</p>
             <p class="truncate text-[11px] text-neutral-500">{{ $product->kota }} · {{ $ago }}</p>
         </div>
-        <button type="button" aria-label="Opsi produk"
-            class="relative z-10 grid size-7 shrink-0 place-items-center rounded-full text-neutral-600 transition hover:bg-neutral-100">
-            <svg viewBox="0 0 24 24" class="size-4 fill-current" aria-hidden="true">
-                <circle cx="12" cy="5" r="1.6" />
-                <circle cx="12" cy="12" r="1.6" />
-                <circle cx="12" cy="19" r="1.6" />
-            </svg>
-        </button>
+        <x-product-options-menu :product="$product" />
     </div>
 
     {{-- Gambar + badge + favorit --}}
@@ -53,7 +46,7 @@
             class="absolute left-2 top-2 rounded px-2 py-0.5 text-[10px] font-bold bg-lime-400 text-neutral-900">{{ $product->status_label }}</span>
 
         <button type="button" aria-label="Favorit" aria-pressed="{{ !empty($product->is_favorite) ? 'true' : 'false' }}"
-            data-favorite-toggle data-url="{{ $favUrl }}"
+            @guest data-open-login @endguest data-favorite-toggle data-url="{{ $favUrl }}" 
             class="absolute right-2 top-2 z-10 grid size-7.5 place-items-center rounded-full bg-neutral-900/50 text-white backdrop-blur-xs transition hover:bg-neutral-900/75 aria-pressed:text-lime-400 aria-pressed:[&>svg]:fill-lime-400 aria-pressed:[&>svg]:stroke-lime-400">
             <svg viewBox="0 0 24 24"
                 class="size-4 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]"

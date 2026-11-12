@@ -181,7 +181,7 @@ class Product extends Model
     {
         return $this->hasMany(Review::class);
     }
-
+    
     /**
      * URL gambar utama produk dari database (dipakai product-card).
      */
@@ -193,7 +193,15 @@ class Product extends Model
                     ? $this->primaryImage
                     : $this->primaryImage()->first();
 
-                return $primary?->path_url ?? $this->images->first()?->path_url;
+                if ($primary?->path_url) {
+                    return $primary->path_url;
+                }
+
+                $fallback = $this->relationLoaded('images')
+                    ? $this->images->first()
+                    : $this->images()->first();
+
+                return $fallback?->path_url;
             }
         );
     }
