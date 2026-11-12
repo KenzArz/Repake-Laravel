@@ -6,7 +6,6 @@ import { initLocationDetect } from "./location-detect";
 window.repakeFirebase = () =>
     Promise.all([import("firebase/app"), import("firebase/auth")]);
 
-
 /* Tombol/link yang butuh login (guest) -> buka login modal.
    login-modal.blade.php (ALE) tinggal listen event 'open-login'. */
 document.addEventListener("click", (e) => {
@@ -56,7 +55,8 @@ document.addEventListener("click", async (e) => {
 
         const favCard = btn.closest("[data-favorite-card]");
         if (favCard && data.is_favorite === false) {
-            favCard.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+            favCard.style.transition =
+                "opacity 0.25s ease, transform 0.25s ease";
             favCard.style.opacity = "0.4";
         } else if (favCard && data.is_favorite === true) {
             favCard.style.opacity = "1";
@@ -66,24 +66,26 @@ document.addEventListener("click", async (e) => {
     }
 });
 
-/* Autoplay banner (setara Timer 4 detik di Flutter) */document.querySelectorAll("[data-banner-slider]").forEach((el) => {
-    const items = [...el.children];
-    if (items.length < 2 || el.scrollWidth <= el.clientWidth + 1) return; // muat semua, tidak perlu geser
+/* Autoplay banner (setara Timer 4 detik di Flutter) */ document
+    .querySelectorAll("[data-banner-slider]")
+    .forEach((el) => {
+        const items = [...el.children];
+        if (items.length < 2 || el.scrollWidth <= el.clientWidth + 1) return; // muat semua, tidak perlu geser
 
-    let i = 0;
-    let paused = false;
-    el.addEventListener("mouseenter", () => (paused = true));
-    el.addEventListener("mouseleave", () => (paused = false));
+        let i = 0;
+        let paused = false;
+        el.addEventListener("mouseenter", () => (paused = true));
+        el.addEventListener("mouseleave", () => (paused = false));
 
-    setInterval(() => {
-        if (paused) return;
-        i = (i + 1) % items.length;
-        el.scrollTo({
-            left: items[i].offsetLeft - el.offsetLeft,
-            behavior: "smooth",
-        });
-    }, 4000);
-});
+        setInterval(() => {
+            if (paused) return;
+            i = (i + 1) % items.length;
+            el.scrollTo({
+                left: items[i].offsetLeft - el.offsetLeft,
+                behavior: "smooth",
+            });
+        }, 4000);
+    });
 
 /* Deteksi kota [ALDI] — hanya aktif bila ada pemicunya di halaman */
 initLocationDetect();
@@ -91,4 +93,17 @@ initLocationDetect();
 /* Form jual barang — hanya dimuat bila halamannya memang punya form tersebut */
 if (document.getElementById("productForm")) {
     import("./product-create").then((module) => module.initProductCreate());
+}
+
+/* Form jual barang — hanya dimuat bila halamannya memang punya form tersebut */
+if (document.getElementById("productForm")) {
+    import("./product-create").then((module) => module.initProductCreate());
+}
+
+/* Detail produk — hanya dimuat di halaman detail produk */
+if (
+    document.getElementById("product-desc") ||
+    document.getElementById("main-product-img")
+) {
+    import("./product-detail").then((module) => module.initProductDetail());
 }
