@@ -238,3 +238,31 @@ test('the chat page renders the last-seen difference attributes when offline', f
         ->assertSee('data-online="0"', false)
         ->assertSee('data-last-seen-at="', false);
 });
+
+test('stream payload exposes unread count and activity rev for the user', function () {
+    $controller = new \App\Http\Controllers\ChatController();
+
+    expect($controller->streamPayload($this->buyer->id))
+        ->toMatchArray(['unread' => 0, 'rev' => 0]);
+
+    $this->conversation->messages()->create([
+        'sender_id' => $this->seller->id,
+        'type' => Message::TYPE_TEXT,
+        'body' => 'Pesan baru',
+    ]);
+
+    $payload = $controller->streamPayload($this->buyer->id);
+    expect($payload['rev'])->toBeGreaterThan(0)
+        ->and($payload['unread'])->toBe(1);
+
+    // Pesan sistem tidak menambah "unread", tetapi menaikkan rev (aktivitas).
+    $this->conversation->messages()->create([
+        'sender_id' => $this->seller->id,
+        'type' => Message::TYPE_SYSTEM,
+        'body' => 'Aktivitas',
+    ]);
+
+    $payload2 = $controller->streamPayload($this->buyer->id);
+    expect($payload2['unread'])->toBe(1)
+        ->and($payload2['rev'])->toBeGreaterThan($payload['rev']);
+});
