@@ -93,6 +93,20 @@ initLocationDetect();
 /* Form jual barang — hanya dimuat bila halamannya memang punya form tersebut */
 if (document.getElementById("productForm")) {
     import("./product-create").then((module) => module.initProductCreate());
+    import("./product-location").then((module) => module.initProductLocation());
+}
+
+/* Detail produk — hanya dimuat di halaman detail produk */
+if (
+    document.getElementById("product-desc") ||
+    document.getElementById("main-product-img")
+) {
+    import("./product-detail").then((module) => module.initProductDetail());
+}
+
+/* Form jual barang — hanya dimuat bila halamannya memang punya form tersebut */
+if (document.getElementById("productForm")) {
+    import("./product-create").then((module) => module.initProductCreate());
 }
 
 /* Form jual barang — hanya dimuat bila halamannya memang punya form tersebut */

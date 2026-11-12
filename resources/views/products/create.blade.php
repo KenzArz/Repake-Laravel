@@ -4,7 +4,8 @@
 
 @section('content')
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <form action="{{ route('products.store') }}" method="POST" enctype="multipart/form-data" id="productForm" novalidate>
+        <form action="{{ route('products.store') }}" method="POST" enctype="multipart/form-data" id="productForm"
+            novalidate>
             @csrf
 
             <div class="grid grid-cols-1 gap-8 lg:grid-cols-12">
@@ -56,7 +57,7 @@
                         </div>
 
                         <div id="previewContainer" class="grid grid-cols-3 gap-3">
-                                                    </div>
+                        </div>
                     </div>
                 </div>
 
@@ -72,7 +73,9 @@
                                 <input type="text" id="judul" name="judul" value="{{ old('judul') }}" required
                                     placeholder="Masukkan nama barang..."
                                     class="mt-2 w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-surface-page)] px-4 py-3 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] outline-none transition focus:border-[var(--color-lime)] focus:bg-white focus:ring-1 focus:ring-[var(--color-lime)]">
-                                <p id="err-judul" class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('judul') ? '' : 'hidden' }}">{{ $errors->first('judul') }}</p>
+                                <p id="err-judul"
+                                    class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('judul') ? '' : 'hidden' }}">
+                                    {{ $errors->first('judul') }}</p>
                             </div>
 
                             <div>
@@ -98,7 +101,9 @@
                                         </svg>
                                     </div>
                                 </div>
-                                <p id="err-category_id" class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('category_id') ? '' : 'hidden' }}">{{ $errors->first('category_id') }}</p>
+                                <p id="err-category_id"
+                                    class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('category_id') ? '' : 'hidden' }}">
+                                    {{ $errors->first('category_id') }}</p>
                             </div>
 
                             <div>
@@ -121,7 +126,9 @@
                                         </label>
                                     @endforeach
                                 </div>
-                                <p id="err-kondisi" class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('kondisi') ? '' : 'hidden' }}">{{ $errors->first('kondisi') }}</p>
+                                <p id="err-kondisi"
+                                    class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('kondisi') ? '' : 'hidden' }}">
+                                    {{ $errors->first('kondisi') }}</p>
                             </div>
 
                             <div>
@@ -137,7 +144,9 @@
                                         step="500" placeholder="Masukkan harga..."
                                         class="w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-surface-page)] py-3 pl-12 pr-4 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] outline-none transition focus:border-[var(--color-lime)] focus:bg-white focus:ring-1 focus:ring-[var(--color-lime)]">
                                 </div>
-                                <p id="err-harga" class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('harga') ? '' : 'hidden' }}">{{ $errors->first('harga') }}</p>
+                                <p id="err-harga"
+                                    class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('harga') ? '' : 'hidden' }}">
+                                    {{ $errors->first('harga') }}</p>
                             </div>
 
                             <div>
@@ -147,17 +156,33 @@
                                 <textarea id="deskripsi" name="deskripsi" rows="4" required
                                     placeholder="Jelaskan kondisi, ukuran, kelengkapan, kekurangan, atau hal lain yang perlu diketahui pembeli..."
                                     class="mt-2 w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-surface-page)] p-4 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] outline-none transition focus:border-[var(--color-lime)] focus:bg-white focus:ring-1 focus:ring-[var(--color-lime)]">{{ old('deskripsi') }}</textarea>
-                                <p id="err-deskripsi" class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('deskripsi') ? '' : 'hidden' }}">{{ $errors->first('deskripsi') }}</p>
+                                <p id="err-deskripsi"
+                                    class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('deskripsi') ? '' : 'hidden' }}">
+                                    {{ $errors->first('deskripsi') }}</p>
                             </div>
 
                             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                {{-- 1. Lokasi COD / Titik Temu (Google Maps Autocomplete + Live GPS) --}}
                                 <div>
-                                    <label for="kota"
-                                        class="block text-xs font-bold text-[var(--color-text-primary)]">
-                                        Kota / Area Produk
-                                    </label>
+                                    <div class="flex items-center justify-between">
+                                        <label for="location_search"
+                                            class="block text-xs font-bold text-[var(--color-text-primary)]">
+                                            Area / Titik COD
+                                        </label>
+                                        <button type="button" id="btn-live-location"
+                                            class="inline-flex items-center gap-1 text-[11px] font-bold text-lime-700 hover:underline cursor-pointer">
+                                            <svg class="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                                stroke-width="2">
+                                                <circle cx="12" cy="12" r="3" />
+                                                <path d="M12 2v3m0 14v3M2 12h3m14 0h3" />
+                                            </svg>
+                                            <span>Lokasi saat ini</span>
+                                        </button>
+                                    </div>
+
                                     <div class="relative mt-1">
-                                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400">
+                                        <span
+                                            class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400">
                                             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                                 stroke-width="2">
                                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -166,14 +191,28 @@
                                                     d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                             </svg>
                                         </span>
-                                        <input type="text" id="kota" name="kota"
-                                            value="{{ old('kota') }}" required
-                                            placeholder="Contoh: Kampus 1 UNSIKA / Telukjambe"
+
+                                        {{-- Input pencarian tempat GMaps --}}
+                                        <input type="text" id="location_search" name="cod_place_name"
+                                            value="{{ old('cod_place_name', old('kota')) }}" required autocomplete="off"
+                                            placeholder="Cari tempat COD di Maps..."
                                             class="w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-surface-page)] py-2.5 pl-9 pr-3 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] outline-none transition focus:border-[var(--color-lime)] focus:bg-white">
+
+                                        {{-- Data tersembunyi hasil pilihan GMaps / Live GPS --}}
+                                        <input type="hidden" id="kota" name="kota" value="{{ old('kota') }}">
+                                        <input type="hidden" id="province" name="province" value="{{ old('province') }}">
+                                        <input type="hidden" id="cod_lat" name="cod_lat" value="{{ old('cod_lat') }}">
+                                        <input type="hidden" id="cod_lng" name="cod_lng" value="{{ old('cod_lng') }}">
                                     </div>
-                                    <p id="err-kota" class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('kota') ? '' : 'hidden' }}">{{ $errors->first('kota') }}</p>
+
+                                    <p id="location-status" class="mt-1 hidden text-[11px] font-medium text-neutral-500">
+                                    </p>
+                                    <p id="err-kota"
+                                        class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('kota') ? '' : 'hidden' }}">
+                                        {{ $errors->first('kota') }}</p>
                                 </div>
 
+                                {{-- 2. Patokan Lokasi (Teks Bebas) --}}
                                 <div>
                                     <label for="patokan_lokasi"
                                         class="block text-xs font-bold text-[var(--color-text-primary)]">
@@ -183,11 +222,15 @@
                                     <input type="text" id="patokan_lokasi" name="patokan_lokasi"
                                         value="{{ old('patokan_lokasi') }}" placeholder="Contoh: Depan Gd. H. Oemar Said"
                                         class="mt-1 w-full rounded-xl border border-[var(--color-border-default)] bg-[var(--color-surface-page)] px-3 py-2.5 text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] outline-none transition focus:border-[var(--color-lime)] focus:bg-white">
-                                    <p id="err-patokan_lokasi" class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('patokan_lokasi') ? '' : 'hidden' }}">{{ $errors->first('patokan_lokasi') }}</p>
+                                    <p id="err-patokan_lokasi"
+                                        class="mt-1 text-xs text-[var(--color-error-base)] {{ $errors->has('patokan_lokasi') ? '' : 'hidden' }}">
+                                        {{ $errors->first('patokan_lokasi') }}</p>
                                 </div>
                             </div>
 
-                            <p id="formError" class="hidden rounded-xl border border-[var(--color-error-base)] bg-red-50 p-3 text-xs font-semibold text-[var(--color-error-base)]"></p>
+                            <p id="formError"
+                                class="hidden rounded-xl border border-[var(--color-error-base)] bg-red-50 p-3 text-xs font-semibold text-[var(--color-error-base)]">
+                            </p>
 
                             <div class="pt-2">
                                 <button type="submit"
@@ -204,4 +247,3 @@
         </form>
     </div>
 @endsection
-
