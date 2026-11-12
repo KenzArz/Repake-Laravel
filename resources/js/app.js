@@ -23,7 +23,24 @@ document.addEventListener("click", async (e) => {
 
     const was = btn.getAttribute("aria-pressed") === "true";
     const nextState = !was;
-    btn.setAttribute("aria-pressed", String(nextState)); // optimistic update
+
+    // 1. Siapkan elemen counter di dalam tombol produk (halaman detail)
+    const productCountEl = btn.querySelector("[data-favorite-count]");
+    const initialCount = productCountEl
+        ? parseInt(productCountEl.dataset.count || "0", 10)
+        : 0;
+
+    const setProductCount = (val) => {
+        if (!productCountEl) return;
+        const safeCount = Math.max(0, val);
+        productCountEl.dataset.count = String(safeCount);
+        productCountEl.textContent = String(safeCount);
+        productCountEl.classList.toggle("hidden", safeCount <= 0);
+    };
+
+    // Optimistic update status & angka
+    btn.setAttribute("aria-pressed", String(nextState));
+    setProductCount(initialCount + (nextState ? 1 : -1));
 
     const url = btn.dataset.url;
     if (!url) return;
@@ -43,26 +60,38 @@ document.addEventListener("click", async (e) => {
         if (!res.ok) throw new Error("Gagal mengubah status favorit");
 
         const data = await res.json();
-        if (typeof data.is_favorite === "boolean") {
-            btn.setAttribute("aria-pressed", String(data.is_favorite));
+        const finalState =
+            typeof data.is_favorite === "boolean"
+                ? data.is_favorite
+                : nextState;
+
+        btn.setAttribute("aria-pressed", String(finalState));
+
+        // 2. Sinkronkan jumlah favorit produk di tombol detail
+        if (typeof data.favorites_count === "number") {
+            setProductCount(data.favorites_count);
+        } else {
+            setProductCount(initialCount + (finalState ? 1 : -1));
         }
 
-        // Update jumlah favorit di halaman jika ada
-        const countEl = document.getElementById("favorites-count");
-        if (countEl && typeof data.count === "number") {
-            countEl.textContent = data.count;
+        // Update total favorit user di halaman /favorites (tetap dipertahankan)
+        const pageCountEl = document.getElementById("favorites-count");
+        if (pageCountEl && typeof data.count === "number") {
+            pageCountEl.textContent = data.count;
         }
 
         const favCard = btn.closest("[data-favorite-card]");
-        if (favCard && data.is_favorite === false) {
+        if (favCard && finalState === false) {
             favCard.style.transition =
                 "opacity 0.25s ease, transform 0.25s ease";
             favCard.style.opacity = "0.4";
-        } else if (favCard && data.is_favorite === true) {
+        } else if (favCard && finalState === true) {
             favCard.style.opacity = "1";
         }
     } catch {
-        btn.setAttribute("aria-pressed", String(was)); // rollback
+        // 3. Rollback status & angka jika gagal
+        btn.setAttribute("aria-pressed", String(was));
+        setProductCount(initialCount);
     }
 });
 
