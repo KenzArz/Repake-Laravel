@@ -77,20 +77,45 @@ class Product extends Model
     }
 
     /**
-     * Slug unik dari judul; diberi suffix angka bila sudah dipakai produk lain.
+     * Slug unik dari judul (ID otomatis ditambahkan saat produk tersimpan).
      */
-    public static function uniqueSlug(string $judul): string
+    public static function uniqueSlug(string $judul, ?int $id = null): string
     {
-        $slug = Str::slug($judul);
-        $candidate = $slug;
-        $suffix = 2;
+        $base = Str::slug($judul) ?: 'produk';
 
-        while (self::withTrashed()->where('slug', $candidate)->exists()) {
-            $candidate = $slug . '-' . $suffix;
-            $suffix++;
-        }
+        return $id !== null
+            ? "{$base}-{$id}"
+            : "{$base}-" . Str::lower(Str::random(6));
+    }
 
-        return $candidate;
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Product $product): void {
+            $base = Str::slug($product->judul) ?: 'produk';
+
+            // Slug sementara yang unik sebelum ID didapat dari database
+            $product->slug = "{$base}-" . Str::lower(Str::random(6));
+        });
+
+        static::created(function (Product $product): void {
+            $base = Str::slug($product->judul) ?: 'produk';
+
+            $product->slug = "{$base}-{$product->id}";
+            $product->saveQuietly();
+        });
+
+        static::updating(function (Product $product): void {
+            if ($product->isDirty('judul') && ! $product->isDirty('slug')) {
+                $base = Str::slug($product->judul) ?: 'produk';
+
+                $product->slug = "{$base}-{$product->id}";
+            }
+        });
     }
 
     public function seller(): BelongsTo

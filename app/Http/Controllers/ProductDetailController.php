@@ -14,14 +14,19 @@ class ProductDetailController extends Controller
     /**
      * Tampilkan halaman detail barang.
      */
-    public function show(int|string $id): View
+    public function show(string $slug): View
     {
-        $product = Product::with(['images', 'primaryImage', 'user', 'codAreas', 'category'])
-            ->findOrFail($id);
+        $baseQuery = Product::with(['images', 'primaryImage', 'user', 'codAreas', 'category'])
+            ->withCount('favorites');
+
+        $product = (clone $baseQuery)->where('slug', $slug)->first()
+            ?? (ctype_digit($slug) ? $baseQuery->find((int) $slug) : null);
+
+        abort_if(! $product, 404);
 
         // Produk serupa / rekomendasi lainnya dari kategori yang sama
         $similarProducts = Product::with(['primaryImage', 'user'])
-            ->when($product->category_id, fn ($q) => $q->where('category_id', $product->category_id))
+            ->when($product->category_id, fn($q) => $q->where('category_id', $product->category_id))
             ->whereKeyNot($product->getKey())
             ->dijual()
             ->latest()

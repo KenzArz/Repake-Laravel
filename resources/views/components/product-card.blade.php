@@ -1,7 +1,7 @@
 @props(['product'])
 
 @php
-    $detailUrl = Route::has('products.show') ? route('products.show', $product->id) : '#';
+    $detailUrl = Route::has('products.show') ? route('products.show', $product) : '#';
     $favUrl = Route::has('favorites.toggle') ? route('favorites.toggle', $product->id) : '';
     $badge = $product->status_label === 'Dijual'
         ? 'bg-lime-500/90 text-neutral-900'
