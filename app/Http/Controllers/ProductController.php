@@ -27,9 +27,9 @@ class ProductController extends Controller
         $kota = trim((string) $request->query('kota'));
 
         $products = Product::with(['primaryImage', 'user', 'category'])
-            ->when($q !== '', fn ($query) => $query->cari($q))
-            ->when($kota !== '', fn ($query) => $query->where('kota', $kota))
-            ->when($kategori !== '', fn ($query) => $query->whereHas('category', fn ($cq) => $cq->where('slug', $kategori)))
+            ->when($q !== '', fn($query) => $query->cari($q))
+            ->when($kota !== '', fn($query) => $query->where('kota', $kota))
+            ->when($kategori !== '', fn($query) => $query->whereHas('category', fn($cq) => $cq->where('slug', $kategori)))
             ->dijual()
             ->latest()
             ->paginate(12)
@@ -61,14 +61,15 @@ class ProductController extends Controller
 
         if ($files->count() > ProductImageStorage::MAX_IMAGES) {
             return $this->error(
-                'Maksimal gambar yang dapat diunggah adalah '.ProductImageStorage::MAX_IMAGES.' gambar.',
-                ['images' => ['Maksimal gambar yang dapat diunggah adalah '.ProductImageStorage::MAX_IMAGES.' gambar.']],
+                'Maksimal gambar yang dapat diunggah adalah ' . ProductImageStorage::MAX_IMAGES . ' gambar.',
+                ['images' => ['Maksimal gambar yang dapat diunggah adalah ' . ProductImageStorage::MAX_IMAGES . ' gambar.']],
                 $request,
             );
         }
 
         try {
-            $this->publisher->publish(Auth::id(), [
+            // 1. Tampung hasil publish() ke variabel $product
+            $product = $this->publisher->publish(Auth::id(), [
                 'category_id' => $request->category_id,
                 'judul' => $request->judul,
                 'slug' => Product::uniqueSlug($request->judul),
@@ -79,6 +80,24 @@ class ProductController extends Controller
                 'kota' => $request->kota,
                 'patokan_lokasi' => $request->patokan_lokasi,
             ], $files);
+
+            // 2. Tambahkan blok ini untuk menyimpan titik COD & koordinat ke CodArea
+            if ($product instanceof Product && $request->filled(['cod_lat', 'cod_lng'])) {
+                $placeName = $request->cod_place_name ?: $request->kota;
+
+                $codArea = \App\Models\CodArea::firstOrCreate(
+                    ['name' => $placeName, 'city' => $request->kota],
+                    [
+                        'province' => $request->province ?? 'Jawa Barat',
+                        'boundary' => [
+                            'type' => 'Point',
+                            'coordinates' => [(float) $request->cod_lng, (float) $request->cod_lat],
+                        ],
+                    ]
+                );
+
+                $product->codAreas()->sync([$codArea->id]);
+            }
         } catch (\Throwable) {
             return $this->error(
                 'Gagal mengunggah produk. Silakan coba lagi atau gunakan gambar lain.',
