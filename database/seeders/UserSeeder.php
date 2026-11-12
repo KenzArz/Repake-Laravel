@@ -13,22 +13,9 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Admin RePake
-        User::updateOrCreate(
-            ['email' => 'admin@unsika.ac.id'],
-            [
-                'name' => 'Admin RePake',
-                'username' => 'admin_repake',
-                'email_verified_at' => now(),
-                'password' => Hash::make('password123'),
-                'phone' => '081234567890',
-                'kota' => 'Karawang',
-                'bio' => 'Administrator resmi RePake UNSIKA',
-                'role' => 'admin',
-            ]
-        );
+        // Akun admin dibuat oleh AdminSeeder dari allowlist email (config/repake.php).
 
-        // 2. Akun Mahasiswa / Penjual Dummy
+        // Akun Mahasiswa / Penjual Dummy
         $sellers = [
             [
                 'name' => 'Midou Wijaya',

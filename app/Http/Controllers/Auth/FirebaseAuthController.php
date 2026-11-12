@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -45,7 +46,12 @@ class FirebaseAuthController extends Controller
             return $this->reject($request);
         }
 
-        $user = User::firstOrNew(['firebase_uid' => $account['localId']]);
+        $user = User::query()
+            ->where(function (Builder $query) use ($account, $email): void {
+                $query->where('firebase_uid', $account['localId'])
+                    ->orWhere('email', $email);
+            })
+            ->first() ?? new User;
 
         if ($user->exists && $user->is_banned) {
             return $this->reject($request);
@@ -57,9 +63,11 @@ class FirebaseAuthController extends Controller
             $user->username = $this->uniqueUsername($email);
         }
 
+        $user->firebase_uid = $account['localId'];
         $user->email = $email;
         $user->avatar = $account['photoUrl'] ?? $user->avatar;
         $user->email_verified_at ??= now();
+        $user->role = $user->isAdmin() ? User::ROLE_ADMIN : User::ROLE_MAHASISWA;
         $user->save();
 
         Auth::login($user, true);
@@ -76,7 +84,7 @@ class FirebaseAuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'redirect' => route('home'),
+            'redirect' => $user->isAdmin() ? route('admin.dashboard') : route('home'),
         ]);
     }
 

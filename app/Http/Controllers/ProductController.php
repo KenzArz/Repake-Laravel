@@ -89,7 +89,7 @@ class ProductController extends Controller
             ->where('name', 'like', "%{$q}%")
             ->take(3)
             ->get()
-            ->map(fn(Category $cat): array => [
+            ->map(fn (Category $cat): array => [
                 'name' => $cat->name,
                 'slug' => $cat->slug,
                 'url' => route('products.index', ['kategori' => [$cat->slug]]),
@@ -102,10 +102,10 @@ class ProductController extends Controller
             ->latest()
             ->take(6)
             ->get()
-            ->map(fn(Product $product): array => [
+            ->map(fn (Product $product): array => [
                 'id' => $product->id,
                 'judul' => $product->judul,
-                'harga' => 'Rp ' . number_format((int) $product->harga, 0, ',', '.'),
+                'harga' => 'Rp '.number_format((int) $product->harga, 0, ',', '.'),
                 'kota' => $product->kota ?: 'Sekitar Kampus',
                 'kondisi' => $product->kondisi,
                 'category' => $product->category?->name ?? 'Produk',
@@ -148,17 +148,17 @@ class ProductController extends Controller
 
         $query = Product::with(['primaryImage', 'user', 'category', 'codAreas'])
             ->dijual()
-            ->when($q !== '', fn(Builder $qb) => $qb->cari($q))
+            ->when($q !== '', fn (Builder $qb) => $qb->cari($q))
             ->when($selectedKategori !== [], function (Builder $qb) use ($selectedKategori): void {
-                $qb->whereHas('category', fn(Builder $cq) => $cq->whereIn('slug', $selectedKategori));
+                $qb->whereHas('category', fn (Builder $cq) => $cq->whereIn('slug', $selectedKategori));
             })
             ->when($selectedKondisi !== [], function (Builder $qb) use ($selectedKondisi): void {
                 $lowered = array_map('mb_strtolower', $selectedKondisi);
                 $qb->whereIn(DB::raw('LOWER(kondisi)'), $lowered);
             })
-            ->when($minPrice !== null && $minPrice !== '' && is_numeric($minPrice), fn(Builder $qb) => $qb->where('harga', '>=', (int) $minPrice))
-            ->when($maxPrice !== null && $maxPrice !== '' && is_numeric($maxPrice), fn(Builder $qb) => $qb->where('harga', '<=', (int) $maxPrice))
-            ->when($negoOnly, fn(Builder $qb) => $qb->where('is_negotiable', true));
+            ->when($minPrice !== null && $minPrice !== '' && is_numeric($minPrice), fn (Builder $qb) => $qb->where('harga', '>=', (int) $minPrice))
+            ->when($maxPrice !== null && $maxPrice !== '' && is_numeric($maxPrice), fn (Builder $qb) => $qb->where('harga', '<=', (int) $maxPrice))
+            ->when($negoOnly, fn (Builder $qb) => $qb->where('is_negotiable', true));
 
         // Jika lokasi aktif atau urutkan terdekat dipilih
         if ($activeKota !== '' || $radiusKm !== null || ($sort === 'terdekat' && $targetLat !== null && $targetLng !== null)) {
@@ -184,9 +184,9 @@ class ProductController extends Controller
             $sorted = match ($sort) {
                 'termurah' => $all->sortBy('harga'),
                 'termahal' => $all->sortByDesc('harga'),
-                'terdekat' => $all->sortBy(fn(Product $p): array => [
+                'terdekat' => $all->sortBy(fn (Product $p): array => [
                     $p->distance_km ?? 9999.0,
-                    - ($p->created_at?->timestamp ?? 0),
+                    -($p->created_at?->timestamp ?? 0),
                 ]),
                 default => $all->sortByDesc('created_at'),
             };
@@ -267,7 +267,7 @@ class ProductController extends Controller
     }
 
     /**
-     * @param array{kota: ?string, lat: ?float, lng: ?float} $location
+     * @param  array{kota: ?string, lat: ?float, lng: ?float}  $location
      * @return array{lat: ?float, lng: ?float, keywords: array<int, string>}
      */
     private function resolveLocationTarget(array $location): array
@@ -316,7 +316,7 @@ class ProductController extends Controller
     }
 
     /**
-     * @param array<int, string> $keywords
+     * @param  array<int, string>  $keywords
      */
     private function matchesLocationKeywords(Product $product, array $keywords): bool
     {
@@ -392,8 +392,8 @@ class ProductController extends Controller
 
         if ($files->count() > ProductImageStorage::MAX_IMAGES) {
             return $this->error(
-                'Maksimal gambar yang dapat diunggah adalah ' . ProductImageStorage::MAX_IMAGES . ' gambar.',
-                ['images' => ['Maksimal gambar yang dapat diunggah adalah ' . ProductImageStorage::MAX_IMAGES . ' gambar.']],
+                'Maksimal gambar yang dapat diunggah adalah '.ProductImageStorage::MAX_IMAGES.' gambar.',
+                ['images' => ['Maksimal gambar yang dapat diunggah adalah '.ProductImageStorage::MAX_IMAGES.' gambar.']],
                 $request,
             );
         }
@@ -506,7 +506,7 @@ class ProductController extends Controller
         ]);
 
         $newFiles = $this->images->validFiles($request->file('images'));
-        $deleteIds = collect($validated['delete_images'] ?? [])->map(fn($id) => (int) $id)->all();
+        $deleteIds = collect($validated['delete_images'] ?? [])->map(fn ($id) => (int) $id)->all();
 
         $product->load('images');
         $remainingExisting = $product->images->whereNotIn('id', $deleteIds);
@@ -520,7 +520,7 @@ class ProductController extends Controller
 
         if ($totalPhotos > ProductImageStorage::MAX_IMAGES) {
             return back()
-                ->withErrors(['images' => 'Maksimal total gambar produk adalah ' . ProductImageStorage::MAX_IMAGES . ' gambar.'])
+                ->withErrors(['images' => 'Maksimal total gambar produk adalah '.ProductImageStorage::MAX_IMAGES.' gambar.'])
                 ->withInput();
         }
 
@@ -529,7 +529,9 @@ class ProductController extends Controller
             'category_id' => $validated['category_id'],
             'harga' => (int) $validated['harga'],
             'kondisi' => $validated['kondisi'],
-            'status' => $validated['status'] ?? $product->status,
+            'status' => $product->status === Product::STATUS_DITANGGUIHKAN
+                ? Product::STATUS_DITANGGUIHKAN
+                : ($validated['status'] ?? $product->status),
             'deskripsi' => $validated['deskripsi'],
             'kota' => $validated['kota'],
             'patokan_lokasi' => $validated['patokan_lokasi'] ?? null,
@@ -575,7 +577,7 @@ class ProductController extends Controller
         $savedNewImages = [];
         foreach ($newFiles as $file) {
             $storedPath = $file->store('products', 'public');
-            $valueToSave = $pathColumn === 'path_url' ? 'storage/' . $storedPath : $storedPath;
+            $valueToSave = $pathColumn === 'path_url' ? 'storage/'.$storedPath : $storedPath;
 
             $savedNewImages[] = $product->images()->create([
                 $pathColumn => $valueToSave,

@@ -18,6 +18,8 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             AdminSeeder::class,
             ProductSeeder::class,
+            BannerSeeder::class,
+            ReportSeeder::class,
         ]);
 
         // Idempoten: aman dijalankan berkali-kali (migrate --seed tanpa fresh).

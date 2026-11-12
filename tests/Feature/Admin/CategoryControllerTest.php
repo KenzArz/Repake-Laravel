@@ -4,6 +4,9 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -30,12 +33,19 @@ test('admin creates a category with an auto generated slug', function () {
 test('category store rejects an empty payload', function () {
     $this->actingAs($this->admin);
 
-    $response = $this->from(route('admin.categories.index'))
+    $response = $this->from(route('admin.dashboard', ['tab' => 'kategori']))
         ->post(route('admin.categories.store'), []);
 
-    $response->assertRedirect(route('admin.categories.index'));
+    $response->assertRedirect(route('admin.dashboard', ['tab' => 'kategori']));
     $response->assertSessionHasErrors(['name']);
     expect(Category::count())->toBe(0);
+});
+
+test('categories index redirects to the dashboard kategori tab', function () {
+    $this->actingAs($this->admin);
+
+    $this->get(route('admin.categories.index'))
+        ->assertRedirect(route('admin.dashboard', ['tab' => 'kategori']));
 });
 
 test('category store rejects a duplicate name', function () {
@@ -82,4 +92,78 @@ test('deleting a category keeps its products with no category', function () {
 
     expect(Category::count())->toBe(0)
         ->and($product->refresh()->category_id)->toBeNull();
+});
+
+test('category store accepts an uploaded PNG icon', function () {
+    Storage::fake('public');
+    $this->actingAs($this->admin);
+
+    $this->post(route('admin.categories.store'), [
+        'name' => 'Perangkat Audio',
+        'icon_file' => UploadedFile::fake()->image('ikon.png', 64, 64),
+    ])->assertRedirect()->assertSessionHas('info');
+
+    $category = Category::where('slug', 'perangkat-audio')->sole();
+
+    expect($category->icon)->toStartWith('/storage/categories/');
+
+    Storage::disk('public')->assertExists(Str::after($category->icon, '/storage/'));
+});
+
+test('category icon upload rejects a non-PNG file', function () {
+    Storage::fake('public');
+    $this->actingAs($this->admin);
+
+    $this->from(route('admin.dashboard', ['tab' => 'kategori']))
+        ->post(route('admin.categories.store'), [
+            'name' => 'Perangkat Audio',
+            'icon_file' => UploadedFile::fake()->image('ikon.jpg'),
+        ])
+        ->assertRedirect(route('admin.dashboard', ['tab' => 'kategori']))
+        ->assertSessionHasErrors(['icon_file']);
+
+    expect(Category::count())->toBe(0);
+});
+
+test('replacing a category icon removes the previous uploaded file', function () {
+    Storage::fake('public');
+    Storage::disk('public')->put('categories/lama.png', 'dummy');
+
+    $category = Category::factory()->create([
+        'name' => 'Buku',
+        'icon' => '/storage/categories/lama.png',
+    ]);
+
+    $this->actingAs($this->admin)
+        ->put(route('admin.categories.update', $category), [
+            'name' => 'Buku',
+            'icon_file' => UploadedFile::fake()->image('baru.png', 64, 64),
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('info');
+
+    $category->refresh();
+
+    expect($category->icon)->toStartWith('/storage/categories/')
+        ->and($category->icon)->not->toBe('/storage/categories/lama.png');
+
+    Storage::disk('public')->assertMissing('categories/lama.png');
+    Storage::disk('public')->assertExists(Str::after($category->icon, '/storage/'));
+});
+
+test('deleting a category removes its uploaded icon', function () {
+    Storage::fake('public');
+    Storage::disk('public')->put('categories/hapus.png', 'dummy');
+
+    $category = Category::factory()->create([
+        'name' => 'Buku',
+        'icon' => '/storage/categories/hapus.png',
+    ]);
+
+    $this->actingAs($this->admin)
+        ->delete(route('admin.categories.destroy', $category))
+        ->assertRedirect()
+        ->assertSessionHas('info');
+
+    Storage::disk('public')->assertMissing('categories/hapus.png');
 });

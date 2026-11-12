@@ -196,6 +196,19 @@
                         </div>
 
                         <div class="py-1">
+                            @if (auth()->user()->isAdmin())
+                                <a href="{{ route('admin.dashboard') }}"
+                                    class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-lime-800 hover:bg-lime-50 hover:text-lime-900 transition">
+                                    <svg viewBox="0 0 24 24" class="size-4 stroke-current stroke-2 fill-none">
+                                        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                                        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                                        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                                        <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                                    </svg>
+                                    <span>Dashboard Admin</span>
+                                </a>
+                            @endif
+
                             <a href="{{ route('profile.catalog') }}"
                                 class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 transition">
                                 <svg viewBox="0 0 24 24" class="size-4 stroke-current stroke-2 fill-none">
@@ -295,6 +308,7 @@
         aria-label="Navigasi utama">
         @php
             $isHome = request()->routeIs('home');
+            $isDashboard = request()->routeIs('admin.*');
             $isFav = request()->routeIs('favorites.*');
             $itemCls = 'flex flex-1 flex-col items-center justify-center gap-1 text-xs transition';
             $activeCls = 'font-semibold text-lime-700';
@@ -310,6 +324,21 @@
             </svg>
             <span class="text-[11px] leading-none">Home</span>
         </a>
+
+        @if (auth()->check() && auth()->user()->isAdmin())
+            <a href="{{ route('admin.dashboard') }}"
+                class="{{ $itemCls }} {{ $isDashboard ? $activeCls : $inactiveCls }}">
+                <svg viewBox="0 0 24 24"
+                    class="size-6 {{ $isDashboard ? 'fill-current stroke-current' : 'fill-none stroke-current' }} stroke-[1.8]"
+                    aria-hidden="true">
+                    <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                    <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                    <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                    <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                </svg>
+                <span class="text-[11px] leading-none">Dashboard</span>
+            </a>
+        @endif
 
         <a href="{{ route('favorites.index') }}" {{ $needLogin }}
             class="{{ $itemCls }} {{ $isFav ? $activeCls : $inactiveCls }}">

@@ -1,6 +1,9 @@
 <?php
 
+use App\Http\Controllers\Admin\BannerController as AdminBannerController;
 use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Auth\FirebaseAuthController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\FavoriteController;
@@ -51,13 +54,29 @@ Route::middleware(['auth', 'banned'])->group(function () {
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
 });
 
-// Admin (wajib login + role admin)
+// Admin (wajib login + allowlist email admin)
 Route::prefix('admin')
     ->name('admin.')
     ->middleware(['auth', 'banned', 'admin'])
     ->group(function () {
+        Route::redirect('/', '/admin/dashboard');
+
+        Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
+
+        // Detail & tindak lanjut laporan.
+        Route::get('/reports/{report}', [AdminReportController::class, 'show'])->name('reports.show');
+        Route::patch('/reports/{report}/moderate', [AdminReportController::class, 'moderate'])->name('reports.moderate');
+
+        // Kategori (index dialihkan ke tab kategori di dashboard).
         Route::resource('categories', AdminCategoryController::class)
             ->only(['index', 'store', 'update', 'destroy']);
+
+        // Banner beranda.
+        Route::post('/banners', [AdminBannerController::class, 'store'])->name('banners.store');
+        Route::patch('/banners/reorder', [AdminBannerController::class, 'reorder'])->name('banners.reorder');
+        Route::patch('/banners/{banner}/toggle', [AdminBannerController::class, 'toggle'])->name('banners.toggle');
+        Route::patch('/banners/{banner}/move', [AdminBannerController::class, 'move'])->name('banners.move');
+        Route::delete('/banners/{banner}', [AdminBannerController::class, 'destroy'])->name('banners.destroy');
     });
 
 // Chat (wajib login)

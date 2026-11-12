@@ -27,6 +27,8 @@ class Product extends Model
 
     public const STATUS_DITINJAU = 'ditinjau';
 
+    public const STATUS_DITANGGUIHKAN = 'ditangguhkan';
+
     /**
      * @var array<int, string>
      */
@@ -53,12 +55,13 @@ class Product extends Model
     }
 
     /**
-     * Produk yang masih ditawarkan.
+     * Produk yang masih ditawarkan dan penjualnya tidak sedang dibanned.
      */
     #[Scope]
     protected function dijual(Builder $query): Builder
     {
-        return $query->where('status', self::STATUS_DIJUAL);
+        return $query->where('status', self::STATUS_DIJUAL)
+            ->whereHas('seller', fn (Builder $seller): Builder => $seller->where('is_banned', false));
     }
 
     /**
@@ -69,23 +72,33 @@ class Product extends Model
     {
         $term = trim((string) $term);
 
-        return $query->when($term !== '', fn(Builder $q): Builder => $q->where(
-            fn(Builder $inner): Builder => $inner
+        return $query->when($term !== '', fn (Builder $q): Builder => $q->where(
+            fn (Builder $inner): Builder => $inner
                 ->where('judul', 'like', "%{$term}%")
                 ->orWhere('deskripsi', 'like', "%{$term}%")
         ));
     }
 
     /**
-     * Slug unik dari judul (ID otomatis ditambahkan saat produk tersimpan).
+     * Slug unik dari judul. Bila slug dasar sudah dipakai, tambahkan
+     * sufiks angka (2, 3, ...) agar URL tetap rapi dan mudah dibaca.
      */
     public static function uniqueSlug(string $judul, ?int $id = null): string
     {
         $base = Str::slug($judul) ?: 'produk';
+        $slug = $base;
+        $suffix = 2;
 
-        return $id !== null
-            ? "{$base}-{$id}"
-            : "{$base}-" . Str::lower(Str::random(6));
+        while (static::query()
+            ->where('slug', $slug)
+            ->when($id !== null, fn (Builder $query): Builder => $query->whereKeyNot($id))
+            ->exists()
+        ) {
+            $slug = "{$base}-{$suffix}";
+            $suffix++;
+        }
+
+        return $slug;
     }
 
     public function getRouteKeyName(): string
@@ -96,24 +109,14 @@ class Product extends Model
     protected static function booted(): void
     {
         static::creating(function (Product $product): void {
-            $base = Str::slug($product->judul) ?: 'produk';
-
-            // Slug sementara yang unik sebelum ID didapat dari database
-            $product->slug = "{$base}-" . Str::lower(Str::random(6));
-        });
-
-        static::created(function (Product $product): void {
-            $base = Str::slug($product->judul) ?: 'produk';
-
-            $product->slug = "{$base}-{$product->id}";
-            $product->saveQuietly();
+            if (blank($product->slug)) {
+                $product->slug = static::uniqueSlug((string) $product->judul);
+            }
         });
 
         static::updating(function (Product $product): void {
             if ($product->isDirty('judul') && ! $product->isDirty('slug')) {
-                $base = Str::slug($product->judul) ?: 'produk';
-
-                $product->slug = "{$base}-{$product->id}";
+                $product->slug = static::uniqueSlug((string) $product->judul, $product->id);
             }
         });
     }
@@ -181,7 +184,7 @@ class Product extends Model
     {
         return $this->hasMany(Review::class);
     }
-    
+
     /**
      * URL gambar utama produk dari database (dipakai product-card).
      */
@@ -240,9 +243,10 @@ class Product extends Model
     protected function statusLabel(): Attribute
     {
         return Attribute::make(
-            get: fn(): string => match ($this->status) {
+            get: fn (): string => match ($this->status) {
                 self::STATUS_TERJUAL => 'Terjual',
                 self::STATUS_DITINJAU => 'Ditinjau',
+                self::STATUS_DITANGGUIHKAN => 'Ditangguhkan',
                 self::STATUS_DRAFT => 'Draft',
                 default => 'Dijual',
             }

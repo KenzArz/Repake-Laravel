@@ -35,6 +35,23 @@ test('returns 404 for non-existent product', function () {
     $response->assertStatus(404);
 });
 
+test('suspended product is hidden from guests but visible to its owner', function () {
+    $this->product->update(['status' => Product::STATUS_DITANGGUIHKAN]);
+
+    $this->get(route('products.show', $this->product))->assertNotFound();
+
+    $this->actingAs(User::find($this->product->user_id))
+        ->get(route('products.show', $this->product))
+        ->assertOk()
+        ->assertSee('Ditangguhkan');
+});
+
+test('product from a banned seller is hidden from guests', function () {
+    User::whereKey($this->product->user_id)->update(['is_banned' => true]);
+
+    $this->get(route('products.show', $this->product))->assertNotFound();
+});
+
 test('authenticated user can submit report for a product', function () {
     Storage::fake('public');
 

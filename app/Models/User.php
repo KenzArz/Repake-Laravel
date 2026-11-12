@@ -25,9 +25,19 @@ class User extends Authenticatable
 
     public const ROLE_ADMIN = 'admin';
 
+    /**
+     * Admin ditentukan oleh allowlist email eksplisit (config/repake.php),
+     * bukan dari domain email. Role di database hanya cermin untuk tampilan.
+     */
     public function isAdmin(): bool
     {
-        return $this->role === self::ROLE_ADMIN;
+        $email = strtolower(trim((string) $this->email));
+
+        if ($email === '') {
+            return false;
+        }
+
+        return in_array($email, config('repake.admin_emails', []), true);
     }
 
     protected function casts(): array

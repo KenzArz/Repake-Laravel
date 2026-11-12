@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Report;
 use App\Models\Review;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class ProductDetailController extends Controller
@@ -14,7 +15,7 @@ class ProductDetailController extends Controller
     /**
      * Tampilkan halaman detail barang.
      */
-    public function show(string $slug): View
+    public function show(Request $request, string $slug): View
     {
         $baseQuery = Product::with(['images', 'primaryImage', 'user', 'codAreas', 'category'])
             ->withCount('favorites');
@@ -24,9 +25,20 @@ class ProductDetailController extends Controller
 
         abort_if(! $product, 404);
 
+        $viewer = $request->user();
+        $isOwner = $viewer !== null && (int) $viewer->id === (int) $product->user_id;
+        $isAdmin = $viewer?->isAdmin() ?? false;
+
+        // Produk yang disuspend/draft dan produk milik penjual yang dibanned
+        // tidak boleh diakses publik lewat URL langsung.
+        $hiddenStatuses = [Product::STATUS_DRAFT, Product::STATUS_DITANGGUIHKAN];
+
+        abort_if(! $isAdmin && ! $isOwner && in_array($product->status, $hiddenStatuses, true), 404);
+        abort_if(! $isAdmin && $product->user?->is_banned, 404);
+
         // Produk serupa / rekomendasi lainnya dari kategori yang sama
         $similarProducts = Product::with(['primaryImage', 'user'])
-            ->when($product->category_id, fn($q) => $q->where('category_id', $product->category_id))
+            ->when($product->category_id, fn ($q) => $q->where('category_id', $product->category_id))
             ->whereKeyNot($product->getKey())
             ->dijual()
             ->latest()
@@ -62,7 +74,10 @@ class ProductDetailController extends Controller
     {
         $validated = $request->validated();
 
-        $product = Product::findOrFail($id);
+        $product = Product::where('slug', (string) $id)->first()
+            ?? (ctype_digit((string) $id) ? Product::find((int) $id) : null);
+
+        abort_if(! $product, 404);
 
         // Pemilik tidak bisa melaporkan produknya sendiri.
         abort_if($product->user_id === (int) auth()->id(), 403);

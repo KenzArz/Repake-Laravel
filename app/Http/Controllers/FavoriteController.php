@@ -34,18 +34,25 @@ class FavoriteController extends Controller
     {
         $userId = $request->user()->id;
 
-        if (! Product::whereKey($id)->exists()) {
+        // Route memakai {id}, tetapi Product memakai slug sebagai route key
+        // sehingga tautan bisa mengirim slug maupun ID numerik.
+        $product = Product::where('slug', (string) $id)->first()
+            ?? (ctype_digit((string) $id) ? Product::find((int) $id) : null);
+
+        if (! $product) {
             abort(404, 'Produk tidak ditemukan');
         }
 
-        $existing = Favorite::where('user_id', $userId)->where('product_id', $id)->first();
+        $productId = $product->id;
+
+        $existing = Favorite::where('user_id', $userId)->where('product_id', $productId)->first();
 
         if ($existing) {
             $existing->delete();
             $isFavorite = false;
             $message = 'Produk dihapus dari favorit.';
         } else {
-            Favorite::create(['user_id' => $userId, 'product_id' => (int) $id]);
+            Favorite::create(['user_id' => $userId, 'product_id' => $productId]);
             $isFavorite = true;
             $message = 'Produk berhasil ditambahkan ke favorit.';
         }
@@ -56,7 +63,7 @@ class FavoriteController extends Controller
             return response()->json([
                 'success' => true,
                 'is_favorite' => $isFavorite,
-                'product_id' => (int) $id,
+                'product_id' => $productId,
                 'count' => $count,
                 'message' => $message,
             ]);

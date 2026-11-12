@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Banner;
 use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Database\Eloquent\Builder;
@@ -62,7 +63,7 @@ class HomeController extends Controller
         $baseQuery = Product::with(['primaryImage', 'user'])
             ->dijual()
             ->when($kategori !== '', function (Builder $query) use ($kategori): void {
-                $query->whereHas('category', fn(Builder $q) => $q->where('slug', $kategori));
+                $query->whereHas('category', fn (Builder $q) => $q->where('slug', $kategori));
             });
 
         $nearby = $this->getNearbyProducts(clone $baseQuery, $userLocation, 4);
@@ -77,7 +78,11 @@ class HomeController extends Controller
             : null;
 
         return view('home.index', [
-            'banners' => [],
+            'banners' => Banner::aktif()
+                ->take(3)
+                ->get()
+                ->map(fn (Banner $banner): string => $banner->image_url)
+                ->all(),
             'categories' => $this->categories(),
             'activeCategory' => $activeCategory,
             'nearby' => $nearby,
@@ -123,7 +128,7 @@ class HomeController extends Controller
     }
 
     /**
-     * @param array{kota: ?string, lat: ?float, lng: ?float} $userLocation
+     * @param  array{kota: ?string, lat: ?float, lng: ?float}  $userLocation
      */
     private function getNearbyProducts(Builder $baseQuery, array $userLocation, int $limit = 4): Collection
     {
@@ -146,7 +151,7 @@ class HomeController extends Controller
                 $isNearby = $isKeywordMatch || ($distanceKm !== null && $distanceKm <= 15.0);
                 $tier = $isNearby ? 0 : 1;
                 $sortDistance = $distanceKm ?? ($isKeywordMatch ? 5.0 : 9999.0);
-                $newestFirst = - ($product->created_at?->timestamp ?? 0);
+                $newestFirst = -($product->created_at?->timestamp ?? 0);
 
                 return [$tier, $sortDistance, $newestFirst];
             })
@@ -155,7 +160,7 @@ class HomeController extends Controller
     }
 
     /**
-     * @param array{kota: ?string, lat: ?float, lng: ?float} $location
+     * @param  array{kota: ?string, lat: ?float, lng: ?float}  $location
      * @return array{lat: ?float, lng: ?float, keywords: array<int, string>}
      */
     private function resolveLocationTarget(array $location): array
@@ -226,7 +231,7 @@ class HomeController extends Controller
     }
 
     /**
-     * @param array<int, string> $keywords
+     * @param  array<int, string>  $keywords
      */
     private function matchesLocationKeywords(Product $product, array $keywords): bool
     {
@@ -246,7 +251,7 @@ class HomeController extends Controller
     {
         return Category::urut()
             ->get()
-            ->map(fn($category): object => (object) [
+            ->map(fn ($category): object => (object) [
                 'name' => $category->name,
                 'slug' => $category->slug,
                 'icon_url' => $category->icon,
