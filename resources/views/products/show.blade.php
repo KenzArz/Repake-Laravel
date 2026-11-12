@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('title', $product->judul . ' - RePake')
+@section('canonical', $product->detailUrl())
 
 @section('content')
     <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6">
@@ -137,9 +138,11 @@
                 <div>
                     {{-- Header Penjual & Opsi 3 Titik --}}
                     <div class="flex items-start justify-between">
-                        <div class="flex items-center gap-3">
+                        <a href="{{ $product->user?->profileUrl() ?? '#' }}"
+                           class="group flex items-center gap-3"
+                           title="Lihat profil {{ $product->penjual }}">
                             <div
-                                class="size-9 shrink-0 overflow-hidden rounded-full border border-neutral-300 bg-neutral-200">
+                                class="size-9 shrink-0 overflow-hidden rounded-full border border-neutral-300 bg-neutral-200 transition group-hover:ring-2 group-hover:ring-lime-400">
                                 <img src="{{ $seller?->avatar_url ?? $product->penjual_avatar }}"
                                     alt="{{ $product->penjual ?? 'Midou_kun' }}" referrerpolicy="no-referrer"
                                     class="size-full object-cover"
@@ -147,7 +150,7 @@
                             </div>
                             <div>
                                 <div class="flex items-center gap-2">
-                                    <h2 class="text-sm font-bold text-neutral-900">{{ $product->penjual ?? 'Midou_kun' }}
+                                    <h2 class="text-sm font-bold text-neutral-900 group-hover:underline">{{ $product->penjual ?? 'Midou_kun' }}
                                     </h2>
                                     <span class="inline-flex items-center gap-1 text-xs font-bold text-neutral-900">
                                         <svg viewBox="0 0 24 24" class="size-3.5 fill-amber-500 text-amber-500">
@@ -159,7 +162,7 @@
                                 </div>
                                 <p class="text-[11px] text-neutral-500">{{ $product->kota }} · 2 jam lalu</p>
                             </div>
-                        </div>
+                        </a>
 
                         <x-product-options-menu :product="$product" button-class="size-8" menu-class="top-9" />
                     </div>

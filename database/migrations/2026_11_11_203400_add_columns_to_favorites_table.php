@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('favorites', function (Blueprint $table) {
-            $table->foreignId('user_id')->after('id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('product_id')->after('user_id')->constrained('products')->restrictOnDelete();
+            $table->foreignUuid('user_id')->after('id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUuid('product_id')->after('user_id')->constrained('products')->restrictOnDelete();
             $table->unique(['user_id', 'product_id']);
         });
     }

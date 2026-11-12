@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::table('messages', function (Blueprint $table) {
             $table->foreignId('conversation_id')->after('id')->constrained('conversations')->cascadeOnDelete();
-            $table->foreignId('sender_id')->after('conversation_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUuid('sender_id')->after('conversation_id')->constrained('users')->cascadeOnDelete();
             $table->text('body')->nullable()->after('sender_id');
             $table->string('image')->nullable()->after('body');
             $table->string('type', 20)->default('text')->after('image');

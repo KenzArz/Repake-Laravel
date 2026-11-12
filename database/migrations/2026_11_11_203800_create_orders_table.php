@@ -10,9 +10,9 @@ return new class extends Migration
     {
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('buyer_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('seller_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('product_id')->constrained('products')->restrictOnDelete();
+            $table->foreignUuid('buyer_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUuid('seller_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUuid('product_id')->constrained('products')->restrictOnDelete();
             $table->unsignedBigInteger('harga_final');
             $table->string('status', 20)->default('pending');
             $table->timestamp('completed_at')->nullable();

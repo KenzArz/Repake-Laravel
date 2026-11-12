@@ -7,6 +7,7 @@ use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class FavoriteController extends Controller
@@ -17,6 +18,7 @@ class FavoriteController extends Controller
     public function index(Request $request): View
     {
         $favorites = Product::with(['primaryImage', 'user'])
+            ->dijual()
             ->whereHas('favorites', fn ($q) => $q->where('user_id', $request->user()->id))
             ->latest()
             ->get();
@@ -29,20 +31,20 @@ class FavoriteController extends Controller
 
     /**
      * Toggle status favorit suatu produk untuk user yang login (tabel favorites).
+     *
+     * Parameter rute adalah UUID produk, bukan slug atau nomor urut.
      */
-    public function toggle(Request $request, int|string $id): JsonResponse|RedirectResponse
+    public function toggle(Request $request, string $id): JsonResponse|RedirectResponse
     {
-        $userId = $request->user()->id;
+        abort_unless(Str::isUuid($id), 404);
 
-        // Route memakai {id}, tetapi Product memakai slug sebagai route key
-        // sehingga tautan bisa mengirim slug maupun ID numerik.
-        $product = Product::where('slug', (string) $id)->first()
-            ?? (ctype_digit((string) $id) ? Product::find((int) $id) : null);
+        $product = Product::query()->find($id);
 
         if (! $product) {
             abort(404, 'Produk tidak ditemukan');
         }
 
+        $userId = $request->user()->id;
         $productId = $product->id;
 
         $existing = Favorite::where('user_id', $userId)->where('product_id', $productId)->first();

@@ -99,7 +99,7 @@
                             <h1 class="text-xl font-extrabold text-[var(--color-text-primary)] sm:text-2xl">
                                 Edit <span id="headerProductTitle" class="text-lime-600">{{ $product->judul }}</span>
                             </h1>
-                            <a href="{{ route('products.show', $product) }}"
+                            <a href="{{ $product->detailUrl() }}"
                                 class="shrink-0 rounded-xl border border-[var(--color-border-default)] bg-[var(--color-surface-page)] px-3.5 py-2 text-xs font-bold text-[var(--color-text-secondary)] transition hover:bg-neutral-100 hover:text-[var(--color-text-primary)]">
                                 Batal
                             </a>

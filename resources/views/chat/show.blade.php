@@ -37,11 +37,30 @@
                     <svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current stroke-2" aria-hidden="true"><path d="m15 18-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </a>
 
-                <img src="{{ $other?->avatar_url ?? asset('images/default-avatar.png') }}"
-                     alt="" class="size-10 shrink-0 rounded-full object-cover">
+                @php
+                    // Tautan ke profil publik lawan bicara; akun banned tidak ditautkan.
+                    $counterpartUrl = ($other !== null && ! $other->is_banned) ? $other->profileUrl() : null;
+                @endphp
+
+                @if ($counterpartUrl)
+                    <a href="{{ $counterpartUrl }}" class="shrink-0 rounded-full transition hover:ring-2 hover:ring-lime-400"
+                       title="Lihat profil {{ $other->name }}">
+                        <img src="{{ $other?->avatar_url ?? asset('images/default-avatar.png') }}"
+                             alt="" class="size-10 shrink-0 rounded-full object-cover">
+                    </a>
+                @else
+                    <img src="{{ $other?->avatar_url ?? asset('images/default-avatar.png') }}"
+                         alt="" class="size-10 shrink-0 rounded-full object-cover">
+                @endif
 
                 <div class="min-w-0 flex-1">
-                    <p class="truncate text-[17px] font-extrabold leading-tight text-neutral-900 sm:text-[18px]">{{ $other?->name }}</p>
+                    <p class="truncate text-[17px] font-extrabold leading-tight text-neutral-900 sm:text-[18px]">
+                        @if ($counterpartUrl)
+                            <a href="{{ $counterpartUrl }}" class="hover:underline">{{ $other?->name }}</a>
+                        @else
+                            {{ $other?->name }}
+                        @endif
+                    </p>
                     <p class="truncate text-[12px] leading-tight text-neutral-500"
                        data-presence
                        data-online="{{ $other?->isOnline() ? '1' : '0' }}"
@@ -64,7 +83,7 @@
                             Tandai sudah dibaca
                         </button>
                         @if ($conversation->product)
-                            <a href="{{ route('products.show', $conversation->product->id) }}" class="flex items-center gap-2 px-4 py-2.5 text-[13px] font-medium text-neutral-700 transition hover:bg-neutral-100">
+                            <a href="{{ $conversation->product->detailUrl() }}" class="flex items-center gap-2 px-4 py-2.5 text-[13px] font-medium text-neutral-700 transition hover:bg-neutral-100">
                                 Lihat produk
                             </a>
                         @endif
@@ -76,7 +95,7 @@
             </header>
 
             {{-- Strip produk: menempel di atas, tidak ikut scroll --}}
-            <a href="{{ $conversation->product ? route('products.show', $conversation->product->id) : '#' }}"
+            <a href="{{ $conversation->product ? $conversation->product->detailUrl() : '#' }}"
                class="flex shrink-0 items-center gap-3 border-b border-neutral-200 px-3 py-2.5 transition hover:bg-neutral-100/60 sm:px-4">
                 <div class="size-11 shrink-0 overflow-hidden rounded-md bg-neutral-200">
                     @if ($conversation->product?->coverImage)

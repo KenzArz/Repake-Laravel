@@ -8,25 +8,37 @@ use App\Models\Report;
 use App\Models\Review;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class ProductDetailController extends Controller
 {
     /**
      * Tampilkan halaman detail barang.
+     *
+     * Identitas produk diambil dari query `?id={uuid}`. Segmen `{slug}`
+     * hanya untuk keterbacaan URL, sehingga produk berjudul sama tetap
+     * dibedakan oleh UUID dan rename judul tidak mematikan link lama.
      */
-    public function show(Request $request, string $slug): View
+    public function show(Request $request, string $slug): View|RedirectResponse
     {
         $baseQuery = Product::with(['images', 'primaryImage', 'user', 'codAreas', 'category'])
             ->withCount('favorites');
 
-        $product = (clone $baseQuery)->where('slug', $slug)->first()
-            ?? (ctype_digit($slug) ? $baseQuery->find((int) $slug) : null);
+        $id = $request->query('id');
 
-        abort_if(! $product, 404);
+        if (filled($id)) {
+            abort_unless(is_string($id) && Str::isUuid($id), 404);
+
+            $product = (clone $baseQuery)->find($id);
+        } else {
+            $product = (clone $baseQuery)->where('slug', $slug)->first();
+        }
+
+        abort_if($product === null, 404);
 
         $viewer = $request->user();
-        $isOwner = $viewer !== null && (int) $viewer->id === (int) $product->user_id;
+        $isOwner = $viewer !== null && $viewer->id === $product->user_id;
         $isAdmin = $viewer?->isAdmin() ?? false;
 
         // Produk yang disuspend/draft dan produk milik penjual yang dibanned
@@ -35,6 +47,12 @@ class ProductDetailController extends Controller
 
         abort_if(! $isAdmin && ! $isOwner && in_array($product->status, $hiddenStatuses, true), 404);
         abort_if(! $isAdmin && $product->user?->is_banned, 404);
+
+        // Satu produk = satu URL kanonis. Link tanpa UUID atau dengan slug
+        // usang dialihkan permanen agar tidak ada konten duplikat.
+        if (! $request->filled('id') || $product->slug !== $slug) {
+            return redirect()->to($product->detailUrl(), 301);
+        }
 
         // Produk serupa / rekomendasi lainnya dari kategori yang sama
         $similarProducts = Product::with(['primaryImage', 'user'])
@@ -68,23 +86,36 @@ class ProductDetailController extends Controller
     }
 
     /**
+     * Alihkan URL produk versi lama (/products/{slug}) ke URL kanonis.
+     */
+    public function legacy(string $slug): RedirectResponse
+    {
+        $product = Product::query()->where('slug', $slug)->first();
+
+        abort_if($product === null, 404);
+
+        return redirect()->to($product->detailUrl(), 301);
+    }
+
+    /**
      * Simpan laporan pengaduan barang ke database.
      */
-    public function report(StoreReportRequest $request, int|string $id): RedirectResponse
+    public function report(StoreReportRequest $request, string $id): RedirectResponse
     {
         $validated = $request->validated();
 
-        $product = Product::where('slug', (string) $id)->first()
-            ?? (ctype_digit((string) $id) ? Product::find((int) $id) : null);
+        abort_unless(Str::isUuid($id), 404);
 
-        abort_if(! $product, 404);
+        $product = Product::query()->find($id);
+
+        abort_if($product === null, 404);
 
         // Pemilik tidak bisa melaporkan produknya sendiri.
-        abort_if($product->user_id === (int) auth()->id(), 403);
+        abort_if($product->user_id === $request->user()?->id, 403);
 
-        $report = Report::create([
+        Report::create([
             'product_id' => $product->id,
-            'reporter_id' => auth()->id(),
+            'reporter_id' => $request->user()?->id,
             'alasan' => $validated['alasan'],
             'keterangan' => $validated['keterangan'],
             'bukti' => $request->hasFile('bukti')

@@ -21,7 +21,7 @@ beforeEach(function () {
 });
 
 test('user can view product detail page', function () {
-    $response = $this->get(route('products.show', $this->product));
+    $response = $this->get($this->product->detailUrl());
 
     $response->assertStatus(200);
     $response->assertSee('Detail Produk');
@@ -38,10 +38,10 @@ test('returns 404 for non-existent product', function () {
 test('suspended product is hidden from guests but visible to its owner', function () {
     $this->product->update(['status' => Product::STATUS_DITANGGUIHKAN]);
 
-    $this->get(route('products.show', $this->product))->assertNotFound();
+    $this->get($this->product->detailUrl())->assertNotFound();
 
     $this->actingAs(User::find($this->product->user_id))
-        ->get(route('products.show', $this->product))
+        ->get($this->product->detailUrl())
         ->assertOk()
         ->assertSee('Ditangguhkan');
 });
@@ -49,7 +49,7 @@ test('suspended product is hidden from guests but visible to its owner', functio
 test('product from a banned seller is hidden from guests', function () {
     User::whereKey($this->product->user_id)->update(['is_banned' => true]);
 
-    $this->get(route('products.show', $this->product))->assertNotFound();
+    $this->get($this->product->detailUrl())->assertNotFound();
 });
 
 test('authenticated user can submit report for a product', function () {
@@ -57,7 +57,7 @@ test('authenticated user can submit report for a product', function () {
 
     $reporter = User::factory()->create();
     $response = $this->actingAs($reporter)
-        ->post(route('products.report', $this->product), [
+        ->post(route('products.report', $this->product->id), [
             'alasan' => 'penipuan',
             'keterangan' => 'Barang ini terindikasi penipuan dan mencurigakan.',
             'bukti' => UploadedFile::fake()->image('bukti.jpg'),
@@ -78,7 +78,7 @@ test('authenticated user can submit report for a product', function () {
 });
 
 test('guest cannot submit a report', function () {
-    $response = $this->post(route('products.report', $this->product), [
+    $response = $this->post(route('products.report', $this->product->id), [
         'alasan' => 'penipuan',
         'keterangan' => 'Barang ini terindikasi penipuan.',
     ]);
@@ -91,7 +91,7 @@ test('product owner cannot report their own product', function () {
     $owner = User::find($this->product->user_id);
 
     $response = $this->actingAs($owner)
-        ->post(route('products.report', $this->product), [
+        ->post(route('products.report', $this->product->id), [
             'alasan' => 'penipuan',
             'keterangan' => 'Produk saya sendiri.',
         ]);
@@ -102,7 +102,7 @@ test('product owner cannot report their own product', function () {
 
 test('validates report form input', function () {
     $response = $this->actingAs(User::factory()->create())
-        ->post(route('products.report', $this->product), [
+        ->post(route('products.report', $this->product->id), [
             'alasan' => 'invalid_reason',
             'keterangan' => '',
         ]);

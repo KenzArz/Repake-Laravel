@@ -7,9 +7,10 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
@@ -19,7 +20,7 @@ use Illuminate\Support\Facades\Storage;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, HasUuids, Notifiable;
 
     public const ROLE_MAHASISWA = 'mahasiswa';
 
@@ -42,6 +43,21 @@ class User extends Authenticatable
             'is_banned' => 'boolean',
             'last_seen_at' => 'datetime',
         ];
+    }
+
+    /**
+     * URL profil publik penjual. Username dipakai lebih dulu agar URL rapi,
+     * dengan UUID sebagai identitas kanonis lewat query `id`.
+     *
+     * Akun lama yang belum punya username memakai UUID sebagai segmen path,
+     * sehingga profilnya tetap unik dan tidak bisa ditebak dari nomor urut.
+     */
+    public function profileUrl(): string
+    {
+        return route('sellers.show', array_filter([
+            'seller' => $this->username ?: $this->id,
+            'id' => $this->username ? $this->id : null,
+        ]));
     }
 
     /**
@@ -89,18 +105,11 @@ class User extends Authenticatable
     }
 
     /**
-     * Produk yang difavoritkan, lewat tabel favorites.
+     * Produk yang difavoritkan, lewat tabel pivot favorites.
      */
-    public function favoritedProducts(): HasManyThrough
+    public function favoritedProducts(): BelongsToMany
     {
-        return $this->hasManyThrough(
-            Product::class,
-            Favorite::class,
-            'user_id',
-            'id',
-            'id',
-            'product_id',
-        );
+        return $this->belongsToMany(Product::class, 'favorites')->withTimestamps();
     }
 
     public function conversationsAsBuyer(): HasMany

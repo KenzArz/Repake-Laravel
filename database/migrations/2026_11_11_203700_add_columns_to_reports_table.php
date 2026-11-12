@@ -9,13 +9,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('reports', function (Blueprint $table) {
-            $table->foreignId('product_id')->after('id')->constrained('products')->restrictOnDelete();
-            $table->foreignId('reporter_id')->after('product_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUuid('product_id')->after('id')->constrained('products')->restrictOnDelete();
+            $table->foreignUuid('reporter_id')->after('product_id')->constrained('users')->cascadeOnDelete();
             $table->string('alasan', 50)->after('reporter_id');
             $table->text('keterangan')->after('alasan');
             $table->string('bukti')->nullable()->after('keterangan');
             $table->string('status', 20)->default('pending')->after('bukti');
-            $table->foreignId('reviewed_by')->nullable()->after('status')->constrained('users')->nullOnDelete();
+            $table->foreignUuid('reviewed_by')->nullable()->after('status')->constrained('users')->nullOnDelete();
             $table->timestamp('reviewed_at')->nullable()->after('reviewed_by');
             $table->index(['status', 'created_at']);
         });
