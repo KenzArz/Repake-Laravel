@@ -25,7 +25,7 @@ class ProductSeeder extends Seeder
             );
 
             $product = Product::updateOrCreate(
-                ['slug' => Str::slug($item['judul'])],
+                ['judul' => $item['judul']],
                 [
                     'user_id' => $seller->id,
                     'category_id' => $categories[Str::slug($item['kategori'])] ?? null,

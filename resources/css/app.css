@@ -6,9 +6,10 @@
 
 @theme {
     --font-sans:
-        "Instrument Sans", ui-sans-serif, system-ui, sans-serif,
+        "Manrope", ui-sans-serif, system-ui, sans-serif,
         "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
         "Noto Color Emoji";
+    --font-heading: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
 
     /* Brand palette (dari theme/colors.css) agar utility Tailwind memakai warna desain */
     --color-charcoal: #202320;
@@ -37,6 +38,20 @@
     --color-lime-700: #81973d;
     --color-lime-800: #647535;
     --color-lime-900: #46502c;
+
+    /* Warna semantik dari theme/colors.css */
+    --color-success: #4c8b4a;
+    --color-success-tint: #e1e8dc;
+    --color-success-shade: #365735;
+    --color-warning: #d9a23b;
+    --color-warning-tint: #f2ebda;
+    --color-warning-shade: #7c622e;
+    --color-danger: #c1543f;
+    --color-danger-tint: #efe2db;
+    --color-danger-shade: #703c30;
+    --color-info: #4e7da6;
+    --color-info-tint: #e1e7e7;
+    --color-info-shade: #375063;
 }
 
 .pac-container {

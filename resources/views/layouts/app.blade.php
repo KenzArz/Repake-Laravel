@@ -48,7 +48,11 @@
         <main>
             @yield('content')
         </main>
-        <x-footer />
+
+        @hasSection('hide-footer')
+        @else
+            <x-footer />
+        @endif
     </div>
 
     <x-flash-toast />

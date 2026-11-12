@@ -1,17 +1,21 @@
 <?php
 
+use App\Models\Banner;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\Report;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('database seeder fills categories, products, admin, and demo user', function () {
+test('database seeder fills categories, products, banners, reports, admin, and demo user', function () {
     $this->seed();
 
     expect(Category::count())->toBe(8)
         ->and(Product::count())->toBe(12)
+        ->and(Banner::count())->toBe(3)
+        ->and(Report::count())->toBe(3)
         ->and(User::where('role', User::ROLE_ADMIN)->count())->toBe(1)
         ->and(User::where('email', 'test@example.com')->count())->toBe(1);
 });
@@ -21,7 +25,9 @@ test('database seeder is idempotent when run twice', function () {
     $this->seed();
 
     expect(Category::count())->toBe(8)
-        ->and(Product::count())->toBe(12);
+        ->and(Product::count())->toBe(12)
+        ->and(Banner::count())->toBe(3)
+        ->and(Report::count())->toBe(3);
 });
 
 test('every seeded product has a cover image and a seller', function () {
@@ -38,11 +44,12 @@ test('every seeded product has a cover image and a seller', function () {
     }
 });
 
-test('admin account is identified by the isAdmin helper', function () {
+test('admin account is identified by the allowlisted email', function () {
     $this->seed();
 
     $admin = User::where('role', User::ROLE_ADMIN)->sole();
 
-    expect($admin->isAdmin())->toBeTrue()
+    expect($admin->email)->toBe('2410631170004@student.unsika.ac.id')
+        ->and($admin->isAdmin())->toBeTrue()
         ->and(User::where('email', 'test@example.com')->sole()->isAdmin())->toBeFalse();
 });
