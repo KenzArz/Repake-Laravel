@@ -170,7 +170,65 @@ test('the seller accepts an offer and an order is created', function () {
         ->and($order->seller_id)->toBe($this->seller->id)
         ->and($order->product_id)->toBe($this->product->id)
         ->and($order->harga_final)->toBe(150000)
-        ->and($order->status)->toBe(Order::STATUS_DISEPAKATI);
+        ->and($order->status)->toBe(Order::STATUS_DISEPAKATI)
+        ->and($order->conversation_id)->toBe($this->conversation->id);
+});
+
+test('the buyer marks a disepakati order as selesai', function () {
+    $message = Message::factory()->offer(150000)->create([
+        'conversation_id' => $this->conversation->id,
+        'sender_id' => $this->buyer->id,
+    ]);
+
+    $this->actingAs($this->seller)
+        ->postJson(route('chat.offers.accept', [$this->conversation, $message]))
+        ->assertOk()
+        ->assertJsonPath('message.offer_status', 'accepted');
+
+    $order = Order::sole();
+
+    $this->actingAs($this->buyer)
+        ->post(route('chat.complete', $this->conversation))
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    expect($order->refresh()->status)->toBe(Order::STATUS_SELESAI)
+        ->and($order->completed_at)->not->toBeNull();
+});
+
+test('only the buyer can mark the order as selesai', function () {
+    Order::factory()->create([
+        'conversation_id' => $this->conversation->id,
+        'seller_id' => $this->seller->id,
+        'buyer_id' => $this->buyer->id,
+        'product_id' => $this->product->id,
+        'status' => Order::STATUS_DISEPAKATI,
+    ]);
+
+    $this->actingAs($this->seller)
+        ->post(route('chat.complete', $this->conversation))
+        ->assertForbidden();
+
+    expect(Order::sole()->status)->toBe(Order::STATUS_DISEPAKATI);
+});
+
+test('a conversation without an order cannot be completed', function () {
+    $this->actingAs($this->buyer)
+        ->post(route('chat.complete', $this->conversation))
+        ->assertNotFound();
+});
+
+test('an already selesai order cannot be completed again', function () {
+    Order::factory()->selesai()->create([
+        'conversation_id' => $this->conversation->id,
+        'seller_id' => $this->seller->id,
+        'buyer_id' => $this->buyer->id,
+        'product_id' => $this->product->id,
+    ]);
+
+    $this->actingAs($this->buyer)
+        ->post(route('chat.complete', $this->conversation))
+        ->assertStatus(409);
 });
 
 test('the buyer cannot decide on their own offer', function () {

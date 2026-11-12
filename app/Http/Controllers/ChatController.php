@@ -60,6 +60,7 @@ class ChatController extends Controller
 
         $other = $conversation->counterpartFor((string) Auth::id());
         $latestOffer = $conversation->latestOffer()->first();
+        $order = $conversation->order()->first();
 
         // Membuka ruang chat berarti pesan lawan sudah terbaca.
         $this->markMessagesRead($conversation);
@@ -69,6 +70,7 @@ class ChatController extends Controller
             'messages' => $messages,
             'other' => $other,
             'latestOffer' => $latestOffer,
+            'order' => $order,
             'sidebarConversations' => $this->conversationsFor((string) Auth::id()),
             'filter' => 'semua',
         ]);
@@ -339,6 +341,7 @@ class ChatController extends Controller
             $locked->update(['offer_status' => Message::OFFER_ACCEPTED]);
 
             Order::create([
+                'conversation_id' => $conversation->id,
                 'buyer_id' => $conversation->buyer_id,
                 'seller_id' => $conversation->seller_id,
                 'product_id' => $conversation->product_id,
@@ -354,6 +357,32 @@ class ChatController extends Controller
         $system = $this->systemMessage($conversation, 'Penawaran disetujui');
 
         return $this->offerResponse($conversation, $message, $system);
+    }
+
+    /**
+     * Pembeli menandai transaksi selesai → order siap untuk direview.
+     *
+     * Hanya pembeli yang boleh menyelesaikan transaksi. Setelah selesai,
+     * pembeli bisa memberikan ulasan untuk produk yang dibelinya.
+     */
+    public function completeOrder(Conversation $conversation): RedirectResponse
+    {
+        $this->authorizeParticipant($conversation);
+
+        abort_if($conversation->buyer_id !== (string) Auth::id(), 403, 'Hanya pembeli yang bisa menyelesaikan transaksi.');
+
+        $order = $conversation->order()->first();
+
+        abort_if($order === null, 404, 'Belum ada transaksi pada percakapan ini.');
+
+        abort_if($order->status !== Order::STATUS_DISEPAKATI, 409, 'Transaksi ini sudah diproses.');
+
+        $order->update([
+            'status' => Order::STATUS_SELESAI,
+            'completed_at' => now(),
+        ]);
+
+        return back()->with('success', 'Transaksi ditandai selesai. Terima kasih sudah bertransaksi!');
     }
 
     /**

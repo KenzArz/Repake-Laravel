@@ -20,6 +20,7 @@ class Order extends Model
     public const STATUS_BATAL = 'batal';
 
     protected $fillable = [
+        'conversation_id',
         'buyer_id',
         'seller_id',
         'product_id',
@@ -27,6 +28,11 @@ class Order extends Model
         'status',
         'completed_at',
     ];
+
+    public function conversation(): BelongsTo
+    {
+        return $this->belongsTo(Conversation::class);
+    }
 
     protected function casts(): array
     {

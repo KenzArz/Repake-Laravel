@@ -113,6 +113,27 @@
                 </div>
             </a>
 
+            {{-- Aksi transaksi: pembeli menandai selesai saat order disepakati --}}
+            @if (
+                $order !== null
+                && $order->status === \App\Models\Order::STATUS_DISEPAKATI
+                && (string) $conversation->buyer_id === (string) auth()->id()
+            )
+                <form method="POST" action="{{ route('chat.complete', $conversation) }}" class="shrink-0 border-b border-neutral-200 bg-lime-50 px-3 py-2.5 sm:px-4"
+                      onsubmit="return confirm('Tandai transaksi ini selesai? Anda hanya bisa menyelesaikannya sekali.');">
+                    @csrf
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-[12.5px] leading-tight text-neutral-700">
+                            Transaksi <strong>disepakati</strong>. Selesaikan untuk memberi ulasan pada produk ini.
+                        </p>
+                        <button type="submit"
+                                class="shrink-0 rounded-lg bg-lime-500 px-3.5 py-2 text-xs font-bold text-neutral-900 transition hover:bg-lime-600">
+                            Selesaikan Transaksi
+                        </button>
+                    </div>
+                </form>
+            @endif
+
             {{-- Area pesan --}}
             <div id="chat-messages"
                  class="flex flex-1 flex-col gap-2 overflow-y-auto px-3 py-4 sm:px-4"

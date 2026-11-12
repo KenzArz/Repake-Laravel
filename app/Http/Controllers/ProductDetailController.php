@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreReportRequest;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\Report;
 use App\Models\Review;
@@ -78,10 +79,33 @@ class ProductDetailController extends Controller
             'joined' => 'Bergabung 6 bulan lalu',
         ];
 
+        // Ulasan khusus produk ini (review per produk, tidak tercampur produk lain).
+        $productReviews = Review::with(['reviewer'])
+            ->where('product_id', $product->id)
+            ->latest()
+            ->get();
+
+        // Kondisi form ulasan untuk pengunjung yang login.
+        $viewerReview = $viewer !== null
+            ? $productReviews->first(fn (Review $review): bool => $review->reviewer_id === $viewer->id)
+            : null;
+
+        $canReview = $viewer !== null
+            && ! $isOwner
+            && $viewerReview === null
+            && Order::query()
+                ->where('product_id', $product->id)
+                ->where('buyer_id', $viewer->id)
+                ->where('status', Order::STATUS_SELESAI)
+                ->exists();
+
         return view('products.show', [
             'product' => $product,
             'seller' => $seller,
             'similarProducts' => $similarProducts,
+            'productReviews' => $productReviews,
+            'viewerReview' => $viewerReview,
+            'canReview' => $canReview,
         ]);
     }
 

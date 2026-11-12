@@ -1,7 +1,10 @@
+import { initProductReviews } from "./product-review";
+
 export function initProductDetail() {
     initDescriptionToggle();
     initGalleryAndLightbox();
     initCopyCod();
+    initProductReviews();
 }
 
 function initDescriptionToggle() {
