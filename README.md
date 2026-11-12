@@ -232,15 +232,21 @@ Perintah ini menjalankan `php artisan dev`, yang memulai **4 proses sekaligus**:
 > **hot-reload (Live Reload) dan worker antrian tidak berjalan** — hasil edit CSS/JS
 > tidak muncul, dan fitur yang bergantung antrian tidak aktif.
 
-Untuk akses dari perangkat lain di jaringan yang sama, buka Vite & server Laravel
-ke alamat antarmuka jaringan. Vite sudah bind ke `0.0.0.0` secara default, sehingga
-perangkat lain cukup membuka `http://<IP-mesin>:8000`. Bila perlu, atur host yang
-digunakan Vite lewat `.env`:
+Untuk akses dari perangkat lain di jaringan yang sama, **Vite perlu bind ke alamat
+antarmuka jaringan** (default-nya `localhost`, sehingga hanya bisa diakses dari
+mesin ini). Set kedua variabel berikut di `.env` secara **bersamaan**:
 
 ```env
-VITE_DEV_HOST=0.0.0.0        # alamat yang di-bind Vite
-VITE_HMR_HOST=192.168.1.10   # IP mesin untuk hot-reload dari perangkat lain; kosongkan untuk local
+VITE_DEV_HOST=0.0.0.0        # alamat yang di-bind Vite (0.0.0.0 = semua antarmuka)
+VITE_HMR_HOST=192.168.1.10   # IP LAN mesin ini — WAJIB diisi bila VITE_DEV_HOST=0.0.0.0
 ```
+
+Kemudian jalankan ulang `composer dev`, dan perangkat lain membuka
+`http://<IP-mesin>:8000`.
+
+> ⚠️ Jangan set `VITE_DEV_HOST=0.0.0.0` tanpa `VITE_HMR_HOST`. `0.0.0.0` adalah
+> alamat bind, bukan alamat tujuan: browser (terutama Windows/Chrome) gagal
+> memuat aset dari `http://0.0.0.0:5173` dengan `ERR_ADDRESS_INVALID`.
 
 ---
 
