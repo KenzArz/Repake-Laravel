@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ChatController extends Controller
 {
@@ -281,6 +282,89 @@ class ChatController extends Controller
         return response()->json([
             'total' => $this->unreadTotal((int) Auth::id()),
         ]);
+    }
+
+    /**
+     * Stream Server-Sent Events untuk satu user: keluar "unread" (badge navbar)
+     * dan "activity" (isyarat ruang chat) lewat delta-poll ±1,5 dtk.
+     *
+     * Delta-poll dipilih agar tetap bekerja di multi-proses/PHP-FPM tanpa queue
+     * worker. Client EventSource auto-reconnect; nilainya hanya angka (total/rev),
+     * bukan isi pesan.
+     */
+    public function stream(): StreamedResponse
+    {
+        $userId = (int) Auth::id();
+
+        return response()->stream(function () use ($userId): void {
+            ignore_user_abort(true);
+            set_time_limit(0);
+
+            $lastUnread = null;
+            $lastRev = null;
+            $lastBeat = now();
+
+            $emit = static function (string $event, array $data): void {
+                echo 'event: '.$event."\n";
+                echo 'data: '.json_encode($data)."\n\n";
+            };
+
+            $flush = static function (): void {
+                if (ob_get_level() > 0) {
+                    ob_flush();
+                }
+                flush();
+            };
+
+            while (!connection_aborted()) {
+                $payload = $this->streamPayload($userId);
+
+                if ($payload['unread'] !== $lastUnread) {
+                    $lastUnread = $payload['unread'];
+                    $emit('unread', ['total' => $payload['unread']]);
+                    $flush();
+                }
+
+                if ($payload['rev'] !== $lastRev) {
+                    $lastRev = $payload['rev'];
+                    $emit('activity', ['rev' => $payload['rev']]);
+                    $flush();
+                }
+
+                if (now()->diffInSeconds($lastBeat) >= 15) {
+                    $lastBeat = now();
+                    echo ': ping'."\n\n";
+                    $flush();
+                }
+
+                usleep(1_500_000);
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache, no-store, max-age=0, must-revalidate',
+            'Pragma' => 'no-cache',
+            'X-Accel-Buffering' => 'no',
+            'X-Content-Type-Options' => 'nosniff',
+            'Connection' => 'keep-alive',
+        ]);
+    }
+
+    /**
+     * Ringkasan yang dibandingkan delta-poll SSE.
+     *
+     * @return array{unread: int, rev: int}
+     */
+    public function streamPayload(int $userId): array
+    {
+        return [
+            'unread' => $this->unreadTotal($userId),
+            'rev' => (int) Message::query()
+                ->whereHas('conversation', fn ($query) => $query
+                    ->where(fn ($conversation) => $conversation
+                        ->where('buyer_id', $userId)
+                        ->orWhere('seller_id', $userId)))
+                ->max('id'),
+        ];
     }
 
     /**
