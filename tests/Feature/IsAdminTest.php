@@ -18,19 +18,10 @@ test('mahasiswa is forbidden from the admin area', function () {
     $this->get(route('admin.dashboard'))->assertForbidden();
 });
 
-test('role admin without an allowlisted email is forbidden', function () {
-    $this->actingAs(User::factory()->create([
+test('role admin can open the admin dashboard', function () {
+    $admin = User::factory()->create([
         'email' => 'admin@unsika.ac.id',
         'role' => User::ROLE_ADMIN,
-    ]));
-
-    $this->get(route('admin.dashboard'))->assertForbidden();
-});
-
-test('allowlisted email can open the admin dashboard', function () {
-    $admin = User::factory()->create([
-        'email' => '2410631170004@student.unsika.ac.id',
-        'role' => User::ROLE_MAHASISWA,
     ]);
 
     expect($admin->isAdmin())->toBeTrue();
@@ -43,11 +34,15 @@ test('allowlisted email can open the admin dashboard', function () {
         ->assertSee('Banner');
 });
 
-test('admin email match is case insensitive', function () {
-    $admin = User::factory()->create([
-        'email' => '2410631170004@STUDENT.UNSIKA.AC.ID',
+test('role mahasiswa cannot open the admin dashboard', function () {
+    $student = User::factory()->create([
+        'email' => 'student@unsika.ac.id',
         'role' => User::ROLE_MAHASISWA,
     ]);
 
-    expect($admin->isAdmin())->toBeTrue();
+    expect($student->isAdmin())->toBeFalse();
+
+    $this->actingAs($student)
+        ->get(route('admin.dashboard'))
+        ->assertForbidden();
 });
