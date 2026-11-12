@@ -66,8 +66,6 @@ Route::middleware(['auth', 'banned'])->group(function () {
     Route::post('/chat', [ChatController::class, 'start'])->name('chat.store');
 
     // Rute statis harus sebelum wildcard /chat/{conversation}.
-    Route::get('/chat/stream', [ChatController::class, 'stream'])
-        ->name('chat.stream');
     Route::get('/chat/unread-count', [ChatController::class, 'unreadCount'])
         ->name('chat.unread');
     Route::get('/chat/{conversation}', [ChatController::class, 'show'])

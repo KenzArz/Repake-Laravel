@@ -786,12 +786,6 @@ export function initChat() {
         }
     });
 
-    // SSE "activity": ada percakapan user yang berubah → langkah poll sesegera
-    // mungkin agar pesan baru muncul tanpa nunggu jadwal polling rutin & tanpa reload.
-    document.addEventListener("chat:activity", () => {
-        if (!document.hidden) pollLater(0);
-    });
-
     window.addEventListener("focus", () => markRead());
 
     async function markRead() {
@@ -874,17 +868,13 @@ export function initChat() {
 /**
  * Badge pesan belum dibaca di navbar + bottom nav.
  * Dipasang global karena harus ikut tampil di semua halaman.
- *
- * Real-time via Server-Sent Events (SSE): buka koneksi EventSource ke /chat/stream
- * sekali per tab; server mendorong "unread" segera setelah jumlah berubah.
- * Perlu jaring pengaman polling bila SSE mati/lama tak ber-event, plus refresh
- * saat tab kembali terlihat.
  */
 export function initChatBadge() {
     const badges = document.querySelectorAll("[data-chat-badge]");
     if (!badges.length) return;
 
     const badgeUrl = badges[0].dataset.badgeUrl;
+    if (!badgeUrl) return;
 
     const update = (total) => {
         const value = Number(total) || 0;
@@ -894,45 +884,25 @@ export function initChatBadge() {
         });
     };
 
-    // Lambda polling manual: dipakai saat SSE tidak tersedia/terputus lama.
+    let timer = null;
+
     const refresh = async () => {
         try {
             const response = await fetch(badgeUrl, { headers: { Accept: "application/json" } });
             if (!response.ok) return;
-            update((await response.json()).total);
+            const data = await response.json();
+            update(data.total);
         } catch {
             /* offline / sesi berakhir: biarkan angka terakhir */
         }
     };
 
-    // Koneksi SSE. Error tidak fatal — EventSource akan otomatis reconnect.
-    let lastEvent = Date.now();
-    let source = null;
-
-    try {
-        source = new EventSource("/chat/stream");
-        source.addEventListener("unread", (event) => {
-            lastEvent = Date.now();
-            try {
-                update(JSON.parse(event.data).total);
-            } catch {
-                /* abaikan payload rusak */
-            }
-        });
-        source.addEventListener("activity", () => {
-            lastEvent = Date.now();
-            // Isyarat bagi ruang chat yang sedang terbuka: segera tarik pesan baru.
-            window.dispatchEvent(new CustomEvent("chat:activity"));
-        });
-    } catch {
-        source = null;
-    }
-
     const schedule = () => {
-        setTimeout(async () => {
-            if (Date.now() - lastEvent > 30000) await refresh();
+        clearTimeout(timer);
+        timer = setTimeout(async () => {
+            if (!document.hidden) await refresh();
             schedule();
-        }, 30000);
+        }, document.hidden ? 60000 : 25000);
     };
 
     refresh();
