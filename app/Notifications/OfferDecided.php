@@ -2,17 +2,16 @@
 
 namespace App\Notifications;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
  * Notifikasi keputusan tawaran (diterima/ditolak) untuk pembeli.
+ *
+ * Dikirim langsung (tanpa queue) supaya tetap tercatat di database
+ * meski tidak ada queue worker yang berjalan.
  */
-class OfferDecided extends Notification implements ShouldQueue
+class OfferDecided extends Notification
 {
-    use Queueable;
-
     public function __construct(
         public bool $accepted,
         public int $offerAmount,

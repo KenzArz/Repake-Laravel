@@ -27,12 +27,14 @@ class Message extends Model
     protected $fillable = [
         'conversation_id',
         'sender_id',
+        'client_id',
         'body',
         'image',
         'type',
         'offer_amount',
         'offer_status',
         'read_at',
+        'delivered_at',
     ];
 
     protected function casts(): array
@@ -40,7 +42,20 @@ class Message extends Model
         return [
             'offer_amount' => 'integer',
             'read_at' => 'datetime',
+            'delivered_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Status centang untuk pengirim: terkirim / diterima / dibaca.
+     */
+    public function receiptStatus(): string
+    {
+        return match (true) {
+            $this->read_at !== null => 'read',
+            $this->delivered_at !== null => 'delivered',
+            default => 'sent',
+        };
     }
 
     public function conversation(): BelongsTo

@@ -2,17 +2,16 @@
 
 namespace App\Notifications;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
  * Notifikasi pesan chat baru untuk lawan bicara.
+ *
+ * Dikirim langsung (tanpa queue) supaya tetap tercatat di database
+ * meski tidak ada queue worker yang berjalan.
  */
-class NewMessage extends Notification implements ShouldQueue
+class NewMessage extends Notification
 {
-    use Queueable;
-
     public function __construct(
         public string $senderName,
         public int $conversationId,

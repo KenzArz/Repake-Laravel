@@ -147,11 +147,16 @@
 
             {{-- Mail (Chat) --}}
             <a href="{{ $r('chat.index') }}" {{ $needLogin }}
-                class="hidden sm:inline-flex text-neutral-700 hover:text-neutral-900 transition" aria-label="Inbox">
+                class="relative hidden sm:inline-flex text-neutral-700 hover:text-neutral-900 transition" aria-label="Inbox">
                 <svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current stroke-2">
                     <rect width="20" height="16" x="2" y="4" rx="2" />
                     <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                 </svg>
+                @auth
+                    <span data-chat-badge data-badge-url="{{ route('chat.unread') }}"
+                        style="display:none"
+                        class="absolute -right-2 -top-2 h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">0</span>
+                @endauth
             </a>
 
             {{-- State: GUEST vs SUDAH LOGIN --}}
@@ -328,9 +333,16 @@
 
         <a href="{{ Route::has('chat.index') ? route('chat.index') : '#' }}" {{ $needLogin }}
             class="{{ $itemCls }} {{ request()->routeIs('chat.*') ? $activeCls : $inactiveCls }}">
-            <svg viewBox="0 0 24 24" class="size-6 fill-none stroke-current stroke-[1.8]" aria-hidden="true">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
+            <span class="relative inline-flex">
+                <svg viewBox="0 0 24 24" class="size-6 fill-none stroke-current stroke-[1.8]" aria-hidden="true">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                @auth
+                    <span data-chat-badge data-badge-url="{{ route('chat.unread') }}"
+                        style="display:none"
+                        class="absolute -right-2 -top-1.5 h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">0</span>
+                @endauth
+            </span>
             <span class="text-[11px] leading-none">Chat</span>
         </a>
     </nav>
