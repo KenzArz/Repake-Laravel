@@ -21,6 +21,9 @@ document.addEventListener("click", async (e) => {
     if (!btn) return;
     e.preventDefault();
 
+    // Biarkan listener [data-open-login] membuka modal login tanpa mengubah status favorit
+    if (btn.hasAttribute("data-open-login")) return;
+
     const was = btn.getAttribute("aria-pressed") === "true";
     const nextState = !was;
 
@@ -125,22 +128,10 @@ if (document.getElementById("productForm")) {
     import("./product-location").then((module) => module.initProductLocation());
 }
 
-/* Detail produk — hanya dimuat di halaman detail produk */
-if (
-    document.getElementById("product-desc") ||
-    document.getElementById("main-product-img")
-) {
-    import("./product-detail").then((module) => module.initProductDetail());
-}
-
-/* Form jual barang — hanya dimuat bila halamannya memang punya form tersebut */
-if (document.getElementById("productForm")) {
-    import("./product-create").then((module) => module.initProductCreate());
-}
-
-/* Form jual barang — hanya dimuat bila halamannya memang punya form tersebut */
-if (document.getElementById("productForm")) {
-    import("./product-create").then((module) => module.initProductCreate());
+/* Form edit barang — hanya dimuat di halaman edit produk */
+if (document.getElementById("productEditForm")) {
+    import("./product-edit").then((module) => module.initProductEdit());
+    import("./product-location").then((module) => module.initProductLocation());
 }
 
 /* Detail produk — hanya dimuat di halaman detail produk */

@@ -51,6 +51,8 @@
         <x-footer />
     </div>
 
+    <x-flash-toast />
+
     {{-- Pop-up Login SSO Google UNSIKA [ALE] --}}
     @includeIf('components.login-modal')
 
