@@ -55,10 +55,29 @@ class Conversation extends Model
     }
 
     /**
+     * Tawaran terakhir (apa pun statusnya) untuk strip produk + badge.
+     */
+    public function latestOffer(): HasOne
+    {
+        return $this->hasOne(Message::class)->ofMany(
+            ['id' => 'max'],
+            fn ($query) => $query->where('type', Message::TYPE_OFFER),
+        );
+    }
+
+    /**
      * Apakah user ini peserta percakapan (buyer atau seller).
      */
     public function involves(int $userId): bool
     {
         return $this->buyer_id === $userId || $this->seller_id === $userId;
+    }
+
+    /**
+     * Lawan bicara dari sudut pandang user tertentu.
+     */
+    public function counterpartFor(int $userId): ?User
+    {
+        return $this->buyer_id === $userId ? $this->seller : $this->buyer;
     }
 }

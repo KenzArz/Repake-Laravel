@@ -151,6 +151,20 @@ if (
     import("./product-detail").then((module) => module.initProductDetail());
 }
 
+/* Chat — sidebar, ruang chat, dan badge pesan belum dibaca di navbar.
+   Badge dibutuhkan di semua halaman, jadi modul ini dimuat untuk user login. */
+if (
+    document.body.dataset.authed === "1" ||
+    document.getElementById("chat-app") ||
+    document.querySelector("[data-conversation-list]")
+) {
+    import("./chat").then((module) => {
+        module.initChatSidebar();
+        module.initChat();
+        module.initChatBadge();
+    });
+}
+
 window.Alpine = Alpine;
 Alpine.data("productFilter", productFilter);
 Alpine.start();

@@ -64,9 +64,15 @@ Route::prefix('admin')
 Route::middleware(['auth', 'banned'])->group(function () {
     Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
     Route::post('/chat', [ChatController::class, 'start'])->name('chat.store');
+
+    // Rute statis harus sebelum wildcard /chat/{conversation}.
+    Route::get('/chat/unread-count', [ChatController::class, 'unreadCount'])
+        ->name('chat.unread');
     Route::get('/chat/{conversation}', [ChatController::class, 'show'])
         ->scopeBindings()
         ->name('chat.show');
+    Route::post('/chat/{conversation}/read', [ChatController::class, 'markRead'])
+        ->name('chat.read');
     Route::get('/chat/{conversation}/messages', [ChatController::class, 'poll'])
         ->name('chat.messages.poll');
     Route::post('/chat/{conversation}/messages', [ChatController::class, 'sendMessage'])

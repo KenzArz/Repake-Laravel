@@ -36,7 +36,17 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_banned' => 'boolean',
+            'last_seen_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Dianggap online bila heartbeat terakhir < 5 menit lalu.
+     */
+    public function isOnline(int $minutes = 5): bool
+    {
+        return $this->last_seen_at !== null
+            && $this->last_seen_at->gte(now()->subMinutes($minutes));
     }
 
     /**

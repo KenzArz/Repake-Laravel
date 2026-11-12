@@ -2,17 +2,16 @@
 
 namespace App\Notifications;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 /**
  * Notifikasi tawaran harga masuk untuk penjual.
+ *
+ * Dikirim langsung (tanpa queue) supaya tetap tercatat di database
+ * meski tidak ada queue worker yang berjalan.
  */
-class OfferReceived extends Notification implements ShouldQueue
+class OfferReceived extends Notification
 {
-    use Queueable;
-
     public function __construct(
         public string $buyerName,
         public int $offerAmount,

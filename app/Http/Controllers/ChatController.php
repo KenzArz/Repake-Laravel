@@ -11,7 +11,7 @@ use App\Models\User;
 use App\Notifications\NewMessage;
 use App\Notifications\OfferDecided;
 use App\Notifications\OfferReceived;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,12 +23,20 @@ use Illuminate\View\View;
 class ChatController extends Controller
 {
     /**
+     * Jumlah pesan terakhir yang dimuat saat ruang chat dibuka.
+     */
+    private const PAGE_SIZE = 100;
+
+    /**
      * Daftar percakapan user (sebagai pembeli maupun penjual).
      */
-    public function index(): View
+    public function index(Request $request): View
     {
+        $userId = (int) Auth::id();
+
         return view('chat.index', [
-            'conversations' => $this->conversationsFor((int) Auth::id()),
+            'conversations' => $this->conversationsFor($userId, $this->filterFrom($request)),
+            'filter' => $this->filterFrom($request),
         ]);
     }
 
@@ -40,25 +48,28 @@ class ChatController extends Controller
         $this->authorizeParticipant($conversation);
 
         $conversation->load(['product.coverImage', 'buyer', 'seller']);
+
         $messages = $conversation->messages()
             ->with('sender')
-            ->orderBy('id')
-            ->get();
-        $pendingOffer = $conversation->messages()
-            ->where('type', Message::TYPE_OFFER)
-            ->where('offer_status', Message::OFFER_PENDING)
             ->orderByDesc('id')
-            ->first();
-        $other = $conversation->buyer_id === (int) Auth::id()
-            ? $conversation->seller
-            : $conversation->buyer;
+            ->limit(self::PAGE_SIZE)
+            ->get()
+            ->reverse()
+            ->values();
+
+        $other = $conversation->counterpartFor((int) Auth::id());
+        $latestOffer = $conversation->latestOffer()->first();
+
+        // Membuka ruang chat berarti pesan lawan sudah terbaca.
+        $this->markMessagesRead($conversation);
 
         return view('chat.show', [
             'conversation' => $conversation,
             'messages' => $messages,
             'other' => $other,
-            'pendingOffer' => $pendingOffer,
+            'latestOffer' => $latestOffer,
             'sidebarConversations' => $this->conversationsFor((int) Auth::id()),
+            'filter' => 'semua',
         ]);
     }
 
@@ -79,14 +90,21 @@ class ChatController extends Controller
             'Tidak bisa memulai chat pada produk milik sendiri.',
         );
 
-        $conversation = Conversation::query()->firstOrCreate(
-            [
-                'buyer_id' => (int) Auth::id(),
-                'seller_id' => $product->user_id,
-                'product_id' => $product->id,
-            ],
-            ['last_message_at' => now()],
-        );
+        $attributes = [
+            'buyer_id' => (int) Auth::id(),
+            'seller_id' => $product->user_id,
+            'product_id' => $product->id,
+        ];
+
+        try {
+            $conversation = Conversation::query()->firstOrCreate(
+                $attributes,
+                ['last_message_at' => now()],
+            );
+        } catch (UniqueConstraintViolationException) {
+            // Dua klik hampir bersamaan: pakai percakapan yang sudah dibuat request lain.
+            $conversation = Conversation::query()->where($attributes)->firstOrFail();
+        }
 
         // Tawaran langsung dari halaman detail produk: buat pesan tawaran pertama.
         if (($offerAmount = $data['offer_amount'] ?? null) !== null) {
@@ -117,10 +135,6 @@ class ChatController extends Controller
         $this->authorizeParticipant($conversation);
 
         $validated = $request->validated();
-        $imagePath = $request->hasFile('image')
-            ? $request->file('image')->store("chat/{$conversation->id}", 'public')
-            : null;
-
         $isOffer = ($validated['type'] ?? null) === Message::TYPE_OFFER;
 
         if ($isOffer) {
@@ -132,43 +146,141 @@ class ChatController extends Controller
             );
         }
 
-        $message = $conversation->messages()->create([
-            'sender_id' => (int) Auth::id(),
-            'body' => $validated['body'] ?? null,
-            'image' => $imagePath,
-            'type' => $isOffer ? Message::TYPE_OFFER : Message::TYPE_TEXT,
-            'offer_amount' => $isOffer ? $validated['offer_amount'] : null,
-            'offer_status' => $isOffer ? Message::OFFER_PENDING : null,
-        ]);
+        $clientId = $validated['client_id'] ?? null;
+
+        // Request ganda dengan client_id yang sama mengembalikan pesan yang sudah ada.
+        if ($clientId !== null) {
+            $existing = $conversation->messages()->where('client_id', $clientId)->first();
+
+            if ($existing !== null) {
+                return $this->sentResponse($conversation, $existing);
+            }
+        }
+
+        $imagePath = $request->hasFile('image')
+            ? $request->file('image')->store("chat/{$conversation->id}", 'public')
+            : null;
+
+        try {
+            $message = $conversation->messages()->create([
+                'sender_id' => (int) Auth::id(),
+                'client_id' => $clientId,
+                'body' => $validated['body'] ?? null,
+                'image' => $imagePath,
+                'type' => $isOffer ? Message::TYPE_OFFER : Message::TYPE_TEXT,
+                'offer_amount' => $isOffer ? $validated['offer_amount'] : null,
+                'offer_status' => $isOffer ? Message::OFFER_PENDING : null,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            // Balapan dua request identik: pakai baris yang menang.
+            if ($imagePath !== null) {
+                Storage::disk('public')->delete($imagePath);
+            }
+
+            $message = $conversation->messages()->where('client_id', $clientId)->sole();
+
+            return $this->sentResponse($conversation, $message);
+        }
 
         $conversation->update(['last_message_at' => $message->created_at]);
 
         $this->notifyCounterpart($conversation, $isOffer, $message);
 
-        if ($request->expectsJson()) {
-            return response()->json([
-                'message' => $this->payload($message->load('sender')),
-            ]);
-        }
-
-        return redirect()->route('chat.show', $conversation);
+        return $this->sentResponse($conversation, $message);
     }
 
     /**
-     * Polling: pesan dengan id lebih besar dari ?after= (JSON).
+     * Polling: pesan baru, perubahan tawaran, resi baca, dan kehadiran lawan.
      */
     public function poll(Request $request, Conversation $conversation): JsonResponse
     {
         $this->authorizeParticipant($conversation);
 
-        $messages = $conversation->messages()
-            ->where('id', '>', (int) $request->query('after', 0))
+        $myId = (int) Auth::id();
+        $conversation->loadMissing(['buyer', 'seller']);
+
+        $after = max(0, (int) $request->query('after', 0));
+        $visible = $request->boolean('visible', true);
+
+        $newMessages = $conversation->messages()
+            ->where('id', '>', $after)
             ->with('sender')
             ->orderBy('id')
-            ->get()
-            ->map($this->payload(...));
+            ->get();
 
-        return response()->json(['messages' => $messages]);
+        // Penanda "diterima" untuk semua pesan lawan yang sudah sampai ke klien ini;
+        // "dibaca" hanya ketika tab benar-benar terlihat.
+        $incomingQuery = $conversation->messages()
+            ->where('sender_id', '!=', $myId);
+
+        if ($visible) {
+            $incomingQuery->where(fn ($query) => $query
+                ->whereNull('delivered_at')
+                ->orWhereNull('read_at'));
+        } else {
+            $incomingQuery->whereNull('delivered_at');
+        }
+
+        $incoming = $incomingQuery->get();
+
+        if ($incoming->isNotEmpty()) {
+            $now = now();
+
+            foreach ($incoming as $message) {
+                $message->delivered_at ??= $now;
+                if ($visible) {
+                    $message->read_at ??= $now;
+                }
+                $message->saveQuietly();
+            }
+        }
+
+        $offers = $conversation->messages()
+            ->where('type', Message::TYPE_OFFER)
+            ->get()
+            ->map(fn (Message $message) => [
+                'id' => $message->id,
+                'version' => $message->updated_at?->getTimestamp() ?? 0,
+                'html' => $this->renderMessage($conversation, $message),
+            ])
+            ->values();
+
+        return response()->json([
+            'messages' => $newMessages
+                ->map(fn (Message $message) => $this->messageMeta($message) + [
+                    'html' => $this->renderMessage($conversation, $message),
+                ])
+                ->values(),
+            'offers' => $offers,
+            'offer_summary' => $this->offerSummaryHtml($conversation),
+            'receipts' => $this->receipts($conversation, $myId),
+            'presence' => $this->presencePayload($conversation, $myId),
+        ]);
+    }
+
+    /**
+     * Tandai pesan lawan sudah dibaca (dipanggil saat tab kembali fokus).
+     */
+    public function markRead(Conversation $conversation): JsonResponse
+    {
+        $this->authorizeParticipant($conversation);
+
+        $this->markMessagesRead($conversation);
+
+        return response()->json([
+            'receipts' => $this->receipts($conversation, (int) Auth::id()),
+            'unread_total' => $this->unreadTotal((int) Auth::id()),
+        ]);
+    }
+
+    /**
+     * Total pesan belum dibaca untuk badge navbar.
+     */
+    public function unreadCount(): JsonResponse
+    {
+        return response()->json([
+            'total' => $this->unreadTotal((int) Auth::id()),
+        ]);
     }
 
     /**
@@ -196,7 +308,9 @@ class ChatController extends Controller
 
         $message->update(['offer_status' => Message::OFFER_CANCELLED]);
 
-        return $this->offerResponse($conversation, $message);
+        $system = $this->systemMessage($conversation, 'Penawaran dibatalkan');
+
+        return $this->offerResponse($conversation, $message, $system);
     }
 
     /**
@@ -207,13 +321,22 @@ class ChatController extends Controller
         $this->authorizeOfferDecision($conversation, $message);
 
         DB::transaction(function () use ($conversation, $message): void {
-            $message->update(['offer_status' => Message::OFFER_ACCEPTED]);
+            // Kunci baris agar dua tap "Terima" tidak membuat dua order.
+            $locked = Message::query()->lockForUpdate()->findOrFail($message->getKey());
+
+            abort_if(
+                $locked->offer_status !== Message::OFFER_PENDING,
+                409,
+                'Tawaran ini sudah diproses.',
+            );
+
+            $locked->update(['offer_status' => Message::OFFER_ACCEPTED]);
 
             Order::create([
                 'buyer_id' => $conversation->buyer_id,
                 'seller_id' => $conversation->seller_id,
                 'product_id' => $conversation->product_id,
-                'harga_final' => $message->offer_amount,
+                'harga_final' => $locked->offer_amount,
                 'status' => Order::STATUS_DISEPAKATI,
             ]);
         });
@@ -222,7 +345,9 @@ class ChatController extends Controller
             new OfferDecided(true, (int) $message->offer_amount, $conversation->id),
         );
 
-        return $this->offerResponse($conversation, $message);
+        $system = $this->systemMessage($conversation, 'Penawaran disetujui');
+
+        return $this->offerResponse($conversation, $message, $system);
     }
 
     /**
@@ -238,7 +363,9 @@ class ChatController extends Controller
             new OfferDecided(false, (int) $message->offer_amount, $conversation->id),
         );
 
-        return $this->offerResponse($conversation, $message);
+        $system = $this->systemMessage($conversation, 'Penawaran ditolak');
+
+        return $this->offerResponse($conversation, $message, $system);
     }
 
     /**
@@ -256,6 +383,28 @@ class ChatController extends Controller
         }
 
         return back();
+    }
+
+    /**
+     * Jawaban untuk kirim pesan (HTML siap tempel + meta tawaran).
+     *
+     * @return JsonResponse|RedirectResponse
+     */
+    private function sentResponse(Conversation $conversation, Message $message)
+    {
+        $conversation->loadMissing(['buyer', 'seller']);
+        $message->loadMissing('sender');
+
+        if (request()->expectsJson()) {
+            return response()->json([
+                'message' => $this->messageMeta($message),
+                'html' => $this->renderMessage($conversation, $message),
+                'offer_summary' => $this->offerSummaryHtml($conversation),
+                'receipts' => $this->receipts($conversation, (int) Auth::id()),
+            ]);
+        }
+
+        return redirect()->route('chat.show', $conversation);
     }
 
     /**
@@ -291,18 +440,40 @@ class ChatController extends Controller
     /**
      * Semua percakapan user beserta data pendukung daftar chat.
      *
-     * @return Collection<int, Conversation>
+     * @return \Illuminate\Database\Eloquent\Collection<int, Conversation>
      */
-    private function conversationsFor(int $userId)
+    private function conversationsFor(int $userId, string $filter = 'semua')
     {
         return Conversation::query()
             ->where(fn ($query) => $query
                 ->where('buyer_id', $userId)
                 ->orWhere('seller_id', $userId))
-            ->with(['product.coverImage', 'buyer', 'seller', 'lastMessage'])
+            ->when($filter === 'membeli', fn ($query) => $query->where('buyer_id', $userId))
+            ->when($filter === 'menjual', fn ($query) => $query->where('seller_id', $userId))
+            ->when($filter === 'belum', fn ($query) => $query->whereHas(
+                'messages',
+                fn ($messages) => $messages
+                    ->whereNull('read_at')
+                    ->where('type', '!=', Message::TYPE_SYSTEM)
+                    ->where('sender_id', '!=', $userId),
+            ))
+            ->with(['product.coverImage', 'buyer', 'seller', 'lastMessage', 'latestOffer'])
+            ->withCount(['messages as unread_count' => fn ($query) => $query
+                ->whereNull('read_at')
+                ->where('type', '!=', Message::TYPE_SYSTEM)
+                ->where('sender_id', '!=', $userId)])
             ->orderByDesc('last_message_at')
             ->orderByDesc('id')
             ->get();
+    }
+
+    private function filterFrom(Request $request): string
+    {
+        $filter = (string) $request->query('filter', 'semua');
+
+        return in_array($filter, ['semua', 'membeli', 'menjual', 'belum'], true)
+            ? $filter
+            : 'semua';
     }
 
     /**
@@ -340,34 +511,149 @@ class ChatController extends Controller
     /**
      * Respons setelah keputusan tawaran.
      */
-    private function offerResponse(Conversation $conversation, Message $message): JsonResponse|RedirectResponse
+    private function offerResponse(Conversation $conversation, Message $message, ?Message $system = null): JsonResponse|RedirectResponse
     {
         $message->refresh();
+        $conversation->loadMissing(['buyer', 'seller']);
 
         if (request()->expectsJson()) {
-            return response()->json(['message' => $this->payload($message)]);
+            $payload = [
+                'message' => $this->messageMeta($message),
+                'html' => $this->renderMessage($conversation, $message),
+                'offer_summary' => $this->offerSummaryHtml($conversation),
+            ];
+
+            if ($system !== null) {
+                $payload['system'] = [
+                    'id' => $system->id,
+                    'html' => $this->renderMessage($conversation, $system),
+                ];
+            }
+
+            return response()->json($payload);
         }
 
         return redirect()->route('chat.show', $conversation);
     }
 
     /**
-     * Bentuk JSON satu pesan untuk polling dan respons kirim.
+     * Pesan sistem di tengah alur (contoh: "Penawaran disetujui").
+     */
+    private function systemMessage(Conversation $conversation, string $body): Message
+    {
+        $message = $conversation->messages()->create([
+            'sender_id' => (int) Auth::id(),
+            'body' => $body,
+            'type' => Message::TYPE_SYSTEM,
+        ]);
+
+        $conversation->update(['last_message_at' => $message->created_at]);
+
+        return $message;
+    }
+
+    /**
+     * Tandai semua pesan lawan sebagai diterima + dibaca.
+     */
+    private function markMessagesRead(Conversation $conversation): void
+    {
+        $now = now();
+
+        $query = $conversation->messages()
+            ->where('sender_id', '!=', (int) Auth::id());
+
+        (clone $query)->whereNull('delivered_at')->update(['delivered_at' => $now]);
+        (clone $query)->whereNull('read_at')->update(['read_at' => $now]);
+    }
+
+    /**
+     * Resi baca untuk pesan milik saya sendiri.
+     *
+     * @return array{read_upto: int, delivered_upto: int}
+     */
+    private function receipts(Conversation $conversation, int $myId): array
+    {
+        $mine = $conversation->messages()->where('sender_id', $myId);
+
+        return [
+            'read_upto' => (int) (clone $mine)->whereNotNull('read_at')->max('id'),
+            'delivered_upto' => (int) (clone $mine)->whereNotNull('delivered_at')->max('id'),
+        ];
+    }
+
+    /**
+     * Data kehadiran lawan bicara.
+     *
+     * @return array{online: bool, last_seen_at: string|null, label: string}
+     */
+    private function presencePayload(Conversation $conversation, int $myId): array
+    {
+        $other = $conversation->counterpartFor($myId);
+
+        if ($other === null) {
+            return ['online' => false, 'last_seen_at' => null, 'label' => 'Tidak tersedia'];
+        }
+
+        return [
+            'online' => $other->isOnline(),
+            'last_seen_at' => $other->last_seen_at?->toIso8601String(),
+            'label' => $other->isOnline() ? 'Online' : 'Terakhir dilihat',
+        ];
+    }
+
+    /**
+     * Total pesan belum dibaca dari seluruh percakapan.
+     */
+    private function unreadTotal(int $userId): int
+    {
+        return Message::query()
+            ->whereNull('read_at')
+            ->where('type', '!=', Message::TYPE_SYSTEM)
+            ->where('sender_id', '!=', $userId)
+            ->whereHas('conversation', fn ($query) => $query
+                ->where('buyer_id', $userId)
+                ->orWhere('seller_id', $userId))
+            ->count();
+    }
+
+    /**
+     * HTML strip produk (badge status + nominal tawaran).
+     */
+    private function offerSummaryHtml(Conversation $conversation): string
+    {
+        return view('chat.partials.offer-badge', [
+            'offer' => $conversation->latestOffer()->first(),
+        ])->render();
+    }
+
+    /**
+     * Render satu pesan memakai partial Blade yang sama dengan SSR,
+     * supaya markup JS dan server tidak pernah berbeda.
+     */
+    private function renderMessage(Conversation $conversation, Message $message): string
+    {
+        return view('chat.partials.message', [
+            'message' => $message,
+            'conversation' => $conversation,
+            'myId' => (int) Auth::id(),
+        ])->render();
+    }
+
+    /**
+     * Meta ringkas satu pesan.
      *
      * @return array<string, mixed>
      */
-    private function payload(Message $message): array
+    private function messageMeta(Message $message): array
     {
         return [
             'id' => $message->id,
             'sender_id' => $message->sender_id,
-            'sender_name' => $message->sender->name,
             'body' => $message->body,
-            'image' => $message->image !== null ? Storage::url($message->image) : null,
             'type' => $message->type,
             'offer_amount' => $message->offer_amount,
             'offer_status' => $message->offer_status,
-            'created_at' => $message->created_at?->format('H:i'),
+            'created_at' => $message->created_at?->toIso8601String(),
         ];
     }
 }
