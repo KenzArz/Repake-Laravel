@@ -46,7 +46,6 @@ class UserFactory extends Factory
     public function admin(): static
     {
         return $this->state(fn (): array => [
-            'email' => config('repake.admin_emails')[0] ?? 'admin@unsika.ac.id',
             'role' => User::ROLE_ADMIN,
         ]);
     }

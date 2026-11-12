@@ -164,10 +164,15 @@ test('user can logout', function () {
     expect(session('user_profile'))->toBeNull();
 });
 
-test('allowlisted admin email is granted admin and redirected to dashboard', function () {
+test('user with admin role is granted access and redirected to dashboard', function () {
+    $admin = User::factory()->admin()->create([
+        'email' => 'admin@unsika.ac.id',
+        'firebase_uid' => 'admin-uid-existing',
+    ]);
+
     fakeFirebaseLookup([
         'localId' => 'admin-uid',
-        'email' => '2410631170004@student.unsika.ac.id',
+        'email' => 'admin@unsika.ac.id',
         'displayName' => 'Admin RePake',
     ]);
 
@@ -186,11 +191,11 @@ test('allowlisted admin email is granted admin and redirected to dashboard', fun
 });
 
 test('existing admin row without firebase uid is linked by email on first login', function () {
-    $admin = User::factory()->admin()->create(['firebase_uid' => null]);
+    $admin = User::factory()->admin()->create(['firebase_uid' => null, 'email' => 'admin@unsika.ac.id']);
 
     fakeFirebaseLookup([
         'localId' => 'admin-uid',
-        'email' => '2410631170004@student.unsika.ac.id',
+        'email' => 'admin@unsika.ac.id',
     ]);
 
     $this->postJson(route('auth.firebase'), ['id_token' => 'valid-token'])

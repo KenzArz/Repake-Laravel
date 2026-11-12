@@ -44,12 +44,11 @@ test('every seeded product has a cover image and a seller', function () {
     }
 });
 
-test('admin account is identified by the allowlisted email', function () {
+test('admin account is identified by the admin role', function () {
     $this->seed();
 
     $admin = User::where('role', User::ROLE_ADMIN)->sole();
 
-    expect($admin->email)->toBe('2410631170004@student.unsika.ac.id')
-        ->and($admin->isAdmin())->toBeTrue()
+    expect($admin->isAdmin())->toBeTrue()
         ->and(User::where('email', 'test@example.com')->sole()->isAdmin())->toBeFalse();
 });
