@@ -69,8 +69,8 @@ class Product extends Model
     {
         $term = trim((string) $term);
 
-        return $query->when($term !== '', fn (Builder $q): Builder => $q->where(
-            fn (Builder $inner): Builder => $inner
+        return $query->when($term !== '', fn(Builder $q): Builder => $q->where(
+            fn(Builder $inner): Builder => $inner
                 ->where('judul', 'like', "%{$term}%")
                 ->orWhere('deskripsi', 'like', "%{$term}%")
         ));
@@ -86,7 +86,7 @@ class Product extends Model
         $suffix = 2;
 
         while (self::withTrashed()->where('slug', $candidate)->exists()) {
-            $candidate = $slug.'-'.$suffix;
+            $candidate = $slug . '-' . $suffix;
             $suffix++;
         }
 
@@ -188,12 +188,26 @@ class Product extends Model
     }
 
     /**
+     * URL avatar penjual (dipakai product-card & halaman detail).
+     */
+    protected function penjualAvatar(): Attribute
+    {
+        return Attribute::make(
+            get: function (): string {
+                $seller = $this->relationLoaded('user') ? $this->user : $this->user()->first();
+
+                return $seller?->avatar_url ?? asset('images/default-avatar.png');
+            }
+        );
+    }
+
+    /**
      * Label status untuk tampilan (dipakai product-card & halaman detail).
      */
     protected function statusLabel(): Attribute
     {
         return Attribute::make(
-            get: fn (): string => match ($this->status) {
+            get: fn(): string => match ($this->status) {
                 self::STATUS_TERJUAL => 'Terjual',
                 self::STATUS_DITINJAU => 'Ditinjau',
                 self::STATUS_DRAFT => 'Draft',

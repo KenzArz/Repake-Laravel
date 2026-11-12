@@ -52,8 +52,12 @@ class User extends Authenticatable
                 return null;
             }
 
-            if (str_starts_with($avatar, 'http://') || str_starts_with($avatar, 'https://')) {
+            if (str_starts_with($avatar, 'http://') || str_starts_with($avatar, 'https://') || str_starts_with($avatar, '/')) {
                 return $avatar;
+            }
+
+            if (file_exists(public_path($avatar))) {
+                return asset($avatar);
             }
 
             return Storage::url($avatar);
