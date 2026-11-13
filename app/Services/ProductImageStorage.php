@@ -73,7 +73,9 @@ class ProductImageStorage
             $path = $this->toWebp($file) ?? $file->store(self::DIRECTORY, self::DISK);
 
             return is_string($path) && $path !== '' ? $path : null;
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return null;
         }
     }
