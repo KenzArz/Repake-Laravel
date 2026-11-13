@@ -28,7 +28,7 @@ class CategoryController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100', 'unique:categories,name'],
             'icon' => ['nullable', 'string', 'max:100'],
-            'icon_file' => ['nullable', 'image', 'mimes:png', 'max:2048'],
+            'icon_file' => ['nullable', 'image', 'mimes:png,webp', 'max:2048'],
         ], [
             'icon_file.image' => 'Ikon harus berupa gambar.',
             'icon_file.mimes' => 'Ikon harus berformat PNG.',
@@ -57,12 +57,12 @@ class CategoryController extends Controller
     public function update(Request $request, Category $category): RedirectResponse
     {
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:100', 'unique:categories,name,'.$category->id],
+            'name' => ['required', 'string', 'max:100', 'unique:categories,name,' . $category->id],
             'icon' => ['nullable', 'string', 'max:100'],
-            'icon_file' => ['nullable', 'image', 'mimes:png', 'max:2048'],
+            'icon_file' => ['nullable', 'image', 'mimes:png,webp', 'max:2048'],
         ], [
             'icon_file.image' => 'Ikon harus berupa gambar.',
-            'icon_file.mimes' => 'Ikon harus berformat PNG.',
+            'icon_file.mimes' => 'Ikon harus berformat PNG atau WEBP.',
             'icon_file.max' => 'Ukuran ikon maksimal 2 MB.',
         ]);
 

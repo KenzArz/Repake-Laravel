@@ -11,24 +11,73 @@
 
     <div class="mx-auto max-w-6xl px-4 py-2 sm:px-6">
 
-        {{-- Mau cari apa? (1 Baris Horizontal Scroll seperti Evensie) --}}
-        <section class="mt-8">
-            <h2 class="mb-4 text-xl font-bold text-neutral-900">Mau cari apa?</h2>
-            <div
-                class="-mx-4 -mt-2.5 flex flex-nowrap items-start gap-3 overflow-x-auto px-4 pt-2.5 pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:justify-between sm:gap-2 sm:px-0">
+        {{-- Mau cari apa? (1 Baris Horizontal Scroll & Responsif untuk >8 Kategori) --}}
+        <section x-data="{
+                    canLeft: false,
+                    canRight: false,
+                    checkScroll() {
+                        const el = this.$refs.track;
+                        if (!el) return;
+                        this.canLeft = el.scrollLeft > 4;
+                        this.canRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+                    },
+                    scrollByAmount(dir) {
+                        const el = this.$refs.track;
+                        if (!el) return;
+                        el.scrollBy({ left: dir * 320, behavior: 'smooth' });
+                    }
+                }" x-init="$nextTick(() => checkScroll())" @resize.window.debounce.150ms="checkScroll()"
+            class="group/cat relative mt-8">
+
+            <div class="mb-4 flex items-center justify-between">
+                <h2 class="text-xl font-bold text-neutral-900">Mau cari apa?</h2>
+
+                {{-- Tombol geser khusus desktop: otomatis muncul HANYA jika kategori > 8 (overflow) --}}
+                <div x-show="canLeft || canRight" x-cloak class="hidden items-center gap-1.5 sm:flex">
+                    <button type="button" @click="scrollByAmount(-1)" :disabled="!canLeft"
+                        aria-label="Geser kategori ke kiri"
+                        class="grid size-8 place-items-center rounded-full border border-neutral-200 bg-white text-neutral-700 shadow-2xs transition hover:border-lime-400 hover:bg-lime-50 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-35 cursor-pointer">
+                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                        </svg>
+                    </button>
+                    <button type="button" @click="scrollByAmount(1)" :disabled="!canRight"
+                        aria-label="Geser kategori ke kanan"
+                        class="grid size-8 place-items-center rounded-full border border-neutral-200 bg-white text-neutral-700 shadow-2xs transition hover:border-lime-400 hover:bg-lime-50 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-35 cursor-pointer">
+                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div x-ref="track" @scroll.passive="checkScroll()"
+                class="-mx-4 -mt-2.5 flex snap-x snap-proximity scroll-px-4 flex-nowrap items-start justify-between gap-3 overflow-x-auto px-4 pt-2.5 pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:scroll-px-0 sm:gap-5 sm:px-0 lg:gap-6">
                 @foreach ($categories as $category)
                     <a href="{{ route('products.index', ['kategori' => [$category->slug]]) }}"
-                        class="group flex w-[76px] shrink-0 flex-col items-center text-center sm:w-auto sm:flex-1">
-                        <div
-                            class="flex size-16 shrink-0 items-center justify-center rounded-full bg-neutral-200 transition-all duration-200 ease-out group-hover:-translate-y-1.5 group-hover:bg-lime-100 group-hover:ring-2 group-hover:ring-lime-500 group-hover:shadow-md sm:size-[72px]">
+                        class="group flex w-[72px] shrink-0 snap-start flex-col items-center text-center sm:w-[84px]">
+                        <div class="relative flex size-16 shrink-0 items-center justify-center rounded-full
+                                            bg-[radial-gradient(circle_at_30%_25%,var(--color-neutral-700),var(--color-neutral-900)_70%)]
+                                            shadow-[inset_0_0_0_1px_rgb(184_217_78/0.35),inset_0_-8px_14px_-6px_rgb(184_217_78/0.30),0_6px_16px_-6px_rgb(184_217_78/0.45)]
+                                            transition-all duration-200 ease-out
+                                            group-hover:-translate-y-1.5
+                                            group-hover:shadow-[inset_0_0_0_1px_rgb(184_217_78/0.7),inset_0_-10px_16px_-6px_rgb(184_217_78/0.5),0_10px_24px_-6px_rgb(184_217_78/0.7)]
+                                            sm:size-[72px]">
                             @if ($category->icon_url)
                                 <img src="{{ $category->icon_url }}" alt="{{ $category->name }}"
-                                    class="size-8 object-contain transition-transform duration-200 ease-out group-hover:scale-105 sm:size-9"
-                                    onerror="this.remove()">
+                                    class="size-8 object-contain transition-transform duration-200 ease-out group-hover:scale-110 sm:size-9"
+                                    onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');">
+                                <span class="hidden text-sm font-extrabold text-[var(--color-lime)]">
+                                    {{ mb_strtoupper(mb_substr($category->name, 0, 2)) }}
+                                </span>
+                            @else
+                                <span class="text-sm font-extrabold text-[var(--color-lime)]">
+                                    {{ mb_strtoupper(mb_substr($category->name, 0, 2)) }}
+                                </span>
                             @endif
                         </div>
                         <p
-                            class="mt-2 line-clamp-2 text-xs font-semibold leading-tight text-neutral-800 transition-colors duration-200 group-hover:text-neutral-900">
+                            class="mt-2 line-clamp-2 text-xs font-semibold leading-tight text-neutral-700 transition-colors duration-200 group-hover:text-neutral-950">
                             {{ $category->name }}
                         </p>
                     </a>

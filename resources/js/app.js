@@ -112,8 +112,7 @@ document.querySelectorAll("[data-banner-slider]").forEach((el) => {
     const items = [...el.querySelectorAll("[data-banner-slide]")];
     if (items.length < 2) return;
 
-    const offsetOf = (item) =>
-        item.offsetLeft - items[0].offsetLeft;
+    const offsetOf = (item) => item.offsetLeft - items[0].offsetLeft;
 
     let paused = false;
 
@@ -129,7 +128,10 @@ document.querySelectorAll("[data-banner-slider]").forEach((el) => {
         // Di ujung / tidak ada lagi yang bisa digeser -> balik ke awal (loop).
         if (next === -1 || positions[next] > maxScroll + 2) next = 0;
 
-        el.scrollTo({ left: next === 0 ? 0 : positions[next], behavior: "smooth" });
+        el.scrollTo({
+            left: next === 0 ? 0 : positions[next],
+            behavior: "smooth",
+        });
     };
 
     el.addEventListener("mouseenter", () => (paused = true));
@@ -187,6 +189,10 @@ if (
         module.initChatBadge();
     });
 }
+
+import { initAdminWebpUpload } from "./admin-webp-upload";
+
+initAdminWebpUpload();
 
 window.Alpine = Alpine;
 Alpine.data("productFilter", productFilter);
