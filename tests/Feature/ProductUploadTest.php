@@ -242,3 +242,44 @@ test('product update can add images to a product without any image', function ()
 
     Storage::disk('public')->assertExists($image->path);
 });
+
+test('upload with php upload error reports the file name', function () {
+    $fake = UploadedFile::fake()->image('rusak.jpg', 800, 600);
+
+    $broken = new UploadedFile(
+        $fake->getPathname(),
+        'rusak.jpg',
+        'image/jpeg',
+        UPLOAD_ERR_INI_SIZE,
+        true,
+    );
+
+    $response = $this->actingAs($this->user)
+        ->withHeaders(['X-Requested-With' => 'XMLHttpRequest', 'Accept' => 'application/json'])
+        ->post(route('products.store'), payload([
+            'category_id' => $this->category->id,
+            'images' => [$broken],
+        ]));
+
+    $response->assertStatus(422);
+    expect(json_encode($response->json('errors')))
+        ->toContain('rusak.jpg');
+});
+
+test('fake jpg with non-image content is rejected with format message', function () {
+    $path = tempnam(sys_get_temp_dir(), 'palsu');
+    file_put_contents($path, 'bukan gambar');
+
+    $file = new UploadedFile($path, 'palsu.jpg', null, null, true);
+
+    $response = $this->actingAs($this->user)
+        ->withHeaders(['X-Requested-With' => 'XMLHttpRequest', 'Accept' => 'application/json'])
+        ->post(route('products.store'), payload([
+            'category_id' => $this->category->id,
+            'images' => [$file],
+        ]));
+
+    $response->assertStatus(422);
+    expect(json_encode($response->json('errors')))
+        ->toContain('Format gambar harus JPG, PNG, atau WebP.');
+});

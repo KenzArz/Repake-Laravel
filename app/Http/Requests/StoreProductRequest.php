@@ -5,13 +5,38 @@ namespace App\Http\Requests;
 use App\Services\ProductImageStorage;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class StoreProductRequest extends FormRequest
 {
     public function authorize(): bool
     {
         return Auth::check();
+    }
+
+    /**
+     * File yang gagal diunggah PHP biasanya lolos dari validasi "uploaded"
+     * dengan pesan generik. Tangkap di sini agar pesannya menyebut nama file.
+     *
+     * @throws ValidationException
+     */
+    protected function prepareForValidation(): void
+    {
+        $files = $this->file('images');
+
+        foreach (is_array($files) ? $files : [$files] as $file) {
+            if ($file instanceof UploadedFile && ! $file->isValid()) {
+                $message = sprintf(
+                    'Gambar "%s" gagal diunggah: %s',
+                    $file->getClientOriginalName(),
+                    $file->getErrorMessage(),
+                );
+
+                throw ValidationException::withMessages(['images' => $message]);
+            }
+        }
     }
 
     /**

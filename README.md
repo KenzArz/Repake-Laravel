@@ -255,8 +255,8 @@ konfigurasi PHP tidak lebih kecil dari itu, kalau tidak body request dibuang
 oleh PHP dan muncul error 419 (form seperti ter-reset):
 
 ```ini
-; php.ini (CLI dan FPM)
-upload_max_filesize = 12M
+; php.ini (CLI dan FPM) — nilai minimum
+upload_max_filesize = 6M
 post_max_size = 20M
 memory_limit = 256M
 ```

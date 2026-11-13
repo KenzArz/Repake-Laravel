@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -466,6 +467,35 @@ class ProductController extends Controller
     }
 
     /**
+     * Deteksi file gambar yang gagal diunggah PHP sebelum validasi lain
+     * dijalankan, supaya pesannya menyebut nama file dan alasannya.
+     */
+    private function invalidUploadError(Request $request): JsonResponse|RedirectResponse|null
+    {
+        $file = collect((array) $request->file('images'))
+            ->first(fn ($item): bool => $item instanceof UploadedFile && ! $item->isValid());
+
+        if (! $file instanceof UploadedFile) {
+            return null;
+        }
+
+        $message = sprintf(
+            'Gambar "%s" gagal diunggah: %s',
+            $file->getClientOriginalName(),
+            $file->getErrorMessage(),
+        );
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message' => $message,
+                'errors' => ['images' => [$message]],
+            ], 422);
+        }
+
+        return back()->withErrors(['images' => $message])->withInput();
+    }
+
+    /**
      * Tampilkan form edit produk milik penjual.
      */
     public function edit(Product $product): View
@@ -486,6 +516,12 @@ class ProductController extends Controller
     public function update(Request $request, Product $product): RedirectResponse|JsonResponse
     {
         abort_if($product->user_id !== Auth::id(), 403);
+
+        $uploadError = $this->invalidUploadError($request);
+
+        if ($uploadError !== null) {
+            return $uploadError;
+        }
 
         $validated = $request->validate([
             'judul' => ['required', 'string', 'max:255'],

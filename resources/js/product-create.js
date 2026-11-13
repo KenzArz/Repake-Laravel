@@ -139,8 +139,10 @@ function focusInvalid(name) {
 }
 
 function compressImage(file, quality = 0.7, maxSide = 1920) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        const failedMessage = `Gambar "${file.name}" rusak atau formatnya tidak didukung.`;
 
         img.onload = () => {
             let width = img.width;
@@ -165,12 +167,19 @@ function compressImage(file, quality = 0.7, maxSide = 1920) {
 
             canvas.toBlob(
                 (blob) => {
+                    URL.revokeObjectURL(objectUrl);
+
+                    if (!blob) {
+                        reject(new Error(failedMessage));
+                        return;
+                    }
+
                     resolve(
-                        blob
-                            ? new File([blob], file.name, {
-                                  type: "image/jpeg",
-                              })
-                            : file,
+                        new File(
+                            [blob],
+                            file.name.replace(/\.[^./\\]+$/, "") + ".jpg",
+                            { type: "image/jpeg" },
+                        ),
                     );
                 },
                 "image/jpeg",
@@ -178,16 +187,18 @@ function compressImage(file, quality = 0.7, maxSide = 1920) {
             );
         };
 
-        img.onerror = () => resolve(file);
-        img.src = URL.createObjectURL(file);
+        img.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error(failedMessage));
+        };
+
+        img.src = objectUrl;
     });
 }
 
 async function prepareFiles(accepted) {
     return Promise.all(
         accepted.map(async (file) => {
-            if (file.size <= SAFE_UPLOAD_BYTES) return file;
-
             const compressed = await compressImage(file, 0.7);
 
             return compressed.size > SAFE_UPLOAD_BYTES
@@ -379,7 +390,11 @@ function handleImageSelection(event) {
             renderPreviews();
             if (rejected) showError(rejected);
         })
-        .catch(() => showError("Gagal memproses gambar. Coba gambar lain."));
+        .catch((error) =>
+            showError(
+                error?.message || "Gagal memproses gambar. Coba gambar lain.",
+            ),
+        );
 }
 
 function handleSubmit(event) {
