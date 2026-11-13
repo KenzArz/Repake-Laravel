@@ -16,6 +16,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -89,7 +90,7 @@ class ProductController extends Controller
             ->where('name', 'like', "%{$q}%")
             ->take(3)
             ->get()
-            ->map(fn (Category $cat): array => [
+            ->map(fn(Category $cat): array => [
                 'name' => $cat->name,
                 'slug' => $cat->slug,
                 'url' => route('products.index', ['kategori' => [$cat->slug]]),
@@ -102,10 +103,10 @@ class ProductController extends Controller
             ->latest()
             ->take(6)
             ->get()
-            ->map(fn (Product $product): array => [
+            ->map(fn(Product $product): array => [
                 'id' => $product->id,
                 'judul' => $product->judul,
-                'harga' => 'Rp '.number_format((int) $product->harga, 0, ',', '.'),
+                'harga' => 'Rp ' . number_format((int) $product->harga, 0, ',', '.'),
                 'kota' => $product->kota ?: 'Sekitar Kampus',
                 'kondisi' => $product->kondisi,
                 'category' => $product->category?->name ?? 'Produk',
@@ -148,17 +149,17 @@ class ProductController extends Controller
 
         $query = Product::with(['primaryImage', 'user', 'category', 'codAreas'])
             ->dijual()
-            ->when($q !== '', fn (Builder $qb) => $qb->cari($q))
+            ->when($q !== '', fn(Builder $qb) => $qb->cari($q))
             ->when($selectedKategori !== [], function (Builder $qb) use ($selectedKategori): void {
-                $qb->whereHas('category', fn (Builder $cq) => $cq->whereIn('slug', $selectedKategori));
+                $qb->whereHas('category', fn(Builder $cq) => $cq->whereIn('slug', $selectedKategori));
             })
             ->when($selectedKondisi !== [], function (Builder $qb) use ($selectedKondisi): void {
                 $lowered = array_map('mb_strtolower', $selectedKondisi);
                 $qb->whereIn(DB::raw('LOWER(kondisi)'), $lowered);
             })
-            ->when($minPrice !== null && $minPrice !== '' && is_numeric($minPrice), fn (Builder $qb) => $qb->where('harga', '>=', (int) $minPrice))
-            ->when($maxPrice !== null && $maxPrice !== '' && is_numeric($maxPrice), fn (Builder $qb) => $qb->where('harga', '<=', (int) $maxPrice))
-            ->when($negoOnly, fn (Builder $qb) => $qb->where('is_negotiable', true));
+            ->when($minPrice !== null && $minPrice !== '' && is_numeric($minPrice), fn(Builder $qb) => $qb->where('harga', '>=', (int) $minPrice))
+            ->when($maxPrice !== null && $maxPrice !== '' && is_numeric($maxPrice), fn(Builder $qb) => $qb->where('harga', '<=', (int) $maxPrice))
+            ->when($negoOnly, fn(Builder $qb) => $qb->where('is_negotiable', true));
 
         // Jika lokasi aktif atau urutkan terdekat dipilih
         if ($activeKota !== '' || $radiusKm !== null || ($sort === 'terdekat' && $targetLat !== null && $targetLng !== null)) {
@@ -184,9 +185,9 @@ class ProductController extends Controller
             $sorted = match ($sort) {
                 'termurah' => $all->sortBy('harga'),
                 'termahal' => $all->sortByDesc('harga'),
-                'terdekat' => $all->sortBy(fn (Product $p): array => [
+                'terdekat' => $all->sortBy(fn(Product $p): array => [
                     $p->distance_km ?? 9999.0,
-                    -($p->created_at?->timestamp ?? 0),
+                    - ($p->created_at?->timestamp ?? 0),
                 ]),
                 default => $all->sortByDesc('created_at'),
             };
@@ -392,8 +393,8 @@ class ProductController extends Controller
 
         if ($files->count() > ProductImageStorage::MAX_IMAGES) {
             return $this->error(
-                'Maksimal gambar yang dapat diunggah adalah '.ProductImageStorage::MAX_IMAGES.' gambar.',
-                ['images' => ['Maksimal gambar yang dapat diunggah adalah '.ProductImageStorage::MAX_IMAGES.' gambar.']],
+                'Maksimal gambar yang dapat diunggah adalah ' . ProductImageStorage::MAX_IMAGES . ' gambar.',
+                ['images' => ['Maksimal gambar yang dapat diunggah adalah ' . ProductImageStorage::MAX_IMAGES . ' gambar.']],
                 $request,
             );
         }
@@ -410,14 +411,24 @@ class ProductController extends Controller
                 'kota' => $request->kota,
                 'patokan_lokasi' => $request->patokan_lokasi,
             ], $files);
+        } catch (\Throwable $e) {
+            report($e);
 
-            if ($product instanceof Product && $request->filled(['cod_lat', 'cod_lng'])) {
+            return $this->error(
+                'Gagal mengunggah produk: ' . $e->getMessage(),
+                ['images' => ['Gagal menyimpan produk: ' . $e->getMessage()]],
+                $request,
+            );
+        }
+
+        if ($product instanceof Product && $request->filled(['cod_lat', 'cod_lng'])) {
+            try {
                 $placeName = $request->cod_place_name ?: $request->kota;
 
                 $codArea = CodArea::firstOrCreate(
                     ['name' => $placeName, 'city' => $request->kota],
                     [
-                        'province' => $request->province ?? 'Jawa Barat',
+                        'province' => $request->filled('province') ? $request->province : 'Jawa Barat',
                         'boundary' => [
                             'type' => 'Point',
                             'coordinates' => [(float) $request->cod_lng, (float) $request->cod_lat],
@@ -426,13 +437,9 @@ class ProductController extends Controller
                 );
 
                 $product->codAreas()->sync([$codArea->id]);
+            } catch (\Throwable $e) {
+                report($e);
             }
-        } catch (\Throwable) {
-            return $this->error(
-                'Gagal mengunggah produk. Silakan coba lagi atau gunakan gambar lain.',
-                ['images' => ['Gagal menyimpan gambar produk. Coba lagi.']],
-                $request,
-            );
         }
 
         $judul = $product instanceof Product ? $product->judul : $request->judul;
@@ -478,7 +485,7 @@ class ProductController extends Controller
      */
     public function update(Request $request, Product $product): RedirectResponse|JsonResponse
     {
-        abort_if($product->user_id !== Auth::id(), 403);
+        abort_if((string) $product->user_id !== (string) Auth::id(), 403);
 
         $validated = $request->validate([
             'judul' => ['required', 'string', 'max:255'],
@@ -498,18 +505,20 @@ class ProductController extends Controller
             'cod_lng' => ['nullable', 'numeric'],
             'patokan_lokasi' => ['nullable', 'string', 'max:255'],
             'is_negotiable' => ['sometimes', 'boolean'],
-            'cover_image_id' => ['nullable', 'integer'],
+            'cover_image_id' => ['nullable'],
             'delete_images' => ['nullable', 'array'],
-            'delete_images.*' => ['integer'],
+            'delete_images.*' => ['required'],
             'images' => ['nullable', 'array'],
             'images.*' => ['image', 'mimes:jpeg,png,jpg,webp', 'max:5120'],
         ]);
 
         $newFiles = $this->images->validFiles($request->file('images'));
-        $deleteIds = collect($validated['delete_images'] ?? [])->map(fn ($id) => (int) $id)->all();
+        $deleteIds = collect($validated['delete_images'] ?? [])->map(fn($id) => (string) $id)->all();
 
         $product->load('images');
-        $remainingExisting = $product->images->whereNotIn('id', $deleteIds);
+        $remainingExisting = $product->images->filter(
+            fn($img) => ! in_array((string) $img->id, $deleteIds, true)
+        );
         $totalPhotos = $remainingExisting->count() + $newFiles->count();
 
         if ($totalPhotos < 1) {
@@ -520,7 +529,7 @@ class ProductController extends Controller
 
         if ($totalPhotos > ProductImageStorage::MAX_IMAGES) {
             return back()
-                ->withErrors(['images' => 'Maksimal total gambar produk adalah '.ProductImageStorage::MAX_IMAGES.' gambar.'])
+                ->withErrors(['images' => 'Maksimal total gambar produk adalah ' . ProductImageStorage::MAX_IMAGES . ' gambar.'])
                 ->withInput();
         }
 
@@ -535,28 +544,30 @@ class ProductController extends Controller
             'deskripsi' => $validated['deskripsi'],
             'kota' => $validated['kota'],
             'patokan_lokasi' => $validated['patokan_lokasi'] ?? null,
-            'is_negotiable' => $request->boolean('is_negotiable', $product->is_negotiable),
+            'is_negotiable' => $request->boolean('is_negotiable', (bool) $product->is_negotiable),
         ]);
 
-        // Update titik lokasi COD jika tersedia
         if ($request->filled(['cod_lat', 'cod_lng'])) {
-            $placeName = ($validated['cod_place_name'] ?? null) ?: $validated['kota'];
+            try {
+                $placeName = ($validated['cod_place_name'] ?? null) ?: $validated['kota'];
 
-            $codArea = CodArea::firstOrCreate(
-                ['name' => $placeName, 'city' => $validated['kota']],
-                [
-                    'province' => $validated['province'] ?? 'Jawa Barat',
-                    'boundary' => [
-                        'type' => 'Point',
-                        'coordinates' => [(float) $validated['cod_lng'], (float) $validated['cod_lat']],
-                    ],
-                ]
-            );
+                $codArea = CodArea::firstOrCreate(
+                    ['name' => $placeName, 'city' => $validated['kota']],
+                    [
+                        'province' => $request->filled('province') ? $request->province : 'Jawa Barat',
+                        'boundary' => [
+                            'type' => 'Point',
+                            'coordinates' => [(float) $validated['cod_lng'], (float) $validated['cod_lat']],
+                        ],
+                    ]
+                );
 
-            $product->codAreas()->sync([$codArea->id]);
+                $product->codAreas()->sync([$codArea->id]);
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
 
-        // Hapus foto lama yang ditandai
         if ($deleteIds !== []) {
             $toDelete = $product->images()->whereIn('id', $deleteIds)->get();
             foreach ($toDelete as $img) {
@@ -569,15 +580,13 @@ class ProductController extends Controller
             }
         }
 
-        // Simpan foto baru yang diunggah
-        $sampleAttrs = $product->images()->first()?->getAttributes() ?? [];
-        $pathColumn = array_key_exists('path', $sampleAttrs) ? 'path' : 'path_url';
+        $pathColumn = Schema::hasColumn('product_images', 'path') ? 'path' : 'path_url';
         $nextUrutan = ((int) $product->images()->max('urutan')) + 1;
 
         $savedNewImages = [];
         foreach ($newFiles as $file) {
             $storedPath = $file->store('products', 'public');
-            $valueToSave = $pathColumn === 'path_url' ? 'storage/'.$storedPath : $storedPath;
+            $valueToSave = $pathColumn === 'path_url' ? 'storage/' . $storedPath : $storedPath;
 
             $savedNewImages[] = $product->images()->create([
                 $pathColumn => $valueToSave,
@@ -586,8 +595,7 @@ class ProductController extends Controller
             ]);
         }
 
-        // Terapkan urutan gambar & set urutan ke-0 sebagai Cover Utama
-        $existingMap = $product->images()->get()->keyBy('id');
+        $existingMap = $product->images()->get()->keyBy(fn($img) => (string) $img->id);
         $imageOrder = $request->input('image_order', []);
 
         if (is_array($imageOrder) && $imageOrder !== []) {
@@ -599,12 +607,11 @@ class ProductController extends Controller
                     continue;
                 }
 
-                [$type, $rawIdx] = explode(':', $token, 2);
-                $idx = (int) $rawIdx;
+                [$type, $rawId] = explode(':', $token, 2);
 
                 $target = match ($type) {
-                    'existing' => $existingMap->get($idx),
-                    'new' => $savedNewImages[$idx] ?? null,
+                    'existing' => $existingMap->get((string) $rawId),
+                    'new' => $savedNewImages[(int) $rawId] ?? null,
                     default => null,
                 };
 
@@ -618,7 +625,6 @@ class ProductController extends Controller
             }
         }
 
-        // Pengaman: pastikan selalu ada minimal 1 foto dengan is_cover = true
         if (! $product->images()->where('is_cover', true)->exists()) {
             $firstImage = $product->images()->orderBy('urutan')->first();
             if ($firstImage) {
@@ -641,7 +647,7 @@ class ProductController extends Controller
             ->to($product->detailUrl())
             ->with('success', $toastMessage);
     }
-
+    
     /**
      * Hapus produk (soft delete).
      */

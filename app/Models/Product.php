@@ -62,7 +62,7 @@ class Product extends Model
     protected function dijual(Builder $query): Builder
     {
         return $query->where('status', self::STATUS_DIJUAL)
-            ->whereHas('seller', fn (Builder $seller): Builder => $seller->where('is_banned', false));
+            ->whereHas('seller', fn(Builder $seller): Builder => $seller->where('is_banned', false));
     }
 
     /**
@@ -73,8 +73,8 @@ class Product extends Model
     {
         $term = trim((string) $term);
 
-        return $query->when($term !== '', fn (Builder $q): Builder => $q->where(
-            fn (Builder $inner): Builder => $inner
+        return $query->when($term !== '', fn(Builder $q): Builder => $q->where(
+            fn(Builder $inner): Builder => $inner
                 ->where('judul', 'like', "%{$term}%")
                 ->orWhere('deskripsi', 'like', "%{$term}%")
         ));
@@ -90,9 +90,9 @@ class Product extends Model
         $slug = $base;
         $suffix = 2;
 
-        while (static::query()
+        while (static::withTrashed()
             ->where('slug', $slug)
-            ->when($id !== null, fn (Builder $query): Builder => $query->whereKeyNot($id))
+            ->when($id !== null, fn(Builder $query): Builder => $query->whereKeyNot($id))
             ->exists()
         ) {
             $slug = "{$base}-{$suffix}";
@@ -259,7 +259,7 @@ class Product extends Model
     protected function statusLabel(): Attribute
     {
         return Attribute::make(
-            get: fn (): string => match ($this->status) {
+            get: fn(): string => match ($this->status) {
                 self::STATUS_TERJUAL => 'Terjual',
                 self::STATUS_DITINJAU => 'Ditinjau',
                 self::STATUS_DITANGGUIHKAN => 'Ditangguhkan',

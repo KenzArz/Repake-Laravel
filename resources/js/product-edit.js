@@ -456,7 +456,7 @@ export function initProductEdit() {
             els.previewContainer.dataset.existingImages || "[]",
         );
         existing.forEach((img) => {
-            items.push({ type: "existing", id: Number(img.id), url: img.url });
+            items.push({ type: "existing", id: String(img.id), url: img.url });
         });
     } catch {
         // Abaikan jika JSON kosong

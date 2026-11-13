@@ -93,6 +93,13 @@ function validateImages() {
     return "";
 }
 
+// Di awal handleSubmit(event), sebelum const first = validateAll():
+const locationInput = document.getElementById("location_search");
+const kotaInput = document.getElementById("kota");
+if (locationInput && kotaInput && !kotaInput.value.trim()) {
+    kotaInput.value = locationInput.value.trim();
+}
+
 function validateAll() {
     let first = null;
 
@@ -391,6 +398,15 @@ function handleSubmit(event) {
 
 export function initProductCreate() {
     els.form = document.getElementById("productForm");
+
+    // Di dalam initProductCreate():
+    const locationInput = document.getElementById("location_search");
+    const kotaInput = document.getElementById("kota");
+    locationInput?.addEventListener("input", () => {
+        if (kotaInput) {
+            kotaInput.value = locationInput.value.trim();
+        }
+    });
 
     if (!els.form) return;
 

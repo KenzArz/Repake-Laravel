@@ -32,9 +32,9 @@ Route::middleware(['auth', 'banned'])->group(function () {
     Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
     Route::post('/products', [ProductController::class, 'store'])->name('products.store');
 
-    Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
-    Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
-    Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+    Route::get('/products/{product:id}/edit', [ProductController::class, 'edit'])->name('products.edit');
+    Route::put('/products/{product:id}', [ProductController::class, 'update'])->name('products.update');
+    Route::delete('/products/{product:id}', [ProductController::class, 'destroy'])->name('products.destroy');
 
     // Laporan produk (wajib login)
     Route::post('/products/{id}/report', [ProductDetailController::class, 'report'])
