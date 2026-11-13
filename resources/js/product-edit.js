@@ -1,6 +1,9 @@
 const MAX_FILES = 3;
 const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 6 * 1024 * 1024;
 const SAFE_UPLOAD_BYTES = 2 * 1024 * 1024;
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const ALLOWED_TYPES_MESSAGE = "Format gambar harus JPG, PNG, atau WebP.";
 
 const FIELD_IDS = [
     "judul",
@@ -87,12 +90,19 @@ function validateImages() {
     if (items.length === 0) return "Unggah minimal 1 gambar produk.";
     if (items.length > MAX_FILES) return `Maksimal ${MAX_FILES} gambar produk.`;
 
+    let totalBytes = 0;
+
     for (const entry of items) {
         if (entry.type !== "new") continue;
-        if (!entry.file.type.startsWith("image/"))
-            return "Hanya file gambar yang diperbolehkan.";
+        if (!ALLOWED_TYPES.includes(entry.file.type))
+            return ALLOWED_TYPES_MESSAGE;
         if (entry.file.size > MAX_BYTES)
             return `Gambar "${entry.file.name}" melebihi 5MB.`;
+        totalBytes += entry.file.size;
+    }
+
+    if (totalBytes > MAX_TOTAL_BYTES) {
+        return "Total ukuran gambar terlalu besar. Kurangi jumlah atau ukuran gambar (maksimal total 6MB).";
     }
 
     return "";
@@ -153,7 +163,10 @@ function compressImage(file, quality = 0.7, maxSide = 1920) {
             const canvas = document.createElement("canvas");
             canvas.width = Math.round(width);
             canvas.height = Math.round(height);
-            canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+            const context = canvas.getContext("2d");
+            context.fillStyle = "#ffffff";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(img, 0, 0, width, height);
 
             canvas.toBlob(
                 (blob) => {
@@ -304,8 +317,10 @@ function buildFormData() {
 
 function handleResponse(response) {
     if (response.status === 419) {
-        window.location.reload();
-        return;
+        throw {
+            userMessage:
+                "Sesi Anda sudah berakhir. Muat ulang halaman, lalu unggah ulang gambar dan isi form.",
+        };
     }
 
     if (response.status === 413) {
@@ -330,6 +345,11 @@ function handleResponse(response) {
 
 function handleError(error) {
     els.submitBtn.disabled = false;
+
+    if (error?.userMessage) {
+        showFormError(error.userMessage);
+        return;
+    }
 
     if (error?.validation) {
         let firstField = null;
@@ -362,8 +382,8 @@ function handleImageSelection(event) {
     let rejected = "";
 
     Array.from(event.target.files || []).forEach((file) => {
-        if (!file.type.startsWith("image/")) {
-            rejected = "Hanya file gambar yang diperbolehkan.";
+        if (!ALLOWED_TYPES.includes(file.type)) {
+            rejected = ALLOWED_TYPES_MESSAGE;
             return;
         }
         if (file.size > MAX_BYTES) {
@@ -465,7 +485,11 @@ export function initProductEdit() {
     renderPreviews();
 
     els.closeErrorBtn.addEventListener("click", hideError);
-    els.dropzone.addEventListener("click", () => els.imageInput.click());
+    els.dropzone.addEventListener("click", (event) => {
+        if (event.target === els.imageInput) return;
+
+        els.imageInput.click();
+    });
 
     els.dropzone.addEventListener("dragover", (event) => {
         event.preventDefault();

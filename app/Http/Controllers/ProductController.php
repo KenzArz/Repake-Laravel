@@ -16,7 +16,6 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -410,8 +409,20 @@ class ProductController extends Controller
                 'kota' => $request->kota,
                 'patokan_lokasi' => $request->patokan_lokasi,
             ], $files);
+        } catch (\Throwable $e) {
+            report($e);
 
-            if ($product instanceof Product && $request->filled(['cod_lat', 'cod_lng'])) {
+            return $this->error(
+                'Gagal mengunggah produk. Silakan coba lagi atau gunakan gambar lain.',
+                ['images' => ['Gagal menyimpan gambar produk. Coba lagi.']],
+                $request,
+            );
+        }
+
+        // Titik COD bukan bagian dari transaksi pembuatan produk. Bila gagal,
+        // produk tetap tersimpan dan penjual bisa melengkapi lokasinya lewat edit.
+        if ($request->filled(['cod_lat', 'cod_lng'])) {
+            try {
                 $placeName = $request->cod_place_name ?: $request->kota;
 
                 $codArea = CodArea::firstOrCreate(
@@ -426,13 +437,9 @@ class ProductController extends Controller
                 );
 
                 $product->codAreas()->sync([$codArea->id]);
+            } catch (\Throwable $e) {
+                report($e);
             }
-        } catch (\Throwable) {
-            return $this->error(
-                'Gagal mengunggah produk. Silakan coba lagi atau gunakan gambar lain.',
-                ['images' => ['Gagal menyimpan gambar produk. Coba lagi.']],
-                $request,
-            );
         }
 
         $judul = $product instanceof Product ? $product->judul : $request->judul;
@@ -449,7 +456,7 @@ class ProductController extends Controller
             ->with('success', $toastMessage);
     }
 
-    private function error(string $message, array $errors, StoreProductRequest $request): RedirectResponse|JsonResponse
+    private function error(string $message, array $errors, Request $request): RedirectResponse|JsonResponse
     {
         if ($request->wantsJson()) {
             return response()->json(['message' => $message, 'errors' => $errors], 422);
@@ -501,8 +508,11 @@ class ProductController extends Controller
             'cover_image_id' => ['nullable', 'integer'],
             'delete_images' => ['nullable', 'array'],
             'delete_images.*' => ['integer'],
-            'images' => ['nullable', 'array'],
+            'images' => ['nullable', 'array', 'max:'.ProductImageStorage::MAX_IMAGES],
             'images.*' => ['image', 'mimes:jpeg,png,jpg,webp', 'max:5120'],
+        ], [
+            'images.*.mimes' => 'Format gambar harus JPG, PNG, atau WebP.',
+            'images.*.max' => 'Ukuran tiap gambar maksimal 5MB.',
         ]);
 
         $newFiles = $this->images->validFiles($request->file('images'));
@@ -524,110 +534,128 @@ class ProductController extends Controller
                 ->withInput();
         }
 
-        $product->update([
-            'judul' => $validated['judul'],
-            'category_id' => $validated['category_id'],
-            'harga' => (int) $validated['harga'],
-            'kondisi' => $validated['kondisi'],
-            'status' => $product->status === Product::STATUS_DITANGGUIHKAN
-                ? Product::STATUS_DITANGGUIHKAN
-                : ($validated['status'] ?? $product->status),
-            'deskripsi' => $validated['deskripsi'],
-            'kota' => $validated['kota'],
-            'patokan_lokasi' => $validated['patokan_lokasi'] ?? null,
-            'is_negotiable' => $request->boolean('is_negotiable', $product->is_negotiable),
-        ]);
+        $storedPaths = [];
+        $deletedPaths = [];
 
-        // Update titik lokasi COD jika tersedia
-        if ($request->filled(['cod_lat', 'cod_lng'])) {
-            $placeName = ($validated['cod_place_name'] ?? null) ?: $validated['kota'];
-
-            $codArea = CodArea::firstOrCreate(
-                ['name' => $placeName, 'city' => $validated['kota']],
-                [
-                    'province' => $validated['province'] ?? 'Jawa Barat',
-                    'boundary' => [
-                        'type' => 'Point',
-                        'coordinates' => [(float) $validated['cod_lng'], (float) $validated['cod_lat']],
-                    ],
-                ]
-            );
-
-            $product->codAreas()->sync([$codArea->id]);
-        }
-
-        // Hapus foto lama yang ditandai
-        if ($deleteIds !== []) {
-            $toDelete = $product->images()->whereIn('id', $deleteIds)->get();
-            foreach ($toDelete as $img) {
-                $rawPath = $img->getAttributes()['path'] ?? $img->getAttributes()['path_url'] ?? null;
-                if ($rawPath) {
-                    $diskPath = preg_replace('#^/?storage/#', '', $rawPath);
-                    Storage::disk('public')->delete($diskPath);
-                }
-                $img->delete();
-            }
-        }
-
-        // Simpan foto baru yang diunggah
-        $sampleAttrs = $product->images()->first()?->getAttributes() ?? [];
-        $pathColumn = array_key_exists('path', $sampleAttrs) ? 'path' : 'path_url';
-        $nextUrutan = ((int) $product->images()->max('urutan')) + 1;
-
-        $savedNewImages = [];
-        foreach ($newFiles as $file) {
-            $storedPath = $file->store('products', 'public');
-            $valueToSave = $pathColumn === 'path_url' ? 'storage/'.$storedPath : $storedPath;
-
-            $savedNewImages[] = $product->images()->create([
-                $pathColumn => $valueToSave,
-                'urutan' => $nextUrutan++,
-                'is_cover' => false,
-            ]);
-        }
-
-        // Terapkan urutan gambar & set urutan ke-0 sebagai Cover Utama
-        $existingMap = $product->images()->get()->keyBy('id');
-        $imageOrder = $request->input('image_order', []);
-
-        if (is_array($imageOrder) && $imageOrder !== []) {
-            $product->images()->update(['is_cover' => false]);
-            $urutan = 0;
-
-            foreach ($imageOrder as $token) {
-                if (! is_string($token) || ! str_contains($token, ':')) {
-                    continue;
-                }
-
-                [$type, $rawIdx] = explode(':', $token, 2);
-                $idx = (int) $rawIdx;
-
-                $target = match ($type) {
-                    'existing' => $existingMap->get($idx),
-                    'new' => $savedNewImages[$idx] ?? null,
-                    default => null,
-                };
-
-                if ($target) {
-                    $product->images()->whereKey($target->id)->update([
-                        'urutan' => $urutan,
-                        'is_cover' => $urutan === 0,
-                    ]);
-                    $urutan++;
-                }
-            }
-        }
-
-        // Pengaman: pastikan selalu ada minimal 1 foto dengan is_cover = true
-        if (! $product->images()->where('is_cover', true)->exists()) {
-            $firstImage = $product->images()->orderBy('urutan')->first();
-            if ($firstImage) {
-                $product->images()->whereKey($firstImage->id)->update([
-                    'is_cover' => true,
-                    'urutan' => 0,
+        try {
+            DB::transaction(function () use ($product, $validated, $request, $deleteIds, $newFiles, &$storedPaths, &$deletedPaths): void {
+                $product->update([
+                    'judul' => $validated['judul'],
+                    'category_id' => $validated['category_id'],
+                    'harga' => (int) $validated['harga'],
+                    'kondisi' => $validated['kondisi'],
+                    'status' => $product->status === Product::STATUS_DITANGGUIHKAN
+                        ? Product::STATUS_DITANGGUIHKAN
+                        : ($validated['status'] ?? $product->status),
+                    'deskripsi' => $validated['deskripsi'],
+                    'kota' => $validated['kota'],
+                    'patokan_lokasi' => $validated['patokan_lokasi'] ?? null,
+                    'is_negotiable' => $request->boolean('is_negotiable', $product->is_negotiable),
                 ]);
-            }
+
+                // Update titik lokasi COD jika tersedia
+                if ($request->filled(['cod_lat', 'cod_lng'])) {
+                    $placeName = ($validated['cod_place_name'] ?? null) ?: $validated['kota'];
+
+                    $codArea = CodArea::firstOrCreate(
+                        ['name' => $placeName, 'city' => $validated['kota']],
+                        [
+                            'province' => $validated['province'] ?? 'Jawa Barat',
+                            'boundary' => [
+                                'type' => 'Point',
+                                'coordinates' => [(float) $validated['cod_lng'], (float) $validated['cod_lat']],
+                            ],
+                        ]
+                    );
+
+                    $product->codAreas()->sync([$codArea->id]);
+                }
+
+                // Hapus baris foto lama. File fisiknya baru dihapus setelah
+                // transaksi sukses supaya tidak ada foto yang hilang saat gagal.
+                if ($deleteIds !== []) {
+                    $toDelete = $product->images()->whereIn('id', $deleteIds)->get();
+                    foreach ($toDelete as $img) {
+                        $deletedPaths[] = preg_replace('#^/?storage/#', '', $img->path) ?? $img->path;
+                        $img->delete();
+                    }
+                }
+
+                // Simpan foto baru yang diunggah
+                $nextUrutan = ((int) $product->images()->max('urutan')) + 1;
+                $savedNewImages = [];
+
+                foreach ($newFiles as $file) {
+                    $storedPath = $this->images->storeFile($file);
+
+                    if ($storedPath === null) {
+                        throw new \RuntimeException('Gagal menyimpan gambar produk.');
+                    }
+
+                    $storedPaths[] = $storedPath;
+
+                    $savedNewImages[] = $product->images()->create([
+                        'path' => $storedPath,
+                        'urutan' => $nextUrutan++,
+                        'is_cover' => false,
+                    ]);
+                }
+
+                // Terapkan urutan gambar & set urutan ke-0 sebagai Cover Utama
+                $existingMap = $product->images()->get()->keyBy('id');
+                $imageOrder = $request->input('image_order', []);
+
+                if (is_array($imageOrder) && $imageOrder !== []) {
+                    $product->images()->update(['is_cover' => false]);
+                    $urutan = 0;
+
+                    foreach ($imageOrder as $token) {
+                        if (! is_string($token) || ! str_contains($token, ':')) {
+                            continue;
+                        }
+
+                        [$type, $rawIdx] = explode(':', $token, 2);
+                        $idx = (int) $rawIdx;
+
+                        $target = match ($type) {
+                            'existing' => $existingMap->get($idx),
+                            'new' => $savedNewImages[$idx] ?? null,
+                            default => null,
+                        };
+
+                        if ($target) {
+                            $product->images()->whereKey($target->id)->update([
+                                'urutan' => $urutan,
+                                'is_cover' => $urutan === 0,
+                            ]);
+                            $urutan++;
+                        }
+                    }
+                }
+
+                // Pengaman: pastikan selalu ada minimal 1 foto dengan is_cover = true
+                if (! $product->images()->where('is_cover', true)->exists()) {
+                    $firstImage = $product->images()->orderBy('urutan')->first();
+                    if ($firstImage) {
+                        $product->images()->whereKey($firstImage->id)->update([
+                            'is_cover' => true,
+                            'urutan' => 0,
+                        ]);
+                    }
+                }
+            });
+        } catch (\Throwable $e) {
+            $this->images->delete($storedPaths);
+            report($e);
+
+            return $this->error(
+                'Gagal menyimpan perubahan produk. Silakan coba lagi.',
+                ['images' => ['Gagal menyimpan perubahan produk. Coba lagi.']],
+                $request,
+            );
         }
+
+        $this->images->delete($deletedPaths);
 
         $toastMessage = "Perubahan pada produk \"{$product->judul}\" berhasil disimpan.";
 

@@ -41,7 +41,9 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
+            // URL relatif agar gambar tetap tampil saat aplikasi diakses dari
+            // host/port lain (mis. dari HP di jaringan yang sama).
+            'url' => '/storage',
             'visibility' => 'public',
             'throw' => false,
             'report' => false,
