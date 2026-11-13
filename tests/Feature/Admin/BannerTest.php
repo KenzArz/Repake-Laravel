@@ -137,7 +137,7 @@ test('the first banner cannot be moved up', function () {
         ->and($second->refresh()->sort_order)->toBe(2);
 });
 
-test('homepage shows at most three active banners in the configured order', function () {
+test('homepage shows all active banners in the configured order', function () {
     Banner::factory()->create(['image_path' => 'images/banner-1.webp', 'is_active' => true, 'sort_order' => 1]);
     Banner::factory()->create(['image_path' => 'images/banner-2.webp', 'is_active' => true, 'sort_order' => 2]);
     Banner::factory()->create(['image_path' => 'images/banner-3.webp', 'is_active' => true, 'sort_order' => 3]);
@@ -149,17 +149,19 @@ test('homepage shows at most three active banners in the configured order', func
     $response->assertSee('images/banner-1.webp')
         ->assertSee('images/banner-2.webp')
         ->assertSee('images/banner-3.webp')
-        ->assertDontSee('images/banner-4.webp')
+        ->assertSee('images/banner-4.webp')
         ->assertDontSee('images/banner-off.webp');
 
     $positions = [
         strpos($response->getContent(), 'images/banner-1.webp'),
         strpos($response->getContent(), 'images/banner-2.webp'),
         strpos($response->getContent(), 'images/banner-3.webp'),
+        strpos($response->getContent(), 'images/banner-4.webp'),
     ];
 
     expect($positions[0])->toBeLessThan($positions[1])
-        ->and($positions[1])->toBeLessThan($positions[2]);
+        ->and($positions[1])->toBeLessThan($positions[2])
+        ->and($positions[2])->toBeLessThan($positions[3]);
 });
 
 test('admin reorders banners via drag and drop payload', function () {

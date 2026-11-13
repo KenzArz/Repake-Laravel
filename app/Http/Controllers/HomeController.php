@@ -79,7 +79,6 @@ class HomeController extends Controller
 
         return view('home.index', [
             'banners' => Banner::aktif()
-                ->take(3)
                 ->get()
                 ->map(fn (Banner $banner): string => $banner->image_url)
                 ->all(),

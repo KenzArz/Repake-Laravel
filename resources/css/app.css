@@ -54,6 +54,16 @@
     --color-info-shade: #375063;
 }
 
+/* Sembunyikan scrollbar secara halus (dipakai modal/carousel). */
+@utility no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}
+
 .pac-container {
     z-index: 9999 !important;
     border-radius: 0.75rem;

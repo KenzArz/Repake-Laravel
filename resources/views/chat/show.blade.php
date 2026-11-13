@@ -268,7 +268,7 @@
 
 {{-- Modal ubah nominal tawaran --}}
 <dialog id="chat-offer-modal" data-offer-modal
-        class="w-[calc(100%-2rem)] max-w-sm rounded-2xl bg-transparent p-0 backdrop:bg-neutral-900/50">
+        class="m-auto w-[calc(100%-2rem)] max-w-sm rounded-2xl bg-transparent p-0 backdrop:bg-neutral-900/50">
     <form data-offer-form class="rounded-2xl bg-white p-5">
         <h2 class="text-[17px] font-extrabold text-neutral-900">Ubah tawaran</h2>
         <p class="mt-1 text-[13px] text-neutral-500">
