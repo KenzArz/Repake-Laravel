@@ -2,30 +2,22 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
     /**
      * Seed the application's database.
+     *
+     * Hanya mengisi data inti: kategori (dengan icon), area COD, dan akun admin.
+     * Data dummy (produk, banner, report, user demo) tidak dijalankan lagi.
      */
     public function run(): void
     {
         $this->call([
             CategorySeeder::class,
             CodAreaSeeder::class,
-            UserSeeder::class,
             AdminSeeder::class,
-            ProductSeeder::class,
-            BannerSeeder::class,
-            ReportSeeder::class,
         ]);
-
-        // Idempoten: aman dijalankan berkali-kali (migrate --seed tanpa fresh).
-        User::firstOrCreate(
-            ['email' => 'test@example.com'],
-            ['name' => 'Test User', 'password' => 'password'],
-        );
     }
 }
