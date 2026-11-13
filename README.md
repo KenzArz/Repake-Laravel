@@ -248,6 +248,23 @@ Kemudian jalankan ulang `composer dev`, dan perangkat lain membuka
 > alamat bind, bukan alamat tujuan: browser (terutama Windows/Chrome) gagal
 > memuat aset dari `http://0.0.0.0:5173` dengan `ERR_ADDRESS_INVALID`.
 
+### Batas Upload Gambar
+
+Form jual/edit produk menerima maksimal **3 gambar, 5MB per gambar**. Pastikan
+konfigurasi PHP tidak lebih kecil dari itu, kalau tidak body request dibuang
+oleh PHP dan muncul error 419 (form seperti ter-reset):
+
+```ini
+; php.ini (CLI dan FPM)
+upload_max_filesize = 12M
+post_max_size = 20M
+memory_limit = 256M
+```
+
+`public/.user.ini` sudah menyetel nilai tersebut untuk PHP-FPM/CGI. Untuk
+`php artisan serve` (PHP CLI), nilai `php.ini` di atas tetap perlu diterapkan
+manual karena `.user.ini` tidak dibaca oleh server bawaan PHP.
+
 ---
 
 ## Project Structure
