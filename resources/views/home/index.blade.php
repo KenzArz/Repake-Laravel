@@ -3,22 +3,24 @@
 @section('title', 'RePake - Jual Beli Barang Bekas')
 
 @section('content')
-    <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6">
 
-        {{-- Banner (3 Box Persegi Panjang Abu Sesuai Wireframe) --}}
-        <section aria-label="Promo">
-            <x-banner-slider :images="$banners" />
-        </section>
+    {{-- Banner Stacking Carousel (Full-width agar peek kiri & kanan tidak terpotong) --}}
+    <section aria-label="Promo" class="pt-4 sm:pt-6">
+        <x-banner-slider :images="$banners" />
+    </section>
 
-        {{-- Mau cari apa? (8 Kategori -> Langsung ke Halaman Pencarian dengan Filter Kategori Aktif) --}}
-        <section class="mt-10">
+    <div class="mx-auto max-w-6xl px-4 py-2 sm:px-6">
+
+        {{-- Mau cari apa? (1 Baris Horizontal Scroll seperti Evensie) --}}
+        <section class="mt-8">
             <h2 class="mb-4 text-xl font-bold text-neutral-900">Mau cari apa?</h2>
-            <div class="grid grid-cols-4 gap-x-3 gap-y-5 sm:grid-cols-8 sm:gap-4">
+            <div
+                class="-mx-4 -mt-2.5 flex flex-nowrap items-start gap-3 overflow-x-auto px-4 pt-2.5 pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:justify-between sm:gap-2 sm:px-0">
                 @foreach ($categories as $category)
                     <a href="{{ route('products.index', ['kategori' => [$category->slug]]) }}"
-                        class="group flex flex-col items-center">
+                        class="group flex w-[76px] shrink-0 flex-col items-center text-center sm:w-auto sm:flex-1">
                         <div
-                            class="flex size-16 shrink-0 items-center justify-center rounded-full bg-neutral-200 transition-all duration-200 ease-out group-hover:scale-110 group-hover:bg-lime-100 group-hover:ring-2 group-hover:ring-lime-500 group-hover:shadow-lg group-hover:shadow-neutral-900/10 sm:size-20">
+                            class="flex size-16 shrink-0 items-center justify-center rounded-full bg-neutral-200 transition-all duration-200 ease-out group-hover:-translate-y-1.5 group-hover:bg-lime-100 group-hover:ring-2 group-hover:ring-lime-500 group-hover:shadow-md sm:size-[72px]">
                             @if ($category->icon_url)
                                 <img src="{{ $category->icon_url }}" alt="{{ $category->name }}"
                                     class="size-8 object-contain transition-transform duration-200 ease-out group-hover:scale-105 sm:size-9"
@@ -26,7 +28,7 @@
                             @endif
                         </div>
                         <p
-                            class="mt-2.5 text-center text-xs font-medium text-neutral-800 transition-colors duration-200 group-hover:text-neutral-900 sm:text-sm">
+                            class="mt-2 line-clamp-2 text-xs font-semibold leading-tight text-neutral-800 transition-colors duration-200 group-hover:text-neutral-900">
                             {{ $category->name }}
                         </p>
                     </a>

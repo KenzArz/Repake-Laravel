@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             CategorySeeder::class,
             CodAreaSeeder::class,
             AdminSeeder::class,
+            BannerSeeder::class,
         ]);
     }
 }
