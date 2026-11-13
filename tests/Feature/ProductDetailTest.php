@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Category;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\Report;
 use App\Models\User;
@@ -44,6 +45,32 @@ test('suspended product is hidden from guests but visible to its owner', functio
         ->get($this->product->detailUrl())
         ->assertOk()
         ->assertSee('Ditangguhkan');
+});
+
+test('sold product is hidden from guests but visible to its owner', function () {
+    $this->product->update(['status' => Product::STATUS_TERJUAL]);
+
+    $this->get($this->product->detailUrl())->assertNotFound();
+
+    $this->actingAs(User::find($this->product->user_id))
+        ->get($this->product->detailUrl())
+        ->assertOk();
+});
+
+test('sold product stays visible to the buyer who ordered it', function () {
+    $this->product->update(['status' => Product::STATUS_TERJUAL]);
+
+    $buyer = User::factory()->create();
+    Order::factory()->selesai()->create([
+        'seller_id' => $this->product->user_id,
+        'buyer_id' => $buyer->id,
+        'product_id' => $this->product->id,
+    ]);
+
+    $this->actingAs($buyer)
+        ->get($this->product->detailUrl())
+        ->assertOk()
+        ->assertSee('Ulasan Produk');
 });
 
 test('product from a banned seller is hidden from guests', function () {

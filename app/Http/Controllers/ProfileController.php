@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateProfileRequest;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\Review;
 use App\Models\User;
@@ -159,11 +160,14 @@ class ProfileController extends Controller
         $products = $this->productsFor($user, $tab, $isOwner);
         $reviews = $this->reviewsFor($user);
 
-        // Statistik profile dihitung dari data nyata, bukan hardcode
+        // Statistik profile dihitung dari data nyata, bukan hardcode.
         $profile = $this->profileData($user);
         $profile['rating'] = round((float) ($reviews->avg(fn (array $review): int => $review['rating']) ?? 0), 1);
         $profile['reviews_count'] = $reviews->count();
         $profile['sold_count'] = $this->productCount($user, $isOwner);
+
+        // Ulasan penjual->pembeli: pengulas melihat form di profil pembeli.
+        $reviewableOrder = $this->reviewableOrderFor($user, $tab, $isOwner);
 
         return [
             'profile' => $profile,
@@ -173,10 +177,37 @@ class ProfileController extends Controller
             'products' => $products,
             'reviews' => $reviews->all(),
             'reviewCount' => $reviews->count(),
+            'reviewableOrder' => $reviewableOrder,
             'favoriteCount' => $isOwner ? $this->favoriteCount($user) : 0,
             'chatProducts' => $isOwner ? collect() : $this->activeProducts($user),
             'profileUrl' => $isOwner ? route('profile.catalog') : $user->profileUrl(),
         ];
+    }
+
+    /**
+     * Order yang memungkinkan pengunjung (sebagai penjual) mengulas pemilik
+     * profil (sebagai pembeli). Hanya relevan pada tab ulasan profil orang lain.
+     */
+    private function reviewableOrderFor(User $user, string $tab, bool $isOwner): ?Order
+    {
+        if ($isOwner || $tab !== 'ulasan' || ! auth()->check()) {
+            return null;
+        }
+
+        $viewerId = (string) auth()->id();
+
+        $order = Order::query()
+            ->where('seller_id', $viewerId)
+            ->where('buyer_id', $user->id)
+            ->whereIn('status', [Order::STATUS_DISEPAKATI, Order::STATUS_SELESAI])
+            ->latest('id')
+            ->first();
+
+        if ($order === null || $order->reviews()->where('reviewer_id', $viewerId)->exists()) {
+            return null;
+        }
+
+        return $order;
     }
 
     /**
@@ -251,15 +282,18 @@ class ProfileController extends Controller
     private function reviewsFor(User $user): Collection
     {
         return Review::with(['product.primaryImage', 'reviewer'])
-            ->where('seller_id', $user->id)
+            ->where('reviewee_id', $user->id)
             ->latest()
             ->get()
             ->map(fn (Review $review): array => [
                 'id' => $review->id,
-                'reviewer_name' => $review->reviewer?->name ?? 'Pembeli',
+                'reviewer_id' => $review->reviewer_id,
+                'is_mine' => (string) $review->reviewer_id === (string) auth()->id(),
+                'reviewer_name' => $review->reviewer?->name ?? 'Pengguna',
                 'time_ago' => $review->created_at?->locale('id')->diffForHumans(['syntax' => CarbonInterface::DIFF_ABSOLUTE]).' lalu',
                 'rating' => $review->rating,
                 'comment' => $review->komentar ?? '',
+                'has_product' => $review->product !== null,
                 'product_title' => $review->product?->judul ?? '',
                 'product_price' => 'Rp '.number_format($review->product?->harga ?? 0, 0, ',', '.'),
                 'product_image' => $review->product?->gambar ?? 'images/default-avatar.png',

@@ -2,7 +2,9 @@
 
 use App\Models\Conversation;
 use App\Models\Message;
+use App\Models\Order;
 use App\Models\Product;
+use App\Models\Review;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -44,6 +46,54 @@ test('a participant opens the conversation with its messages', function () {
         ->assertSee('Ready mas?');
 
     expect($message->exists)->toBeTrue();
+});
+
+test('the chat shows the review action and no complete button once the offer is agreed', function () {
+    Order::factory()->create([
+        'conversation_id' => $this->conversation->id,
+        'seller_id' => $this->seller->id,
+        'buyer_id' => $this->buyer->id,
+        'product_id' => $this->product->id,
+        'status' => Order::STATUS_DISEPAKATI,
+    ]);
+
+    // Pembeli melihat tombol ulasan, bukan "Selesaikan Transaksi".
+    $this->actingAs($this->buyer)
+        ->get(route('chat.show', $this->conversation))
+        ->assertOk()
+        ->assertSee('Tinggalkan ulasan')
+        ->assertDontSee('Selesaikan Transaksi')
+        ->assertDontSee('Tandai Terjual');
+
+    // Penjual melihat "Tandai Terjual".
+    $this->actingAs($this->seller)
+        ->get(route('chat.show', $this->conversation))
+        ->assertOk()
+        ->assertSee('Tandai Terjual');
+});
+
+test('the review action turns into edit ulasan after the buyer reviews', function () {
+    $order = Order::factory()->create([
+        'conversation_id' => $this->conversation->id,
+        'seller_id' => $this->seller->id,
+        'buyer_id' => $this->buyer->id,
+        'product_id' => $this->product->id,
+        'status' => Order::STATUS_DISEPAKATI,
+    ]);
+
+    Review::create([
+        'order_id' => $order->id,
+        'product_id' => $this->product->id,
+        'reviewer_id' => $this->buyer->id,
+        'reviewee_id' => $this->seller->id,
+        'rating' => 5,
+    ]);
+
+    $this->actingAs($this->buyer)
+        ->get(route('chat.show', $this->conversation))
+        ->assertOk()
+        ->assertSee('Edit ulasan')
+        ->assertDontSee('Tinggalkan ulasan');
 });
 
 test('a buyer starts a conversation from a product page', function () {

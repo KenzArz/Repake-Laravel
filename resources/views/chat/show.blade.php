@@ -113,25 +113,48 @@
                 </div>
             </a>
 
-            {{-- Aksi transaksi: pembeli menandai selesai saat order disepakati --}}
+            {{-- Aksi transaksi setelah tawaran disepakati --}}
             @if (
                 $order !== null
-                && $order->status === \App\Models\Order::STATUS_DISEPAKATI
-                && (string) $conversation->buyer_id === (string) auth()->id()
+                && in_array($order->status, [\App\Models\Order::STATUS_DISEPAKATI, \App\Models\Order::STATUS_SELESAI], true)
             )
-                <form method="POST" action="{{ route('chat.complete', $conversation) }}" class="shrink-0 border-b border-neutral-200 bg-lime-50 px-3 py-2.5 sm:px-4"
-                      onsubmit="return confirm('Tandai transaksi ini selesai? Anda hanya bisa menyelesaikannya sekali.');">
-                    @csrf
-                    <div class="flex items-center justify-between gap-3">
-                        <p class="text-[12.5px] leading-tight text-neutral-700">
-                            Transaksi <strong>disepakati</strong>. Selesaikan untuk memberi ulasan pada produk ini.
-                        </p>
-                        <button type="submit"
-                                class="shrink-0 rounded-lg bg-lime-500 px-3.5 py-2 text-xs font-bold text-neutral-900 transition hover:bg-lime-600">
-                            Selesaikan Transaksi
-                        </button>
+                @php
+                    $isBuyer = (string) $conversation->buyer_id === (string) auth()->id();
+                    $product = $conversation->product;
+
+                    if ($isBuyer && $product !== null) {
+                        $reviewUrl = $product->detailUrl().'#ulasan-produk';
+                    } elseif (! $isBuyer) {
+                        $buyer = $conversation->buyer;
+                        $reviewUrl = $buyer->profileUrl();
+                        $sep = str_contains($reviewUrl, '?') ? '&' : '?';
+                        $reviewUrl .= $sep.'tab=ulasan&order='.$order->id;
+                    } else {
+                        $reviewUrl = null;
+                    }
+                @endphp
+
+                <div class="shrink-0 border-b border-neutral-200 bg-lime-50 px-3 py-2.5 sm:px-4">
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if ($reviewUrl)
+                            <a href="{{ $reviewUrl }}"
+                               class="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700">
+                                {{ $myReview ? 'Edit ulasan' : 'Tinggalkan ulasan' }}
+                            </a>
+                        @endif
+
+                        @if ($canMarkSold)
+                            <form method="POST" action="{{ route('chat.sold', $conversation) }}"
+                                  onsubmit="return confirm('Tandai produk ini terjual? Order lain untuk produk ini akan otomatis dibatalkan.');">
+                                @csrf
+                                <button type="submit"
+                                        class="inline-flex items-center justify-center rounded-lg border border-neutral-800 px-4 py-2 text-xs font-bold text-neutral-900 transition hover:bg-neutral-900 hover:text-white">
+                                    Tandai Terjual
+                                </button>
+                            </form>
+                        @endif
                     </div>
-                </form>
+                </div>
             @endif
 
             {{-- Area pesan --}}

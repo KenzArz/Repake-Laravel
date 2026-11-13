@@ -151,6 +151,14 @@ if (
     import("./product-detail").then((module) => module.initProductDetail());
 }
 
+/* Ulasan (detail produk & profil) — dimuat bila halaman punya elemen ulasan */
+if (
+    document.querySelector("[data-rating-input]") ||
+    document.querySelector("[data-review-menu-toggle]")
+) {
+    import("./product-review").then((module) => module.initProductReviews());
+}
+
 /* Chat — sidebar, ruang chat, dan badge pesan belum dibaca di navbar.
    Badge dibutuhkan di semua halaman, jadi modul ini dimuat untuk user login. */
 if (

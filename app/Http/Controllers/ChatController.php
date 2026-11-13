@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Notifications\NewMessage;
 use App\Notifications\OfferDecided;
 use App\Notifications\OfferReceived;
+use App\Notifications\OrderCancelled;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -62,6 +63,13 @@ class ChatController extends Controller
         $latestOffer = $conversation->latestOffer()->first();
         $order = $conversation->order()->first();
 
+        // Ulasan pengguna ini (jika ada) + apakah penjual masih bisa tandai terjual.
+        $myReview = $order?->reviewBy((string) Auth::id());
+        $canMarkSold = $order !== null
+            && $conversation->seller_id === (string) Auth::id()
+            && $order->status === Order::STATUS_DISEPAKATI
+            && $conversation->product?->status === Product::STATUS_DIJUAL;
+
         // Membuka ruang chat berarti pesan lawan sudah terbaca.
         $this->markMessagesRead($conversation);
 
@@ -71,6 +79,8 @@ class ChatController extends Controller
             'other' => $other,
             'latestOffer' => $latestOffer,
             'order' => $order,
+            'myReview' => $myReview,
+            'canMarkSold' => $canMarkSold,
             'sidebarConversations' => $this->conversationsFor((string) Auth::id()),
             'filter' => 'semua',
         ]);
@@ -360,29 +370,56 @@ class ChatController extends Controller
     }
 
     /**
-     * Pembeli menandai transaksi selesai → order siap untuk direview.
+     * Penjual menandai produk terjual.
      *
-     * Hanya pembeli yang boleh menyelesaikan transaksi. Setelah selesai,
-     * pembeli bisa memberikan ulasan untuk produk yang dibelinya.
+     * Finalisasi transaksi sepenuhnya di tangan penjual: produk menjadi
+     * "terjual" (tidak dihapus), order percakapan ini selesai, dan order
+     * "disepakati" lain untuk produk yang sama otomatis dibatalkan.
      */
-    public function completeOrder(Conversation $conversation): RedirectResponse
+    public function markSold(Conversation $conversation): RedirectResponse
     {
         $this->authorizeParticipant($conversation);
 
-        abort_if($conversation->buyer_id !== (string) Auth::id(), 403, 'Hanya pembeli yang bisa menyelesaikan transaksi.');
+        abort_if(
+            $conversation->seller_id !== (string) Auth::id(),
+            403,
+            'Hanya penjual yang bisa menandai produk terjual.',
+        );
+
+        $product = $conversation->product;
+
+        abort_if($product === null, 404, 'Produk tidak ditemukan.');
+        abort_if($product->user_id !== (string) Auth::id(), 403);
+        abort_if($product->status !== Product::STATUS_DIJUAL, 409, 'Produk ini sudah tidak dijual.');
 
         $order = $conversation->order()->first();
 
-        abort_if($order === null, 404, 'Belum ada transaksi pada percakapan ini.');
+        DB::transaction(function () use ($order, $product): void {
+            $product->update(['status' => Product::STATUS_TERJUAL]);
 
-        abort_if($order->status !== Order::STATUS_DISEPAKATI, 409, 'Transaksi ini sudah diproses.');
+            if ($order !== null) {
+                $order->update([
+                    'status' => Order::STATUS_SELESAI,
+                    'completed_at' => now(),
+                ]);
+            }
 
-        $order->update([
-            'status' => Order::STATUS_SELESAI,
-            'completed_at' => now(),
-        ]);
+            // Barang tunggal: order lain untuk produk yang sama tidak mungkin
+            // dilanjutkan, jadi dibatalkan dan pembelinya diberi tahu.
+            $others = Order::query()
+                ->where('product_id', $product->id)
+                ->whereKeyNot($order?->getKey() ?? 0)
+                ->where('status', Order::STATUS_DISEPAKATI)
+                ->get();
 
-        return back()->with('success', 'Transaksi ditandai selesai. Terima kasih sudah bertransaksi!');
+            foreach ($others as $other) {
+                $other->update(['status' => Order::STATUS_BATAL]);
+
+                $other->buyer?->notify(new OrderCancelled($product->judul, $other->conversation_id));
+            }
+        });
+
+        return back()->with('success', 'Produk ditandai terjual. Order lain untuk produk ini otomatis dibatalkan.');
     }
 
     /**

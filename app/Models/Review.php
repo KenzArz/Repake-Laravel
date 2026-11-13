@@ -14,7 +14,7 @@ class Review extends Model
         'order_id',
         'product_id',
         'reviewer_id',
-        'seller_id',
+        'reviewee_id',
         'rating',
         'komentar',
     ];
@@ -41,8 +41,11 @@ class Review extends Model
         return $this->belongsTo(User::class, 'reviewer_id');
     }
 
-    public function seller(): BelongsTo
+    /**
+     * Pihak yang diulas: penjual (ulasan produk) atau pembeli (ulasan orang).
+     */
+    public function reviewee(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'seller_id');
+        return $this->belongsTo(User::class, 'reviewee_id');
     }
 }

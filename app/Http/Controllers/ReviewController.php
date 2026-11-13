@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreReviewRequest;
 use App\Models\Order;
-use App\Models\Product;
 use App\Models\Review;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -12,69 +11,73 @@ use Illuminate\Support\Facades\Auth;
 class ReviewController extends Controller
 {
     /**
-     * Simpan ulasan pembeli untuk satu produk.
+     * Simpan ulasan untuk satu transaksi (dua arah).
      *
-     * Hanya pembeli dari order berstatus "selesai" yang boleh memberi ulasan,
-     * dan hanya sekali per order (unik di kolom order_id). Setiap ulasan
-     * melekat pada satu produk sehingga tidak tercampur dengan produk lain,
-     * namun tetap ikut menyumbang rating agregat penjual di halaman profil.
+     * - Pembeli -> Penjual: ulasan produk (product_id terisi), ikut rating
+     *   agregat penjual.
+     * - Penjual -> Pembeli: ulasan orang (product_id null), masuk ke rating
+     *   profil pembeli karena pembeli tidak punya produk untuk diulas.
+     *
+     * Ulasan dibuka sejak tawaran disepakati dan maksimal sekali per pihak
+     * per transaksi (unik di order_id + reviewer_id).
      */
-    public function store(StoreReviewRequest $request, Product $product): RedirectResponse
+    public function store(StoreReviewRequest $request, Order $order): RedirectResponse
     {
-        $buyerId = (string) Auth::id();
+        $userId = (string) Auth::id();
 
-        abort_if($product->user_id === $buyerId, 403, 'Anda tidak bisa mengulas produk sendiri.');
+        abort_unless(
+            $userId === $order->buyer_id || $userId === $order->seller_id,
+            403,
+            'Anda bukan pihak pada transaksi ini.',
+        );
 
-        // Produk yang ditangguhkan/draft dan penjual yang dibanned tetap 404
-        // terhadap tampilan publik, mengikuti aturan di detail produk.
-        if (! Auth::user()?->isAdmin() && $product->user?->is_banned) {
-            abort(404);
-        }
+        abort_unless(
+            in_array($order->status, [Order::STATUS_DISEPAKATI, Order::STATUS_SELESAI], true),
+            403,
+            'Transaksi ini belum dapat diulas.',
+        );
 
-        $order = Order::query()
-            ->where('product_id', $product->id)
-            ->where('buyer_id', $buyerId)
-            ->where('status', Order::STATUS_SELESAI)
-            ->latest('id')
-            ->first();
+        abort_if(
+            $order->reviews()->where('reviewer_id', $userId)->exists(),
+            409,
+            'Anda sudah pernah mengulas transaksi ini.',
+        );
 
-        abort_if($order === null, 403, 'Anda belum dapat mengulas produk ini.');
-
-        abort_if(Review::where('order_id', $order->id)->exists(), 409, 'Anda sudah pernah mengulas produk ini.');
+        $isBuyer = $userId === $order->buyer_id;
 
         Review::create([
             'order_id' => $order->id,
-            'product_id' => $product->id,
-            'reviewer_id' => $buyerId,
-            'seller_id' => $product->user_id,
+            'product_id' => $isBuyer ? $order->product_id : null,
+            'reviewer_id' => $userId,
+            'reviewee_id' => $isBuyer ? $order->seller_id : $order->buyer_id,
             'rating' => $request->integer('rating'),
-            'komentar' => $request->filled('komentar') ? trim($request->input('komentar')) : null,
+            'komentar' => filled($request->input('komentar')) ? trim((string) $request->input('komentar')) : null,
         ]);
 
         return back()->with('success', 'Ulasan Anda berhasil dikirim. Terima kasih!');
     }
 
     /**
-     * Perbarui ulasan milik pembeli itu sendiri.
+     * Perbarui ulasan milik pengguna itu sendiri.
      */
-    public function update(StoreReviewRequest $request, Product $product, Review $review): RedirectResponse
+    public function update(StoreReviewRequest $request, Review $review): RedirectResponse
     {
-        $this->authorizeOwner($product, $review);
+        $this->authorizeOwner($review);
 
         $review->update([
             'rating' => $request->integer('rating'),
-            'komentar' => $request->filled('komentar') ? trim($request->input('komentar')) : null,
+            'komentar' => filled($request->input('komentar')) ? trim((string) $request->input('komentar')) : null,
         ]);
 
         return back()->with('success', 'Ulasan Anda berhasil diperbarui.');
     }
 
     /**
-     * Hapus ulasan milik pembeli itu sendiri.
+     * Hapus ulasan milik pengguna itu sendiri.
      */
-    public function destroy(Product $product, Review $review): RedirectResponse
+    public function destroy(Review $review): RedirectResponse
     {
-        $this->authorizeOwner($product, $review);
+        $this->authorizeOwner($review);
 
         $review->delete();
 
@@ -82,12 +85,10 @@ class ReviewController extends Controller
     }
 
     /**
-     * Hanya pemilik ulasan yang boleh mengubah/menghapus, dan ulasan harus
-     * milik produk yang sedang dilihat.
+     * Hanya penulis ulasan yang boleh mengubah/menghapus.
      */
-    private function authorizeOwner(Product $product, Review $review): void
+    private function authorizeOwner(Review $review): void
     {
-        abort_if($review->product_id !== $product->id, 404);
         abort_if($review->reviewer_id !== (string) Auth::id(), 403, 'Anda tidak berhak mengelola ulasan ini.');
     }
 }

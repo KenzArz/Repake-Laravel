@@ -36,7 +36,7 @@ class StoreReviewRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'rating.required' => 'Silakan pilih rating bintang untuk produk ini.',
+            'rating.required' => 'Silakan pilih rating bintang untuk ulasan ini.',
             'rating.between' => 'Rating harus antara 1 sampai 5 bintang.',
             'komentar.max' => 'Ulasan maksimal 500 karakter.',
         ];

@@ -261,32 +261,38 @@
                 </div>
 
                 {{-- Bagian Bawah: Tombol Aksi Sejajar Bawah Gambar --}}
-                <div class="mt-6 space-y-2.5">
-                    <form method="POST" action="{{ Route::has('chat.store') ? route('chat.store') : '#' }}">
-                        @csrf
-                        <input type="hidden" name="product_id" value="{{ $product->id }}">
-                        <button type="submit"
-                            class="flex w-full items-center justify-center gap-2 rounded-lg bg-lime-400 py-3 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 sm:text-sm">
-                            <svg viewBox="0 0 24 24" class="size-4.5 fill-none stroke-current stroke-2">
-                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                            </svg>
-                            <span>Chat Penjual</span>
-                        </button>
-                    </form>
+                @if ($product->status === \App\Models\Product::STATUS_DIJUAL)
+                    <div class="mt-6 space-y-2.5">
+                        <form method="POST" action="{{ Route::has('chat.store') ? route('chat.store') : '#' }}">
+                            @csrf
+                            <input type="hidden" name="product_id" value="{{ $product->id }}">
+                            <button type="submit"
+                                class="flex w-full items-center justify-center gap-2 rounded-lg bg-lime-400 py-3 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 sm:text-sm">
+                                <svg viewBox="0 0 24 24" class="size-4.5 fill-none stroke-current stroke-2">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                </svg>
+                                <span>Chat Penjual</span>
+                            </button>
+                        </form>
 
-                    <form method="POST" action="{{ Route::has('chat.store') ? route('chat.store') : '#' }}"
-                        class="flex w-full items-center">
-                        @csrf
-                        <input type="hidden" name="product_id" value="{{ $product->id }}">
-                        <input type="number" name="offer_amount" id="tawar-input" value="{{ $product->harga }}" min="1"
-                            required placeholder="Masukkan tawaran harga..."
-                            class="h-10 flex-1 rounded-l-lg border border-r-0 border-neutral-300 bg-white px-3 text-xs font-medium text-neutral-800 outline-none focus:border-neutral-900 sm:text-sm">
-                        <button type="submit"
-                            class="h-10 whitespace-nowrap rounded-r-lg bg-lime-400 px-5 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 sm:text-sm">
-                            Tawar Harga
-                        </button>
-                    </form>
-                </div>
+                        <form method="POST" action="{{ Route::has('chat.store') ? route('chat.store') : '#' }}"
+                            class="flex w-full items-center">
+                            @csrf
+                            <input type="hidden" name="product_id" value="{{ $product->id }}">
+                            <input type="number" name="offer_amount" id="tawar-input" value="{{ $product->harga }}" min="1"
+                                required placeholder="Masukkan tawaran harga..."
+                                class="h-10 flex-1 rounded-l-lg border border-r-0 border-neutral-300 bg-white px-3 text-xs font-medium text-neutral-800 outline-none focus:border-neutral-900 sm:text-sm">
+                            <button type="submit"
+                                class="h-10 whitespace-nowrap rounded-r-lg bg-lime-400 px-5 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 sm:text-sm">
+                                Tawar Harga
+                            </button>
+                        </form>
+                    </div>
+                @else
+                    <div class="mt-6 rounded-lg border border-neutral-200 bg-neutral-50 py-3 text-center text-xs font-semibold text-neutral-500">
+                        Produk ini sudah tidak dijual.
+                    </div>
+                @endif
 
             </div>
 
@@ -304,7 +310,7 @@
         </section>
 
         {{-- Section: Ulasan Produk (review per produk) --}}
-        <section class="mt-14" data-product-reviews>
+        <section class="mt-14 scroll-mt-24" id="ulasan-produk" data-product-reviews>
             <div class="flex items-center justify-between">
                 <h2 class="text-lg font-bold text-neutral-900 sm:text-xl">Ulasan Produk</h2>
                 <span class="text-xs text-neutral-500">
@@ -313,9 +319,9 @@
                 </span>
             </div>
 
-            {{-- Form ulasan — hanya pembeli dari order selesai yang belum mengulas --}}
+            {{-- Form ulasan — pembeli dengan order disepakati/selesai yang belum mengulas --}}
             @if ($canReview)
-                <form method="POST" action="{{ route('reviews.store', $product) }}"
+                <form method="POST" action="{{ route('reviews.store', $viewerOrder) }}"
                       data-review-form
                       class="mt-4 rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xs">
                     @csrf
@@ -391,7 +397,7 @@
                                                 class="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-neutral-700 transition hover:bg-neutral-100">
                                             Edit ulasan
                                         </button>
-                                        <form method="POST" action="{{ route('reviews.destroy', [$product, $review]) }}"
+                                        <form method="POST" action="{{ route('reviews.destroy', $review) }}"
                                               onsubmit="return confirm('Hapus ulasan Anda?');">
                                             @csrf
                                             @method('DELETE')
@@ -421,7 +427,7 @@
 
                         {{-- Panel edit (tersembunyi sampai menu Edit diklik) --}}
                         @if ($viewerReview !== null && $review->id === $viewerReview->id)
-                            <form method="POST" action="{{ route('reviews.update', [$product, $review]) }}"
+                            <form method="POST" action="{{ route('reviews.update', $review) }}"
                                   hidden
                                   data-edit-review-form
                                   class="mt-4 rounded-xl border border-lime-200 bg-lime-50 p-4">

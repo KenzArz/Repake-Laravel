@@ -12,17 +12,17 @@ beforeEach(function () {
     $this->seller = User::factory()->create();
     $this->buyer = User::factory()->create();
     $this->product = Product::factory()->create(['user_id' => $this->seller->id]);
-});
-
-test('a buyer with a completed order can review that product', function () {
-    $order = Order::factory()->selesai()->create([
+    $this->order = Order::factory()->create([
         'seller_id' => $this->seller->id,
         'buyer_id' => $this->buyer->id,
         'product_id' => $this->product->id,
+        'status' => Order::STATUS_DISEPAKATI,
     ]);
+});
 
+test('a buyer can review the seller for the product once the offer is agreed', function () {
     $this->actingAs($this->buyer)
-        ->post(route('reviews.store', $this->product), [
+        ->post(route('reviews.store', $this->order), [
             'rating' => 5,
             'komentar' => 'Barang bagus, penjual ramah.',
         ])
@@ -30,87 +30,91 @@ test('a buyer with a completed order can review that product', function () {
         ->assertSessionHas('success');
 
     $review = Review::sole();
-    expect($review->order_id)->toBe($order->id)
+    expect($review->order_id)->toBe($this->order->id)
         ->and($review->product_id)->toBe($this->product->id)
         ->and($review->reviewer_id)->toBe($this->buyer->id)
-        ->and($review->seller_id)->toBe($this->seller->id)
+        ->and($review->reviewee_id)->toBe($this->seller->id)
         ->and($review->rating)->toBe(5)
         ->and($review->komentar)->toBe('Barang bagus, penjual ramah.');
 });
 
-test('a buyer without a completed order cannot review', function () {
-    // Order ada tapi belum selesai.
-    Order::factory()->create([
-        'seller_id' => $this->seller->id,
-        'buyer_id' => $this->buyer->id,
-        'product_id' => $this->product->id,
-    ]);
+test('a seller can review the buyer without a product', function () {
+    $this->actingAs($this->seller)
+        ->post(route('reviews.store', $this->order), [
+            'rating' => 4,
+            'komentar' => 'Pembeli responsif dan ramah.',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
 
-    $this->actingAs($this->buyer)
-        ->post(route('reviews.store', $this->product), ['rating' => 4])
-        ->assertForbidden();
-
-    expect(Review::count())->toBe(0);
+    $review = Review::sole();
+    expect($review->product_id)->toBeNull()
+        ->and($review->reviewer_id)->toBe($this->seller->id)
+        ->and($review->reviewee_id)->toBe($this->buyer->id)
+        ->and($review->rating)->toBe(4);
 });
 
-test('a buyer cannot review a product they did not buy', function () {
+test('both parties can review the same order', function () {
     $this->actingAs($this->buyer)
-        ->post(route('reviews.store', $this->product), ['rating' => 4])
-        ->assertForbidden();
-
-    expect(Review::count())->toBe(0);
-});
-
-test('the product owner cannot review their own product', function () {
-    Order::factory()->selesai()->create([
-        'seller_id' => $this->seller->id,
-        'buyer_id' => $this->buyer->id,
-        'product_id' => $this->product->id,
-    ]);
+        ->post(route('reviews.store', $this->order), ['rating' => 5]);
 
     $this->actingAs($this->seller)
-        ->post(route('reviews.store', $this->product), ['rating' => 5])
+        ->post(route('reviews.store', $this->order), ['rating' => 4]);
+
+    expect(Review::count())->toBe(2)
+        ->and(Review::where('reviewee_id', $this->seller->id)->count())->toBe(1)
+        ->and(Review::where('reviewee_id', $this->buyer->id)->count())->toBe(1);
+});
+
+test('a non-participant cannot review the order', function () {
+    $outsider = User::factory()->create();
+
+    $this->actingAs($outsider)
+        ->post(route('reviews.store', $this->order), ['rating' => 4])
         ->assertForbidden();
 
     expect(Review::count())->toBe(0);
 });
 
-test('a buyer can only review a product once per order', function () {
-    $order = Order::factory()->selesai()->create([
-        'seller_id' => $this->seller->id,
-        'buyer_id' => $this->buyer->id,
-        'product_id' => $this->product->id,
-    ]);
+test('a cancelled order cannot be reviewed', function () {
+    $this->order->update(['status' => Order::STATUS_BATAL]);
+
+    $this->actingAs($this->buyer)
+        ->post(route('reviews.store', $this->order), ['rating' => 4])
+        ->assertForbidden();
+
+    expect(Review::count())->toBe(0);
+});
+
+test('a user can only review the same order once but the counterpart still can', function () {
     Review::create([
-        'order_id' => $order->id,
+        'order_id' => $this->order->id,
         'product_id' => $this->product->id,
         'reviewer_id' => $this->buyer->id,
-        'seller_id' => $this->seller->id,
+        'reviewee_id' => $this->seller->id,
         'rating' => 3,
         'komentar' => 'Kurang bagus.',
     ]);
 
     $this->actingAs($this->buyer)
-        ->post(route('reviews.store', $this->product), ['rating' => 5])
+        ->post(route('reviews.store', $this->order), ['rating' => 5])
         ->assertStatus(409);
 
-    expect(Review::count())->toBe(1);
+    $this->actingAs($this->seller)
+        ->post(route('reviews.store', $this->order), ['rating' => 5])
+        ->assertRedirect();
+
+    expect(Review::count())->toBe(2);
 });
 
 test('rating and komentar are validated', function () {
-    Order::factory()->selesai()->create([
-        'seller_id' => $this->seller->id,
-        'buyer_id' => $this->buyer->id,
-        'product_id' => $this->product->id,
-    ]);
-
-    $this->actingAs($this->buyer)->post(route('reviews.store', $this->product), [])
+    $this->actingAs($this->buyer)->post(route('reviews.store', $this->order), [])
         ->assertSessionHasErrors(['rating']);
 
-    $this->actingAs($this->buyer)->post(route('reviews.store', $this->product), ['rating' => 9])
+    $this->actingAs($this->buyer)->post(route('reviews.store', $this->order), ['rating' => 9])
         ->assertSessionHasErrors(['rating']);
 
-    $this->actingAs($this->buyer)->post(route('reviews.store', $this->product), [
+    $this->actingAs($this->buyer)->post(route('reviews.store', $this->order), [
         'rating' => 3,
         'komentar' => str_repeat('a', 501),
     ])->assertSessionHasErrors(['komentar']);
@@ -119,27 +123,22 @@ test('rating and komentar are validated', function () {
 });
 
 test('only the review author can update their review', function () {
-    $order = Order::factory()->selesai()->create([
-        'seller_id' => $this->seller->id,
-        'buyer_id' => $this->buyer->id,
-        'product_id' => $this->product->id,
-    ]);
     $review = Review::create([
-        'order_id' => $order->id,
+        'order_id' => $this->order->id,
         'product_id' => $this->product->id,
         'reviewer_id' => $this->buyer->id,
-        'seller_id' => $this->seller->id,
+        'reviewee_id' => $this->seller->id,
         'rating' => 3,
         'komentar' => 'Awalnya kurang puas.',
     ]);
 
-    $otherBuyer = User::factory()->create();
-    $this->actingAs($otherBuyer)
-        ->patch(route('reviews.update', [$this->product, $review]), ['rating' => 5])
+    $outsider = User::factory()->create();
+    $this->actingAs($outsider)
+        ->patch(route('reviews.update', $review), ['rating' => 5])
         ->assertForbidden();
 
     $this->actingAs($this->buyer)
-        ->patch(route('reviews.update', [$this->product, $review]), [
+        ->patch(route('reviews.update', $review), [
             'rating' => 5,
             'komentar' => 'Ternyata puas setelah dipakai.',
         ])
@@ -151,113 +150,126 @@ test('only the review author can update their review', function () {
 });
 
 test('only the review author can delete their review', function () {
-    $order = Order::factory()->selesai()->create([
-        'seller_id' => $this->seller->id,
-        'buyer_id' => $this->buyer->id,
-        'product_id' => $this->product->id,
-    ]);
     $review = Review::create([
-        'order_id' => $order->id,
+        'order_id' => $this->order->id,
         'product_id' => $this->product->id,
         'reviewer_id' => $this->buyer->id,
-        'seller_id' => $this->seller->id,
+        'reviewee_id' => $this->seller->id,
         'rating' => 4,
         'komentar' => 'Boleh hapus.',
     ]);
 
-    $otherBuyer = User::factory()->create();
-    $this->actingAs($otherBuyer)->delete(route('reviews.destroy', [$this->product, $review]))
-        ->assertForbidden();
+    $outsider = User::factory()->create();
+    $this->actingAs($outsider)->delete(route('reviews.destroy', $review))->assertForbidden();
     expect(Review::count())->toBe(1);
 
-    $this->actingAs($this->buyer)->delete(route('reviews.destroy', [$this->product, $review]))
-        ->assertRedirect();
+    $this->actingAs($this->buyer)->delete(route('reviews.destroy', $review))->assertRedirect();
     expect(Review::count())->toBe(0);
 });
 
-test('product reviews are scoped to that product only', function () {
+test('a product review is scoped to its product while a user review is not', function () {
     $otherProduct = Product::factory()->create(['user_id' => $this->seller->id]);
 
-    $order = Order::factory()->selesai()->create([
-        'seller_id' => $this->seller->id,
-        'buyer_id' => $this->buyer->id,
-        'product_id' => $this->product->id,
-    ]);
     Review::create([
-        'order_id' => $order->id,
+        'order_id' => $this->order->id,
         'product_id' => $this->product->id,
         'reviewer_id' => $this->buyer->id,
-        'seller_id' => $this->seller->id,
+        'reviewee_id' => $this->seller->id,
         'rating' => 5,
-        'komentar' => 'Ulasan unik untuk produk ini.',
+        'komentar' => 'ULASAN PRODUK INI.',
+    ]);
+    Review::create([
+        'order_id' => $this->order->id,
+        'product_id' => null,
+        'reviewer_id' => $this->seller->id,
+        'reviewee_id' => $this->buyer->id,
+        'rating' => 4,
+        'komentar' => 'ULASAN ORANG INI.',
     ]);
 
     $this->get($this->product->detailUrl())
         ->assertOk()
-        ->assertSee('Ulasan unik untuk produk ini.');
+        ->assertSee('ULASAN PRODUK INI.')
+        ->assertDontSee('ULASAN ORANG INI.');
 
-    // Produk lain tidak menampilkan review produk pertama.
+    // Produk lain tidak menampilkan ulasan produk pertama.
     $this->get($otherProduct->detailUrl())
         ->assertOk()
-        ->assertDontSee('Ulasan unik untuk produk ini.');
-
-    expect(Review::count())->toBe(1);
+        ->assertDontSee('ULASAN PRODUK INI.');
 });
 
-test('product detail page renders the review form only for an eligible buyer', function () {
+test('product detail page renders the review form for an agreed order', function () {
     $this->get($this->product->detailUrl())->assertOk()
         ->assertSee('Ulasan Produk')
         ->assertDontSee('Bagaimana produk ini menurut Anda?');
 
-    // Pembeli berkunjung tapi belum selesai transaksi → form sembunyi.
-    $this->actingAs($this->buyer)->get($this->product->detailUrl())
-        ->assertOk()
-        ->assertDontSee('Bagaimana produk ini menurut Anda?');
-
-    // Pembeli dengan order selesai → form tampil.
-    Order::factory()->selesai()->create([
-        'seller_id' => $this->seller->id,
-        'buyer_id' => $this->buyer->id,
-        'product_id' => $this->product->id,
-    ]);
-
+    // Pembeli dengan order disepakati → form tampil.
     $this->actingAs($this->buyer)->get($this->product->detailUrl())
         ->assertOk()
         ->assertSee('Bagaimana produk ini menurut Anda?');
 });
 
-test('a product review contributes to the seller aggregate rating', function () {
-    $orderOne = Order::factory()->selesai()->create([
-        'seller_id' => $this->seller->id,
-        'buyer_id' => $this->buyer->id,
-        'product_id' => $this->product->id,
-    ]);
+test('seller sees a review form on the buyer profile after an agreed order', function () {
+    $url = $this->buyer->profileUrl();
+    $url .= (str_contains($url, '?') ? '&' : '?').'tab=ulasan';
+
+    $this->actingAs($this->seller)
+        ->get($url)
+        ->assertOk()
+        ->assertSee('Beri ulasan untuk');
+
+    // Setelah mengulas, form hilang.
     Review::create([
-        'order_id' => $orderOne->id,
-        'product_id' => $this->product->id,
-        'reviewer_id' => $this->buyer->id,
-        'seller_id' => $this->seller->id,
+        'order_id' => $this->order->id,
+        'product_id' => null,
+        'reviewer_id' => $this->seller->id,
+        'reviewee_id' => $this->buyer->id,
         'rating' => 5,
-        'komentar' => 'Luar biasa.',
+        'komentar' => 'Pembeli oke.',
     ]);
 
-    $secondBuyer = User::factory()->create();
-    $orderTwo = Order::factory()->selesai()->create([
+    $this->actingAs($this->seller)
+        ->get($url)
+        ->assertOk()
+        ->assertDontSee('Beri ulasan untuk')
+        ->assertSee('Pembeli oke.');
+});
+
+test('profile rating is the combined average of every review received', function () {
+    // U sebagai penjual menerima ulasan produk (5).
+    $buyerB = User::factory()->create();
+    $productU = Product::factory()->create(['user_id' => $this->seller->id]);
+    $orderAsSeller = Order::factory()->selesai()->create([
         'seller_id' => $this->seller->id,
-        'buyer_id' => $secondBuyer->id,
-        'product_id' => $this->product->id,
+        'buyer_id' => $buyerB->id,
+        'product_id' => $productU->id,
     ]);
     Review::create([
-        'order_id' => $orderTwo->id,
-        'product_id' => $this->product->id,
-        'reviewer_id' => $secondBuyer->id,
-        'seller_id' => $this->seller->id,
-        'rating' => 3,
-        'komentar' => 'Kurang memuaskan.',
+        'order_id' => $orderAsSeller->id,
+        'product_id' => $productU->id,
+        'reviewer_id' => $buyerB->id,
+        'reviewee_id' => $this->seller->id,
+        'rating' => 5,
     ]);
 
-    // Rerata (5 + 3) / 2 = 4.0 → tampil pada rating penjual di detail produk.
-    $this->get($this->product->detailUrl())
+    // U juga sebagai pembeli menerima ulasan orang (3) dari penjual lain.
+    $otherSeller = User::factory()->create();
+    $productOther = Product::factory()->create(['user_id' => $otherSeller->id]);
+    $orderAsBuyer = Order::factory()->selesai()->create([
+        'seller_id' => $otherSeller->id,
+        'buyer_id' => $this->seller->id,
+        'product_id' => $productOther->id,
+    ]);
+    Review::create([
+        'order_id' => $orderAsBuyer->id,
+        'product_id' => null,
+        'reviewer_id' => $otherSeller->id,
+        'reviewee_id' => $this->seller->id,
+        'rating' => 3,
+    ]);
+
+    // (5 + 3) / 2 = 4.0 pada profil.
+    $this->get($this->seller->profileUrl())
         ->assertOk()
         ->assertSee('4.0');
 });

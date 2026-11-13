@@ -122,7 +122,7 @@ test('seller profile shows reviews written by buyers', function () {
         'order_id' => $order->id,
         'product_id' => $product->id,
         'reviewer_id' => $this->viewer->id,
-        'seller_id' => $this->seller->id,
+        'reviewee_id' => $this->seller->id,
         'rating' => 5,
         'komentar' => 'Penjual fast respon dan barang sesuai deskripsi',
     ]);

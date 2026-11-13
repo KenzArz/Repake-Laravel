@@ -19,7 +19,7 @@ class ReviewFactory extends Factory
             'order_id' => $order->id,
             'product_id' => $order->product_id,
             'reviewer_id' => $order->buyer_id,
-            'seller_id' => $order->seller_id,
+            'reviewee_id' => $order->seller_id,
             'rating' => fake()->numberBetween(1, 5),
             'komentar' => fake()->sentence(),
         ];
