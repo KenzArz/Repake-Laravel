@@ -26,8 +26,8 @@ class AppServiceProvider extends ServiceProvider
 
         //for ngrok or tunneling, force https scheme for all generated URLs
         //nonactive in local dev, but needed for production behind reverse proxy
-        if (request()->hasHeader('x-forwarded-proto') || app()->environment('local')) {
-            URL::forceScheme('https');
-        }
+        // if (request()->hasHeader('x-forwarded-proto') || app()->environment('local')) {
+        //     URL::forceScheme('https');
+        // }
     }
 }
