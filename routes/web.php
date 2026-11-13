@@ -13,6 +13,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductDetailController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReviewController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
@@ -39,6 +40,13 @@ Route::middleware(['auth', 'banned'])->group(function () {
     Route::post('/products/{id}/report', [ProductDetailController::class, 'report'])
         ->middleware(['auth', 'banned'])
         ->name('products.report');
+});
+
+// Ulasan (wajib login) — dua arah, terikat transaksi/order
+Route::middleware(['auth', 'banned'])->group(function () {
+    Route::post('/orders/{order}/ulasan', [ReviewController::class, 'store'])->name('reviews.store');
+    Route::patch('/ulasan/{review}', [ReviewController::class, 'update'])->name('reviews.update');
+    Route::delete('/ulasan/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
 });
 
 // Favorit (wajib login)
@@ -96,6 +104,8 @@ Route::middleware(['auth', 'banned'])->group(function () {
         ->name('chat.show');
     Route::post('/chat/{conversation}/read', [ChatController::class, 'markRead'])
         ->name('chat.read');
+    Route::post('/chat/{conversation}/sold', [ChatController::class, 'markSold'])
+        ->name('chat.sold');
     Route::get('/chat/{conversation}/messages', [ChatController::class, 'poll'])
         ->name('chat.messages.poll');
     Route::post('/chat/{conversation}/messages', [ChatController::class, 'sendMessage'])

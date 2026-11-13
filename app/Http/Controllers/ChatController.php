@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Notifications\NewMessage;
 use App\Notifications\OfferDecided;
 use App\Notifications\OfferReceived;
+use App\Notifications\OrderCancelled;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -60,6 +61,14 @@ class ChatController extends Controller
 
         $other = $conversation->counterpartFor((string) Auth::id());
         $latestOffer = $conversation->latestOffer()->first();
+        $order = $conversation->order()->first();
+
+        // Ulasan pengguna ini (jika ada) + apakah penjual masih bisa tandai terjual.
+        $myReview = $order?->reviewBy((string) Auth::id());
+        $canMarkSold = $order !== null
+            && $conversation->seller_id === (string) Auth::id()
+            && $order->status === Order::STATUS_DISEPAKATI
+            && $conversation->product?->status === Product::STATUS_DIJUAL;
 
         // Membuka ruang chat berarti pesan lawan sudah terbaca.
         $this->markMessagesRead($conversation);
@@ -69,6 +78,9 @@ class ChatController extends Controller
             'messages' => $messages,
             'other' => $other,
             'latestOffer' => $latestOffer,
+            'order' => $order,
+            'myReview' => $myReview,
+            'canMarkSold' => $canMarkSold,
             'sidebarConversations' => $this->conversationsFor((string) Auth::id()),
             'filter' => 'semua',
         ]);
@@ -339,6 +351,7 @@ class ChatController extends Controller
             $locked->update(['offer_status' => Message::OFFER_ACCEPTED]);
 
             Order::create([
+                'conversation_id' => $conversation->id,
                 'buyer_id' => $conversation->buyer_id,
                 'seller_id' => $conversation->seller_id,
                 'product_id' => $conversation->product_id,
@@ -354,6 +367,59 @@ class ChatController extends Controller
         $system = $this->systemMessage($conversation, 'Penawaran disetujui');
 
         return $this->offerResponse($conversation, $message, $system);
+    }
+
+    /**
+     * Penjual menandai produk terjual.
+     *
+     * Finalisasi transaksi sepenuhnya di tangan penjual: produk menjadi
+     * "terjual" (tidak dihapus), order percakapan ini selesai, dan order
+     * "disepakati" lain untuk produk yang sama otomatis dibatalkan.
+     */
+    public function markSold(Conversation $conversation): RedirectResponse
+    {
+        $this->authorizeParticipant($conversation);
+
+        abort_if(
+            $conversation->seller_id !== (string) Auth::id(),
+            403,
+            'Hanya penjual yang bisa menandai produk terjual.',
+        );
+
+        $product = $conversation->product;
+
+        abort_if($product === null, 404, 'Produk tidak ditemukan.');
+        abort_if($product->user_id !== (string) Auth::id(), 403);
+        abort_if($product->status !== Product::STATUS_DIJUAL, 409, 'Produk ini sudah tidak dijual.');
+
+        $order = $conversation->order()->first();
+
+        DB::transaction(function () use ($order, $product): void {
+            $product->update(['status' => Product::STATUS_TERJUAL]);
+
+            if ($order !== null) {
+                $order->update([
+                    'status' => Order::STATUS_SELESAI,
+                    'completed_at' => now(),
+                ]);
+            }
+
+            // Barang tunggal: order lain untuk produk yang sama tidak mungkin
+            // dilanjutkan, jadi dibatalkan dan pembelinya diberi tahu.
+            $others = Order::query()
+                ->where('product_id', $product->id)
+                ->whereKeyNot($order?->getKey() ?? 0)
+                ->where('status', Order::STATUS_DISEPAKATI)
+                ->get();
+
+            foreach ($others as $other) {
+                $other->update(['status' => Order::STATUS_BATAL]);
+
+                $other->buyer?->notify(new OrderCancelled($product->judul, $other->conversation_id));
+            }
+        });
+
+        return back()->with('success', 'Produk ditandai terjual. Order lain untuk produk ini otomatis dibatalkan.');
     }
 
     /**

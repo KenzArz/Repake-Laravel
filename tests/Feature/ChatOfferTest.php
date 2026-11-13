@@ -170,7 +170,101 @@ test('the seller accepts an offer and an order is created', function () {
         ->and($order->seller_id)->toBe($this->seller->id)
         ->and($order->product_id)->toBe($this->product->id)
         ->and($order->harga_final)->toBe(150000)
-        ->and($order->status)->toBe(Order::STATUS_DISEPAKATI);
+        ->and($order->status)->toBe(Order::STATUS_DISEPAKATI)
+        ->and($order->conversation_id)->toBe($this->conversation->id);
+});
+
+test('the seller marks the product as terjual and completes the order', function () {
+    $order = Order::factory()->create([
+        'conversation_id' => $this->conversation->id,
+        'seller_id' => $this->seller->id,
+        'buyer_id' => $this->buyer->id,
+        'product_id' => $this->product->id,
+        'status' => Order::STATUS_DISEPAKATI,
+    ]);
+
+    $this->actingAs($this->seller)
+        ->post(route('chat.sold', $this->conversation))
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    expect($this->product->refresh()->status)->toBe(Product::STATUS_TERJUAL)
+        ->and($order->refresh()->status)->toBe(Order::STATUS_SELESAI)
+        ->and($order->completed_at)->not->toBeNull();
+});
+
+test('only the seller can mark the product as terjual', function () {
+    Order::factory()->create([
+        'conversation_id' => $this->conversation->id,
+        'seller_id' => $this->seller->id,
+        'buyer_id' => $this->buyer->id,
+        'product_id' => $this->product->id,
+        'status' => Order::STATUS_DISEPAKATI,
+    ]);
+
+    $this->actingAs($this->buyer)
+        ->post(route('chat.sold', $this->conversation))
+        ->assertForbidden();
+
+    expect($this->product->refresh()->status)->toBe(Product::STATUS_DIJUAL);
+});
+
+test('another agreed order for the same product is cancelled when marked sold', function () {
+    $otherBuyer = User::factory()->create();
+    $otherConversation = Conversation::factory()->create([
+        'buyer_id' => $otherBuyer->id,
+        'seller_id' => $this->seller->id,
+        'product_id' => $this->product->id,
+    ]);
+
+    $order = Order::factory()->create([
+        'conversation_id' => $this->conversation->id,
+        'seller_id' => $this->seller->id,
+        'buyer_id' => $this->buyer->id,
+        'product_id' => $this->product->id,
+        'status' => Order::STATUS_DISEPAKATI,
+    ]);
+
+    $otherOrder = Order::factory()->create([
+        'conversation_id' => $otherConversation->id,
+        'seller_id' => $this->seller->id,
+        'buyer_id' => $otherBuyer->id,
+        'product_id' => $this->product->id,
+        'status' => Order::STATUS_DISEPAKATI,
+    ]);
+
+    $this->actingAs($this->seller)
+        ->post(route('chat.sold', $this->conversation))
+        ->assertRedirect();
+
+    expect($order->refresh()->status)->toBe(Order::STATUS_SELESAI)
+        ->and($otherOrder->refresh()->status)->toBe(Order::STATUS_BATAL)
+        ->and($otherBuyer->notifications()->count())->toBe(1);
+});
+
+test('a conversation without an order cannot be marked sold', function () {
+    $this->actingAs($this->seller)
+        ->post(route('chat.sold', $this->conversation))
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    expect($this->product->refresh()->status)->toBe(Product::STATUS_TERJUAL);
+});
+
+test('an already sold product cannot be marked sold again', function () {
+    $this->product->update(['status' => Product::STATUS_TERJUAL]);
+
+    Order::factory()->create([
+        'conversation_id' => $this->conversation->id,
+        'seller_id' => $this->seller->id,
+        'buyer_id' => $this->buyer->id,
+        'product_id' => $this->product->id,
+        'status' => Order::STATUS_DISEPAKATI,
+    ]);
+
+    $this->actingAs($this->seller)
+        ->post(route('chat.sold', $this->conversation))
+        ->assertStatus(409);
 });
 
 test('the buyer cannot decide on their own offer', function () {

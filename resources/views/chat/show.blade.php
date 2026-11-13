@@ -113,6 +113,50 @@
                 </div>
             </a>
 
+            {{-- Aksi transaksi setelah tawaran disepakati --}}
+            @if (
+                $order !== null
+                && in_array($order->status, [\App\Models\Order::STATUS_DISEPAKATI, \App\Models\Order::STATUS_SELESAI], true)
+            )
+                @php
+                    $isBuyer = (string) $conversation->buyer_id === (string) auth()->id();
+                    $product = $conversation->product;
+
+                    if ($isBuyer && $product !== null) {
+                        $reviewUrl = $product->detailUrl().'#ulasan-produk';
+                    } elseif (! $isBuyer) {
+                        $buyer = $conversation->buyer;
+                        $reviewUrl = $buyer->profileUrl();
+                        $sep = str_contains($reviewUrl, '?') ? '&' : '?';
+                        $reviewUrl .= $sep.'tab=ulasan&order='.$order->id;
+                    } else {
+                        $reviewUrl = null;
+                    }
+                @endphp
+
+                <div class="shrink-0 border-b border-neutral-200 bg-lime-50 px-3 py-2.5 sm:px-4">
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if ($reviewUrl)
+                            <a href="{{ $reviewUrl }}"
+                               class="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700">
+                                {{ $myReview ? 'Edit ulasan' : 'Tinggalkan ulasan' }}
+                            </a>
+                        @endif
+
+                        @if ($canMarkSold)
+                            <form method="POST" action="{{ route('chat.sold', $conversation) }}"
+                                  onsubmit="return confirm('Tandai produk ini terjual? Order lain untuk produk ini akan otomatis dibatalkan.');">
+                                @csrf
+                                <button type="submit"
+                                        class="inline-flex items-center justify-center rounded-lg border border-neutral-800 px-4 py-2 text-xs font-bold text-neutral-900 transition hover:bg-neutral-900 hover:text-white">
+                                    Tandai Terjual
+                                </button>
+                            </form>
+                        @endif
+                    </div>
+                </div>
+            @endif
+
             {{-- Area pesan --}}
             <div id="chat-messages"
                  class="flex flex-1 flex-col gap-2 overflow-y-auto px-3 py-4 sm:px-4"

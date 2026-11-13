@@ -216,7 +216,7 @@ test('user can view ulasan tab with buyer reviews from the database', function (
         'order_id' => $order->id,
         'product_id' => $product->id,
         'reviewer_id' => $reviewer->id,
-        'seller_id' => $this->profileUser->id,
+        'reviewee_id' => $this->profileUser->id,
         'rating' => 5,
         'komentar' => 'Penjual fast respon, bass nya mendut mendut, puas dipake seharian',
     ]);

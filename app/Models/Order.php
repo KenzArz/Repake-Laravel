@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Order extends Model
 {
@@ -20,6 +20,7 @@ class Order extends Model
     public const STATUS_BATAL = 'batal';
 
     protected $fillable = [
+        'conversation_id',
         'buyer_id',
         'seller_id',
         'product_id',
@@ -34,6 +35,11 @@ class Order extends Model
             'harga_final' => 'integer',
             'completed_at' => 'datetime',
         ];
+    }
+
+    public function conversation(): BelongsTo
+    {
+        return $this->belongsTo(Conversation::class);
     }
 
     public function buyer(): BelongsTo
@@ -51,8 +57,19 @@ class Order extends Model
         return $this->belongsTo(Product::class);
     }
 
-    public function review(): HasOne
+    /**
+     * Ulasan pada transaksi ini (maksimal satu dari pembeli & satu dari penjual).
+     */
+    public function reviews(): HasMany
     {
-        return $this->hasOne(Review::class);
+        return $this->hasMany(Review::class);
+    }
+
+    /**
+     * Ulasan yang ditulis user tertentu pada transaksi ini.
+     */
+    public function reviewBy(string $userId): ?Review
+    {
+        return $this->reviews()->where('reviewer_id', $userId)->first();
     }
 }

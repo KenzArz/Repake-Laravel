@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreReportRequest;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\Report;
 use App\Models\Review;
@@ -41,12 +42,19 @@ class ProductDetailController extends Controller
         $isOwner = $viewer !== null && $viewer->id === $product->user_id;
         $isAdmin = $viewer?->isAdmin() ?? false;
 
-        // Produk yang disuspend/draft dan produk milik penjual yang dibanned
-        // tidak boleh diakses publik lewat URL langsung.
-        $hiddenStatuses = [Product::STATUS_DRAFT, Product::STATUS_DITANGGUIHKAN];
+        // Produk yang disuspend/draft/terjual dan produk milik penjual yang
+        // dibanned tidak boleh diakses publik lewat URL langsung. Pemilik,
+        // admin, dan pembeli yang punya transaksi pada produk ini tetap bisa
+        // membukanya (mis. untuk mengulas produk yang sudah terjual).
+        $hasOrder = $viewer !== null && Order::query()
+            ->where('product_id', $product->id)
+            ->where('buyer_id', $viewer->id)
+            ->exists();
 
-        abort_if(! $isAdmin && ! $isOwner && in_array($product->status, $hiddenStatuses, true), 404);
-        abort_if(! $isAdmin && $product->user?->is_banned, 404);
+        $hiddenStatuses = [Product::STATUS_DRAFT, Product::STATUS_DITANGGUIHKAN, Product::STATUS_TERJUAL];
+
+        abort_if(! $isAdmin && ! $isOwner && ! $hasOrder && in_array($product->status, $hiddenStatuses, true), 404);
+        abort_if(! $isAdmin && ! $hasOrder && $product->user?->is_banned, 404);
 
         // Satu produk = satu URL kanonis. Link tanpa UUID atau dengan slug
         // usang dialihkan permanen agar tidak ada konten duplikat.
@@ -63,8 +71,8 @@ class ProductDetailController extends Controller
             ->take(4)
             ->get();
 
-        // Statistik ulasan penjual dari database
-        $stats = Review::where('seller_id', $product->user_id)
+        // Statistik ulasan penjual dari database (semua ulasan yang diterimanya)
+        $stats = Review::where('reviewee_id', $product->user_id)
             ->selectRaw('COUNT(*) as total, COALESCE(AVG(rating), 0) as avg_rating')
             ->first();
 
@@ -78,10 +86,40 @@ class ProductDetailController extends Controller
             'joined' => 'Bergabung 6 bulan lalu',
         ];
 
+        // Ulasan khusus produk ini (review per produk, tidak tercampur produk lain).
+        $productReviews = Review::with(['reviewer'])
+            ->where('product_id', $product->id)
+            ->latest()
+            ->get();
+
+        // Order pembeli ini pada produk ini yang masih boleh diulas.
+        $viewerOrder = $viewer === null
+            ? null
+            : Order::query()
+                ->where('product_id', $product->id)
+                ->where('buyer_id', $viewer->id)
+                ->whereIn('status', [Order::STATUS_DISEPAKATI, Order::STATUS_SELESAI])
+                ->latest('id')
+                ->first();
+
+        // Ulasan milik pengunjung (bila sudah pernah mengulas produk ini).
+        $viewerReview = $viewer !== null
+            ? $productReviews->first(fn (Review $review): bool => $review->reviewer_id === $viewer->id)
+            : null;
+
+        $canReview = $viewer !== null
+            && ! $isOwner
+            && $viewerReview === null
+            && $viewerOrder !== null;
+
         return view('products.show', [
             'product' => $product,
             'seller' => $seller,
             'similarProducts' => $similarProducts,
+            'productReviews' => $productReviews,
+            'viewerOrder' => $viewerOrder,
+            'viewerReview' => $viewerReview,
+            'canReview' => $canReview,
         ]);
     }
 

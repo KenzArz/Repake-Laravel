@@ -47,6 +47,14 @@ class Conversation extends Model
     }
 
     /**
+     * Order yang lahir dari penawaran yang disetujui dalam percakapan ini.
+     */
+    public function order(): HasOne
+    {
+        return $this->hasOne(Order::class);
+    }
+
+    /**
      * Pesan terakhir untuk daftar percakapan.
      */
     public function lastMessage(): HasOne
