@@ -16,6 +16,16 @@ class ProductImageStorage
     private const DIRECTORY = 'products';
 
     /**
+     * Batas piksel yang aman untuk didekode GD di bawah memory_limit 128M.
+     * Gambar di atas batas ini disimpan apa adanya tanpa konversi WebP.
+     */
+    private const MAX_DECODE_PIXELS = 12_000_000;
+
+    private const MAX_SIDE = 1920;
+
+    private const WEBP_QUALITY = 80;
+
+    /**
      * File gambar yang valid dari request, apa pun bentuknya (single file atau array).
      *
      * @return Collection<int, UploadedFile>
@@ -44,7 +54,7 @@ class ProductImageStorage
         $paths = [];
 
         foreach ($files as $file) {
-            $path = $this->store($file);
+            $path = $this->storeFile($file);
 
             if ($path !== null) {
                 $paths[] = $path;
@@ -52,6 +62,20 @@ class ProductImageStorage
         }
 
         return $paths;
+    }
+
+    /**
+     * Simpan satu gambar ke disk publik, dikonversi ke WebP bila memungkinkan.
+     */
+    public function storeFile(UploadedFile $file): ?string
+    {
+        try {
+            $path = $this->toWebp($file) ?? $file->store(self::DIRECTORY, self::DISK);
+
+            return is_string($path) && $path !== '' ? $path : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
@@ -66,35 +90,73 @@ class ProductImageStorage
         }
     }
 
-    private function store(UploadedFile $file): ?string
-    {
-        try {
-            return $this->toWebp($file) ?? $file->store(self::DIRECTORY, self::DISK);
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
     private function toWebp(UploadedFile $file): ?string
     {
+        $size = @getimagesize($file->getRealPath());
+
+        // Resolusi terlalu besar: jangan didekode agar tidak kehabisan memori.
+        // Simpan file aslinya sebagai fallback.
+        if ($size === false || $size[0] < 1 || $size[1] < 1) {
+            return null;
+        }
+
+        if ($size[0] * $size[1] > self::MAX_DECODE_PIXELS) {
+            return null;
+        }
+
         $image = @imagecreatefromstring((string) file_get_contents($file->getRealPath()));
 
         if ($image === false) {
             return null;
         }
 
-        $path = self::DIRECTORY.'/'.Str::random(40).'.webp';
-
+        $image = $this->downscale($image);
         imagealphablending($image, true);
         imagesavealpha($image, true);
 
         ob_start();
-        imagewebp($image, null, 80);
+        $converted = imagewebp($image, null, self::WEBP_QUALITY);
         $data = ob_get_clean();
         imagedestroy($image);
 
-        Storage::disk(self::DISK)->put($path, $data);
+        if (! $converted || ! is_string($data) || $data === '') {
+            return null;
+        }
+
+        $path = self::DIRECTORY.'/'.Str::random(40).'.webp';
+
+        if (! Storage::disk(self::DISK)->put($path, $data)) {
+            return null;
+        }
 
         return $path;
+    }
+
+    /**
+     * Perkecil gambar agar sisi terpanjang tidak melebihi MAX_SIDE.
+     */
+    private function downscale(\GdImage $image): \GdImage
+    {
+        $width = imagesx($image);
+        $height = imagesy($image);
+
+        if ($width <= self::MAX_SIDE && $height <= self::MAX_SIDE) {
+            return $image;
+        }
+
+        $ratio = min(self::MAX_SIDE / $width, self::MAX_SIDE / $height);
+        $resized = imagescale(
+            $image,
+            max(1, (int) round($width * $ratio)),
+            max(1, (int) round($height * $ratio)),
+        );
+
+        if ($resized === false) {
+            return $image;
+        }
+
+        imagedestroy($image);
+
+        return $resized;
     }
 }

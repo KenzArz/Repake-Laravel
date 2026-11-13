@@ -133,3 +133,112 @@ test('guest cannot create a product', function () {
 
     expect(Product::count())->toBe(0);
 });
+
+test('uploaded image is converted to webp and downscaled', function () {
+    $this->actingAs($this->user)
+        ->withHeaders(['X-Requested-With' => 'XMLHttpRequest', 'Accept' => 'application/json'])
+        ->post(route('products.store'), payload([
+            'category_id' => $this->category->id,
+            'images' => [UploadedFile::fake()->image('besar.jpg', 3000, 2000)],
+        ]))
+        ->assertOk();
+
+    $image = ProductImage::firstOrFail();
+
+    expect($image->path)->toEndWith('.webp');
+
+    $info = getimagesize(Storage::disk('public')->path($image->path));
+
+    expect($info)->not->toBeFalse()
+        ->and(max($info[0], $info[1]))->toBeLessThanOrEqual(1920);
+});
+
+test('product update can replace every image', function () {
+    $product = Product::factory()->create([
+        'user_id' => $this->user->id,
+        'category_id' => $this->category->id,
+    ]);
+
+    $old = $product->images()->create([
+        'path' => 'products/lama.webp',
+        'urutan' => 0,
+        'is_cover' => true,
+    ]);
+
+    Storage::disk('public')->put('products/lama.webp', 'gambar lama');
+
+    $this->actingAs($this->user)
+        ->withHeaders(['X-Requested-With' => 'XMLHttpRequest', 'Accept' => 'application/json'])
+        ->put(route('products.update', $product), payload([
+            'category_id' => $this->category->id,
+            'judul' => $product->judul,
+            'delete_images' => [$old->id],
+            'images' => [UploadedFile::fake()->image('baru.jpg', 800, 600)],
+        ]))
+        ->assertOk()
+        ->assertJson(['redirect' => $product->detailUrl()]);
+
+    $images = $product->images()->get();
+
+    expect($images)->toHaveCount(1)
+        ->and($images->first()->path)->not->toBe('products/lama.webp')
+        ->and($images->first()->path)->not->toBeNull()
+        ->and($images->first()->is_cover)->toBeTrue();
+
+    Storage::disk('public')->assertExists($images->first()->path);
+    Storage::disk('public')->assertMissing('products/lama.webp');
+});
+
+test('product update rejects removing every image without a replacement', function () {
+    $product = Product::factory()->create([
+        'user_id' => $this->user->id,
+        'category_id' => $this->category->id,
+    ]);
+
+    $old = $product->images()->create([
+        'path' => 'products/lama.webp',
+        'urutan' => 0,
+        'is_cover' => true,
+    ]);
+
+    Storage::disk('public')->put('products/lama.webp', 'gambar lama');
+
+    $this->actingAs($this->user)
+        ->withHeaders(['X-Requested-With' => 'XMLHttpRequest', 'Accept' => 'application/json'])
+        ->put(route('products.update', $product), payload([
+            'category_id' => $this->category->id,
+            'judul' => 'Judul Yang Tidak Boleh Tersimpan',
+            'delete_images' => [$old->id],
+        ]))
+        ->assertSessionHasErrors('images');
+
+    expect($product->fresh()->judul)->not->toBe('Judul Yang Tidak Boleh Tersimpan')
+        ->and($product->images()->count())->toBe(1);
+
+    Storage::disk('public')->assertExists('products/lama.webp');
+});
+
+test('product update can add images to a product without any image', function () {
+    $product = Product::factory()->create([
+        'user_id' => $this->user->id,
+        'category_id' => $this->category->id,
+    ]);
+
+    expect($product->images()->count())->toBe(0);
+
+    $this->actingAs($this->user)
+        ->withHeaders(['X-Requested-With' => 'XMLHttpRequest', 'Accept' => 'application/json'])
+        ->put(route('products.update', $product), payload([
+            'category_id' => $this->category->id,
+            'judul' => $product->judul,
+            'images' => [UploadedFile::fake()->image('pulih.jpg', 800, 600)],
+        ]))
+        ->assertOk();
+
+    $image = $product->images()->firstOrFail();
+
+    expect($image->path)->toEndWith('.webp')
+        ->and($image->is_cover)->toBeTrue();
+
+    Storage::disk('public')->assertExists($image->path);
+});
