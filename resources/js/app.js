@@ -107,26 +107,41 @@ document.addEventListener("click", async (e) => {
     }
 });
 
-/* Autoplay banner (setara Timer 4 detik di Flutter) */ document
-    .querySelectorAll("[data-banner-slider]")
-    .forEach((el) => {
-        const items = [...el.children];
-        if (items.length < 2 || el.scrollWidth <= el.clientWidth + 1) return; // muat semua, tidak perlu geser
+/* Autoplay banner (setara Timer 4 detik di Flutter) */
+document.querySelectorAll("[data-banner-slider]").forEach((el) => {
+    const items = [...el.querySelectorAll("[data-banner-slide]")];
+    if (items.length < 2) return;
 
-        let i = 0;
-        let paused = false;
-        el.addEventListener("mouseenter", () => (paused = true));
-        el.addEventListener("mouseleave", () => (paused = false));
+    const offsetOf = (item) =>
+        item.offsetLeft - items[0].offsetLeft;
 
-        setInterval(() => {
-            if (paused) return;
-            i = (i + 1) % items.length;
-            el.scrollTo({
-                left: items[i].offsetLeft - el.offsetLeft,
-                behavior: "smooth",
-            });
-        }, 4000);
-    });
+    let paused = false;
+
+    const advance = () => {
+        if (paused || document.hidden) return;
+
+        const maxScroll = el.scrollWidth - el.clientWidth;
+        if (maxScroll <= 1) return; // semuanya sudah muat di layar
+
+        const positions = items.map(offsetOf);
+        // Banner berikutnya: slide pertama yang mulai melewati posisi scroll aktif.
+        let next = positions.findIndex((left) => left > el.scrollLeft + 2);
+        // Di ujung / tidak ada lagi yang bisa digeser -> balik ke awal (loop).
+        if (next === -1 || positions[next] > maxScroll + 2) next = 0;
+
+        el.scrollTo({ left: next === 0 ? 0 : positions[next], behavior: "smooth" });
+    };
+
+    el.addEventListener("mouseenter", () => (paused = true));
+    el.addEventListener("mouseleave", () => (paused = false));
+    el.addEventListener("focusin", () => (paused = true));
+    el.addEventListener("focusout", () => (paused = false));
+
+    // Hormati preferensi aksesibilitas pengurangan gerakan.
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+
+    setInterval(advance, 4000);
+});
 
 /* Deteksi kota [ALDI] — hanya aktif bila ada pemicunya di halaman */
 initLocationDetect();
