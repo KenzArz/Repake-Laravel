@@ -3,6 +3,7 @@
 @php
     $detailUrl = Route::has('products.show') ? $product->detailUrl() : '#';
     $favUrl = Route::has('favorites.toggle') ? route('favorites.toggle', $product->id) : '';
+    $isDijual = strcasecmp(trim((string) $product->status_label), 'Dijual') === 0;
     $badge = $product->status_label === 'Dijual'
         ? 'bg-lime-500/90 text-neutral-900'
         : 'bg-neutral-200/90 text-neutral-700';
@@ -42,7 +43,7 @@
             <p class="truncate text-xs font-bold text-neutral-900">
                 @if ($sellerUrl)
                     <a href="{{ $sellerUrl }}"
-                        class="relative z-10 transition-colors hover:text-lime-700 hover:underline">{{ $product->penjual }}</a>
+                        class="relative z-10 transition-colors hover:text-lime-700 hover:underline ">{{ $product->penjual }}</a>
                 @else
                     {{ $product->penjual }}
                 @endif
@@ -73,7 +74,7 @@
         </div>
 
         <span
-            class="absolute left-2 top-2 rounded bg-lime-400 px-2 py-0.5 text-[10px] font-bold text-neutral-900 shadow-2xs">{{ $product->status_label }}</span>
+            class="absolute left-2 top-2 rounded bg-lime-400 px-2 py-0.5 text-[10px] font-bold text-neutral-900 shadow-2xs {{ $badge }}">{{ $product->status_label }}</span>
 
         <button type="button" aria-label="Favorit" aria-pressed="{{ !empty($product->is_favorite) ? 'true' : 'false' }}"
             @guest data-open-login @endguest data-favorite-toggle data-url="{{ $favUrl }}"
