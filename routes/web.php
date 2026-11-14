@@ -10,6 +10,7 @@ use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductDetailController;
 use App\Http\Controllers\ProfileController;
@@ -124,6 +125,12 @@ Route::middleware(['auth', 'banned'])->group(function () {
         ->name('chat.offers.cancel');
     Route::delete('/chat/messages/{message}', [ChatController::class, 'destroy'])
         ->name('chat.messages.destroy');
+});
+
+// Riwayat Transaksi (wajib login)
+Route::middleware('auth')->group(function () {
+    Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
+    Route::patch('/orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.update-status');
 });
 
 // Lokasi hasil deteksi browser [ALDI]
