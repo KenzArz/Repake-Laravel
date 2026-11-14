@@ -41,8 +41,18 @@ class ProfileController extends Controller
         $tab = $this->resolveTab($request, self::OWNER_TABS);
         $status = $this->resolveStatus($request);
         $sort = $this->resolveSort($request);
+        $reviewRating = $this->resolveReviewRating($request);
+        $reviewSort = $this->resolveReviewSort($request);
 
-        return view('profile.catalog', $this->catalogPayload($request->user(), $tab, true, $status, $sort));
+        return view('profile.catalog', $this->catalogPayload(
+            $request->user(),
+            $tab,
+            true,
+            $status,
+            $sort,
+            $reviewRating,
+            $reviewSort
+        ));
     }
 
     /**
@@ -75,8 +85,18 @@ class ProfileController extends Controller
         $tab = $this->resolveTab($request, self::PUBLIC_TABS);
         $status = $this->resolveStatus($request);
         $sort = $this->resolveSort($request);
+        $reviewRating = $this->resolveReviewRating($request);
+        $reviewSort = $this->resolveReviewSort($request);
 
-        return view('profile.catalog', $this->catalogPayload($user, $tab, false, $status, $sort));
+        return view('profile.catalog', $this->catalogPayload(
+            $user,
+            $tab,
+            false,
+            $status,
+            $sort,
+            $reviewRating,
+            $reviewSort
+        ));
     }
 
     /**
@@ -220,16 +240,29 @@ class ProfileController extends Controller
         string $tab,
         bool $isOwner,
         string $status = 'semua',
-        string $sort = 'terbaru'
+        string $sort = 'terbaru',
+        string $reviewRating = 'semua',
+        string $reviewSort = 'terbaru'
     ): array {
         $products = $this->productsFor($user, $tab, $isOwner, $status, $sort);
-        $reviews = $this->reviewsFor($user);
+        $allReviews = $this->reviewsFor($user);
 
-        // Statistik profile dihitung dari data nyata, bukan hardcode.
+        // Statistik profile dihitung dari seluruh ulasan nyata, bukan hasil filter.
         $profile = $this->profileData($user);
-        $profile['rating'] = round((float) ($reviews->avg(fn(array $review): int => $review['rating']) ?? 0), 1);
-        $profile['reviews_count'] = $reviews->count();
+        $profile['rating'] = round((float) ($allReviews->avg(fn(array $review): int => $review['rating']) ?? 0), 1);
+        $profile['reviews_count'] = $allReviews->count();
         $profile['sold_count'] = $this->soldCount($user);
+
+        $filteredReviews = $reviewRating !== 'semua'
+            ? $allReviews->filter(fn(array $review): bool => (int) $review['rating'] === (int) $reviewRating)
+            : $allReviews;
+
+        $reviews = match ($reviewSort) {
+            'terlama' => $filteredReviews->reverse()->values(),
+            'rating_tinggi' => $filteredReviews->sortByDesc('rating')->values(),
+            'rating_rendah' => $filteredReviews->sortBy('rating')->values(),
+            default => $filteredReviews->values(),
+        };
 
         // Ulasan penjual->pembeli: pengulas melihat form di profil pembeli.
         $reviewableOrder = $this->reviewableOrderFor($user, $tab, $isOwner);
@@ -241,16 +274,17 @@ class ProfileController extends Controller
             'tab' => $tab,
             'status' => $status,
             'sort' => $sort,
+            'reviewRating' => $reviewRating,
+            'reviewSort' => $reviewSort,
             'products' => $products,
             'reviews' => $reviews->all(),
-            'reviewCount' => $reviews->count(),
+            'reviewCount' => $allReviews->count(),
             'reviewableOrder' => $reviewableOrder,
             'favoriteCount' => $isOwner ? $this->favoriteCount($user) : 0,
             'chatProducts' => $isOwner ? collect() : $this->activeProducts($user),
             'profileUrl' => $isOwner ? route('profile.catalog') : $user->profileUrl(),
         ];
     }
-
     /**
      * Order yang memungkinkan pengunjung (sebagai penjual) mengulas pemilik
      * profil (sebagai pembeli). Hanya relevan pada tab ulasan profil orang lain.
@@ -392,6 +426,8 @@ class ProfileController extends Controller
                 'reviewer_id' => $review->reviewer_id,
                 'is_mine' => (string) $review->reviewer_id === (string) Auth::id(),
                 'reviewer_name' => $review->reviewer?->name ?? 'Pengguna',
+                'reviewer_avatar' => $review->reviewer?->avatar_url ?? asset('images/default-avatar.png'),
+                'reviewer_url' => $review->reviewer?->profileUrl(),
                 'time_ago' => $review->created_at?->locale('id')->diffForHumans(['syntax' => CarbonInterface::DIFF_ABSOLUTE]) . ' lalu',
                 'rating' => $review->rating,
                 'comment' => $review->komentar ?? '',
@@ -474,5 +510,25 @@ class ProfileController extends Controller
         $sort = (string) $request->query('sort', 'terbaru');
 
         return in_array($sort, ['terbaru', 'terlama', 'diminati'], true) ? $sort : 'terbaru';
+    }
+
+    /**
+     * Filter bintang ulasan pada tab Ulasan.
+     */
+    private function resolveReviewRating(Request $request): string
+    {
+        $rating = (string) $request->query('rating', 'semua');
+
+        return in_array($rating, ['semua', '5', '4', '3', '2', '1'], true) ? $rating : 'semua';
+    }
+
+    /**
+     * Urutan ulasan pada tab Ulasan.
+     */
+    private function resolveReviewSort(Request $request): string
+    {
+        $sort = (string) $request->query('review_sort', 'terbaru');
+
+        return in_array($sort, ['terbaru', 'terlama', 'rating_tinggi', 'rating_rendah'], true) ? $sort : 'terbaru';
     }
 }
