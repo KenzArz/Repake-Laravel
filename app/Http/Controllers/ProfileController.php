@@ -11,9 +11,11 @@ use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Illuminate\Http\UploadedFile;
 
 class ProfileController extends Controller
 {
@@ -37,15 +39,17 @@ class ProfileController extends Controller
     public function catalog(Request $request): View
     {
         $tab = $this->resolveTab($request, self::OWNER_TABS);
+        $status = $this->resolveStatus($request);
+        $sort = $this->resolveSort($request);
 
-        return view('profile.catalog', $this->catalogPayload($request->user(), $tab, true));
+        return view('profile.catalog', $this->catalogPayload($request->user(), $tab, true, $status, $sort));
     }
 
     /**
      * Tampilkan profil publik penjual lain.
      *
-     * Hanya produk berstatus "dijual" yang tampil, sehingga produk yang
-     * ditangguhkan admin atau masih draft tidak bocor lewat halaman ini.
+     * Hanya produk berstatus "dijual" atau "terjual" yang tampil, sehingga produk
+     * yang ditangguhkan admin atau masih draft tidak bocor lewat halaman ini.
      * Penjual yang dibanned tidak bisa diakses, sama seperti detail produknya.
      */
     public function show(Request $request, string $seller): View|RedirectResponse
@@ -69,8 +73,10 @@ class ProfileController extends Controller
         }
 
         $tab = $this->resolveTab($request, self::PUBLIC_TABS);
+        $status = $this->resolveStatus($request);
+        $sort = $this->resolveSort($request);
 
-        return view('profile.catalog', $this->catalogPayload($user, $tab, false));
+        return view('profile.catalog', $this->catalogPayload($user, $tab, false, $status, $sort));
     }
 
     /**
@@ -79,7 +85,7 @@ class ProfileController extends Controller
     public function edit(): View
     {
         return view('profile.edit', [
-            'profile' => $this->profileData(auth()->user()),
+            'profile' => $this->profileData(Auth::user()),
         ]);
     }
 
@@ -89,7 +95,7 @@ class ProfileController extends Controller
     public function update(UpdateProfileRequest $request): RedirectResponse
     {
         $validated = $request->validated();
-        $user = auth()->user();
+        $user = Auth::user();
 
         // Perbarui data utama profil
         $user->name = trim($validated['name']);
@@ -104,10 +110,10 @@ class ProfileController extends Controller
         $user->kota = ! empty($validated['kota']) ? trim($validated['kota']) : 'Karawang';
         $user->bio = ! empty($validated['bio']) ? trim($validated['bio']) : null;
 
-        // Upload foto profil jika pengguna memilih gambar baru
+        // Upload foto profil jika pengguna memilih gambar baru (otomatis convert ke .webp)
         if ($request->hasFile('avatar')) {
             $this->deleteStoredAvatar($user->avatar);
-            $user->avatar = $request->file('avatar')->store('avatars', 'public');
+            $user->avatar = $this->storeAvatarAsWebp($request->file('avatar'));
         }
 
         // Hapus foto jika diminta
@@ -116,6 +122,7 @@ class ProfileController extends Controller
             $user->avatar = null;
         }
 
+        /** @var User $user */
         $user->save();
 
         session()->put('user_profile', [
@@ -131,15 +138,68 @@ class ProfileController extends Controller
     }
 
     /**
+     * Konversi dan simpan foto avatar ke format WebP pada disk publik.
+     */
+    private function storeAvatarAsWebp(UploadedFile $file): string
+    {
+        if (! function_exists('imagecreatefromstring') || ! function_exists('imagewebp')) {
+            return $file->store('avatars', 'public');
+        }
+
+        $raw = @file_get_contents($file->getRealPath());
+        $image = $raw !== false ? @imagecreatefromstring($raw) : false;
+
+        if ($image === false) {
+            return $file->store('avatars', 'public');
+        }
+
+        // Perbaiki rotasi otomatis foto kamera HP (EXIF Orientation) jika JPEG
+        if (function_exists('exif_read_data') && $file->getMimeType() === 'image/jpeg') {
+            $exif = @exif_read_data($file->getRealPath());
+            $orientation = (int) ($exif['Orientation'] ?? 1);
+
+            $image = match ($orientation) {
+                3 => imagerotate($image, 180, 0) ?: $image,
+                6 => imagerotate($image, -90, 0) ?: $image,
+                8 => imagerotate($image, 90, 0) ?: $image,
+                default => $image,
+            };
+        }
+
+        // Pertahankan transparansi (alpha channel) untuk PNG/WebP
+        if (function_exists('imagepalettetotruecolor')) {
+            imagepalettetotruecolor($image);
+        }
+        imagealphablending($image, true);
+        imagesavealpha($image, true);
+
+        ob_start();
+        $encoded = imagewebp($image, null, 82);
+        $webpContent = ob_get_clean();
+        unset($image);
+
+        if (! $encoded || $webpContent === false || $webpContent === '') {
+            return $file->store('avatars', 'public');
+        }
+
+        $path = 'avatars/' . Str::uuid() . '.webp';
+        Storage::disk('public')->put($path, $webpContent);
+
+        return $path;
+    }
+
+    /**
      * Hapus berkas avatar lama dari disk publik tanpa menyentuh URL eksternal
      * (mis. foto Google) atau aset bawaan yang tersimpan di public/.
      */
     private function deleteStoredAvatar(?string $path): void
     {
-        if (! $path
+        if (
+            ! $path
             || str_starts_with($path, 'http://')
             || str_starts_with($path, 'https://')
-            || str_starts_with($path, '/')) {
+            || str_starts_with($path, '/')
+        ) {
             return;
         }
 
@@ -155,16 +215,21 @@ class ProfileController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function catalogPayload(User $user, string $tab, bool $isOwner): array
-    {
-        $products = $this->productsFor($user, $tab, $isOwner);
+    private function catalogPayload(
+        User $user,
+        string $tab,
+        bool $isOwner,
+        string $status = 'semua',
+        string $sort = 'terbaru'
+    ): array {
+        $products = $this->productsFor($user, $tab, $isOwner, $status, $sort);
         $reviews = $this->reviewsFor($user);
 
         // Statistik profile dihitung dari data nyata, bukan hardcode.
         $profile = $this->profileData($user);
-        $profile['rating'] = round((float) ($reviews->avg(fn (array $review): int => $review['rating']) ?? 0), 1);
+        $profile['rating'] = round((float) ($reviews->avg(fn(array $review): int => $review['rating']) ?? 0), 1);
         $profile['reviews_count'] = $reviews->count();
-        $profile['sold_count'] = $this->productCount($user, $isOwner);
+        $profile['sold_count'] = $this->soldCount($user);
 
         // Ulasan penjual->pembeli: pengulas melihat form di profil pembeli.
         $reviewableOrder = $this->reviewableOrderFor($user, $tab, $isOwner);
@@ -174,6 +239,8 @@ class ProfileController extends Controller
             'seller' => $user,
             'isOwner' => $isOwner,
             'tab' => $tab,
+            'status' => $status,
+            'sort' => $sort,
             'products' => $products,
             'reviews' => $reviews->all(),
             'reviewCount' => $reviews->count(),
@@ -190,11 +257,11 @@ class ProfileController extends Controller
      */
     private function reviewableOrderFor(User $user, string $tab, bool $isOwner): ?Order
     {
-        if ($isOwner || $tab !== 'ulasan' || ! auth()->check()) {
+        if ($isOwner || $tab !== 'ulasan' || ! Auth::check()) {
             return null;
         }
 
-        $viewerId = (string) auth()->id();
+        $viewerId = (string) Auth::id();
 
         $order = Order::query()
             ->where('seller_id', $viewerId)
@@ -211,12 +278,17 @@ class ProfileController extends Controller
     }
 
     /**
-     * Produk sesuai tab yang sedang aktif.
+     * Produk sesuai tab, filter status, dan urutan yang sedang aktif.
      *
      * @return Collection<int, Product>
      */
-    private function productsFor(User $user, string $tab, bool $isOwner): Collection
-    {
+    private function productsFor(
+        User $user,
+        string $tab,
+        bool $isOwner,
+        string $status = 'semua',
+        string $sort = 'terbaru'
+    ): Collection {
         if ($tab === 'ulasan') {
             return collect();
         }
@@ -224,18 +296,48 @@ class ProfileController extends Controller
         if ($isOwner && $tab === 'favorit') {
             // Samakan dengan katalog: produk yang disuspend/draft atau milik
             // penjual yang dibanned tidak ditampilkan agar tidak menuju 404.
-            return Product::with(['primaryImage', 'user'])
+            $query = Product::with(['primaryImage', 'user'])
                 ->dijual()
-                ->whereHas('favorites', fn ($query) => $query->where('user_id', $user->id))
-                ->latest()
-                ->get();
+                ->whereHas('favorites', fn($query) => $query->where('user_id', $user->id));
+
+            return $this->applySort($query, $sort)->get();
         }
 
-        return Product::with(['primaryImage', 'user'])
+        $query = Product::with(['primaryImage', 'user'])
+            ->where('user_id', $user->id);
+
+        if ($status === 'dijual') {
+            $query->where('status', Product::STATUS_DIJUAL);
+        } elseif ($status === 'terjual') {
+            $query->where('status', Product::STATUS_TERJUAL);
+        } elseif (! $isOwner) {
+            $query->whereIn('status', [Product::STATUS_DIJUAL, Product::STATUS_TERJUAL]);
+        }
+
+        return $this->applySort($query, $sort)->get();
+    }
+
+    /**
+     * Terapkan urutan produk: terbaru, terlama, atau paling diminati (jumlah favorit).
+     */
+    private function applySort($query, string $sort)
+    {
+        return match ($sort) {
+            'terlama' => $query->oldest(),
+            'diminati' => $query->withCount('favorites')->orderByDesc('favorites_count')->latest(),
+            default => $query->latest(),
+        };
+    }
+
+    /**
+     * Jumlah produk berstatus terjual untuk angka "Terjual" pada kartu profil.
+     */
+    private function soldCount(User $user): int
+    {
+        return Product::query()
             ->where('user_id', $user->id)
-            ->when(! $isOwner, fn ($query) => $query->where('status', Product::STATUS_DIJUAL))
-            ->latest()
-            ->get();
+            ->where('status', Product::STATUS_TERJUAL)
+            ->count();
     }
 
     /**
@@ -245,7 +347,7 @@ class ProfileController extends Controller
     {
         return Product::query()
             ->where('user_id', $user->id)
-            ->when(! $isOwner, fn ($query) => $query->where('status', Product::STATUS_DIJUAL))
+            ->when(! $isOwner, fn($query) => $query->where('status', Product::STATUS_DIJUAL))
             ->count();
     }
 
@@ -256,7 +358,7 @@ class ProfileController extends Controller
     {
         return Product::query()
             ->dijual()
-            ->whereHas('favorites', fn ($query) => $query->where('user_id', $user->id))
+            ->whereHas('favorites', fn($query) => $query->where('user_id', $user->id))
             ->count();
     }
 
@@ -285,17 +387,17 @@ class ProfileController extends Controller
             ->where('reviewee_id', $user->id)
             ->latest()
             ->get()
-            ->map(fn (Review $review): array => [
+            ->map(fn(Review $review): array => [
                 'id' => $review->id,
                 'reviewer_id' => $review->reviewer_id,
-                'is_mine' => (string) $review->reviewer_id === (string) auth()->id(),
+                'is_mine' => (string) $review->reviewer_id === (string) Auth::id(),
                 'reviewer_name' => $review->reviewer?->name ?? 'Pengguna',
-                'time_ago' => $review->created_at?->locale('id')->diffForHumans(['syntax' => CarbonInterface::DIFF_ABSOLUTE]).' lalu',
+                'time_ago' => $review->created_at?->locale('id')->diffForHumans(['syntax' => CarbonInterface::DIFF_ABSOLUTE]) . ' lalu',
                 'rating' => $review->rating,
                 'comment' => $review->komentar ?? '',
                 'has_product' => $review->product !== null,
                 'product_title' => $review->product?->judul ?? '',
-                'product_price' => 'Rp '.number_format($review->product?->harga ?? 0, 0, ',', '.'),
+                'product_price' => 'Rp ' . number_format($review->product?->harga ?? 0, 0, ',', '.'),
                 'product_image' => $review->product?->gambar ?? 'images/default-avatar.png',
             ]);
     }
@@ -352,5 +454,25 @@ class ProfileController extends Controller
         $tab = (string) $request->query('tab', 'dijual');
 
         return in_array($tab, $allowed, true) ? $tab : 'dijual';
+    }
+
+    /**
+     * Filter status produk pada tab Produk.
+     */
+    private function resolveStatus(Request $request): string
+    {
+        $status = (string) $request->query('status', 'semua');
+
+        return in_array($status, ['semua', 'dijual', 'terjual'], true) ? $status : 'semua';
+    }
+
+    /**
+     * Urutan produk yang dipilih pengguna.
+     */
+    private function resolveSort(Request $request): string
+    {
+        $sort = (string) $request->query('sort', 'terbaru');
+
+        return in_array($sort, ['terbaru', 'terlama', 'diminati'], true) ? $sort : 'terbaru';
     }
 }

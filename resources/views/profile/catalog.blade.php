@@ -15,6 +15,35 @@
     $tabUrl = fn (string $value): string => $profileUrl
         .(str_contains($profileUrl, '?') ? '&' : '?')
         .http_build_query(['tab' => $value]);
+
+    $statusLabels = [
+        'semua' => 'Semua Produk',
+        'dijual' => 'Produk Dijual',
+        'terjual' => 'Produk Terjual',
+    ];
+    $currentStatusLabel = $statusLabels[$status] ?? 'Semua Produk';
+
+    $sort = $sort ?? 'terbaru';
+    $sortLabels = [
+        'terbaru' => 'Terbaru',
+        'terlama' => 'Terlama',
+        'diminati' => 'Paling Diminati',
+    ];
+    $currentSortLabel = $sortLabels[$sort] ?? 'Terbaru';
+    $filterUrl = function (array $params) use ($profileUrl, $tab, $status, $sort): string {
+        $activeTab = $params['tab'] ?? $tab;
+        $query = ['tab' => $activeTab];
+
+        if ($activeTab !== 'favorit') {
+            $query['status'] = $params['status'] ?? $status;
+        }
+
+        $query['sort'] = $params['sort'] ?? $sort;
+
+        return $profileUrl
+            .(str_contains($profileUrl, '?') ? '&' : '?')
+            .http_build_query($query);
+    };
 @endphp
 
 <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6">
@@ -76,7 +105,7 @@
                 <div class="flex items-center gap-4">
                     <div class="text-left md:text-right">
                         <a href="{{ $tabUrl('ulasan') }}" class="group block">
-                            <p class="flex items-center gap-1 text-xs font-bold text-neutral-900 group-hover:text-lime-700 transition">
+                            <p class="flex items-center gap-1 text-sm font-bold text-neutral-900 group-hover:text-lime-700 transition">
                                 <span class="text-amber-500">★</span>
                                 <span>{{ number_format($profile['rating'] ?? 4.5, 1) }} ({{ $profile['reviews_count'] ?? 67 }} ulasan) · {{ $profile['sold_count'] ?? 10 }} Terjual</span>
                             </p>
@@ -336,14 +365,53 @@
     @else
         {{-- Section: Semua Produk (Dijual / Favorit) --}}
         <section class="mt-6">
-            <div class="flex items-center justify-between">
-                <h2 class="text-base font-extrabold text-neutral-900">
-                    {{ $tab === 'favorit' ? 'Barang Favorit' : 'Semua Produk' }}
-                </h2>
+            <div class="flex items-center justify-between gap-3">
+                @if ($tab === 'favorit')
+                    <h2 class="text-base font-extrabold text-neutral-900">Barang Favorit</h2>
+                @else
+                    <div class="relative">
+                        <button type="button" id="product-status-toggle" aria-expanded="false"
+                                class="group inline-flex items-center gap-1.5 text-base font-extrabold text-neutral-900 transition hover:text-lime-700 cursor-pointer">
+                            <span>{{ $currentStatusLabel }}</span>
+                            <svg viewBox="0 0 24 24" class="size-4 fill-none stroke-current stroke-[2.5] text-neutral-700 transition-transform duration-200 group-aria-expanded:rotate-180 group-hover:text-lime-700">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
+                            </svg>
+                        </button>
 
-                <div class="flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-800">
-                    <span>Urutkan: <strong>Terbaru</strong></span>
-                    <svg viewBox="0 0 24 24" class="size-3.5 fill-none stroke-current stroke-2"><path d="m6 9 6 6 6-6"/></svg>
+                        <div id="product-status-menu"
+                             class="absolute left-0 top-full z-30 mt-1.5 hidden w-44 overflow-hidden rounded-xl border border-neutral-200 bg-white py-1 shadow-xl ring-1 ring-black/5">
+                            @foreach ($statusLabels as $statusKey => $statusLabel)
+                                <a href="{{ $filterUrl(['status' => $statusKey]) }}"
+                                   class="flex items-center justify-between px-3.5 py-2 text-xs font-semibold transition {{ $status === $statusKey ? 'bg-lime-50 text-lime-700' : 'text-neutral-700 hover:bg-neutral-100' }}">
+                                    <span>{{ $statusLabel }}</span>
+                                    @if ($status === $statusKey)
+                                        <svg viewBox="0 0 24 24" class="size-3.5 fill-none stroke-current stroke-[2.5]"><path stroke-linecap="round" stroke-linejoin="round" d="m5 13 4 4L19 7"/></svg>
+                                    @endif
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                <div class="relative">
+                    <button type="button" id="product-sort-toggle" aria-expanded="false"
+                            class="group flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-800 transition hover:bg-neutral-100 cursor-pointer">
+                        <span>Urutkan: <strong>{{ $currentSortLabel }}</strong></span>
+                        <svg viewBox="0 0 24 24" class="size-3.5 fill-none stroke-current stroke-2 transition-transform duration-200 group-aria-expanded:rotate-180"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+
+                    <div id="product-sort-menu"
+                         class="absolute right-0 top-full z-30 mt-1.5 hidden w-44 overflow-hidden rounded-xl border border-neutral-200 bg-white py-1 shadow-xl ring-1 ring-black/5">
+                        @foreach ($sortLabels as $sortKey => $sortLabel)
+                            <a href="{{ $filterUrl(['sort' => $sortKey]) }}"
+                               class="flex items-center justify-between px-3.5 py-2 text-xs font-semibold transition {{ $sort === $sortKey ? 'bg-lime-50 text-lime-700' : 'text-neutral-700 hover:bg-neutral-100' }}">
+                                <span>{{ $sortLabel }}</span>
+                                @if ($sort === $sortKey)
+                                    <svg viewBox="0 0 24 24" class="size-3.5 fill-none stroke-current stroke-[2.5]"><path stroke-linecap="round" stroke-linejoin="round" d="m5 13 4 4L19 7"/></svg>
+                                @endif
+                            </a>
+                        @endforeach
+                    </div>
                 </div>
             </div>
 
@@ -462,5 +530,36 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 });
+
+const setupDropdown = (toggleId, menuId) => {
+        const btn = document.getElementById(toggleId);
+        const dropdown = document.getElementById(menuId);
+        if (!btn || !dropdown) return null;
+
+        const close = () => {
+            dropdown.classList.add('hidden');
+            btn.setAttribute('aria-expanded', 'false');
+        };
+
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const isHidden = dropdown.classList.toggle('hidden');
+            btn.setAttribute('aria-expanded', String(!isHidden));
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
+                close();
+            }
+        });
+
+        return { btn, close };
+    };
+
+    const statusDropdown = setupDropdown('product-status-toggle', 'product-status-menu');
+    const sortDropdown = setupDropdown('product-sort-toggle', 'product-sort-menu');
+
+    statusDropdown?.btn.addEventListener('click', () => sortDropdown?.close());
+    sortDropdown?.btn.addEventListener('click', () => statusDropdown?.close());
 </script>
 @endpush
