@@ -22,7 +22,7 @@
         ],
         [
             'q' => 'Bagaimana cara mengubah status barang jika sudah terjual?',
-            'a' => 'Buka halaman Dashboard atau klik ikon titik tiga (⋮) pada kartu produkmu, lalu ubah status iklan menjadi terjual agar tidak lagi dihubungi calon pembeli baru.',
+            'a' => 'Buka halaman Profil atau klik ikon titik tiga (⋮) pada kartu produkmu, lalu ubah status iklan menjadi terjual agar tidak lagi dihubungi calon pembeli baru.',
         ],
     ],
 ])
