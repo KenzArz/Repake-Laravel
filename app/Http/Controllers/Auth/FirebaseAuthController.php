@@ -25,7 +25,7 @@ class FirebaseAuthController extends Controller
 
         try {
             $response = Http::asJson()->post(
-                'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key='.config('services.firebase.api_key'),
+                'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' . config('services.firebase.api_key'),
                 ['idToken' => $request->string('id_token')->toString()]
             )->throw();
         } catch (RequestException) {
@@ -65,11 +65,23 @@ class FirebaseAuthController extends Controller
 
         $user->firebase_uid = $account['localId'];
         $user->email = $email;
-        $user->avatar = $account['photoUrl'] ?? $user->avatar;
+        $user->email_verified_at ??= now();
+        $user->role = $user->isAdmin() ? User::ROLE_ADMIN : User::ROLE_MAHASISWA;
+
+        $hasCustomAvatar = filled($user->avatar)
+            && ! str_starts_with($user->avatar, 'http://')
+            && ! str_starts_with($user->avatar, 'https://');
+
+        if (! $user->exists) {
+            $user->avatar = $account['photoUrl'] ?? null;
+        } elseif (! $hasCustomAvatar && filled($user->avatar)) {
+            $user->avatar = $account['photoUrl'] ?? $user->avatar;
+        }
+
         $user->email_verified_at ??= now();
         $user->role = $user->isAdmin() ? User::ROLE_ADMIN : User::ROLE_MAHASISWA;
         $user->save();
-
+        
         Auth::login($user, true);
         $request->session()->regenerate();
 
@@ -127,7 +139,7 @@ class FirebaseAuthController extends Controller
         foreach (config('services.firebase.allowed_domains', []) as $allowed) {
             $allowed = strtolower(trim($allowed));
 
-            if ($allowed !== '' && ($domain === $allowed || str_ends_with($domain, '.'.$allowed))) {
+            if ($allowed !== '' && ($domain === $allowed || str_ends_with($domain, '.' . $allowed))) {
                 return true;
             }
         }
@@ -145,7 +157,7 @@ class FirebaseAuthController extends Controller
         $suffix = 1;
 
         while (User::where('username', $username)->exists()) {
-            $username = $base.'_'.$suffix++;
+            $username = $base . '_' . $suffix++;
         }
 
         return $username;
