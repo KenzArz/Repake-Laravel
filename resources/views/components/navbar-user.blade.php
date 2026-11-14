@@ -18,6 +18,19 @@
         ['label' => 'Karawang Barat', 'lat' => -6.3023, 'lng' => 107.2952],
         ['label' => 'Bekasi', 'lat' => -6.2383, 'lng' => 106.9756],
     ];
+
+    $ordersLastSeen = session('orders_last_seen_at');
+
+    $activeOrderCount = auth()->check()
+        ? \App\Models\Order::query()
+            ->where(function ($q) {
+                $q->where('buyer_id', auth()->id())
+                    ->orWhere('seller_id', auth()->id());
+            })
+            ->where('status', \App\Models\Order::STATUS_DISEPAKATI)
+            ->when($ordersLastSeen, fn($q) => $q->where('updated_at', '>', $ordersLastSeen))
+            ->count()
+        : 0;
 @endphp
 
 <header class="sticky top-0 z-40 border-b border-neutral-200 bg-white/95 backdrop-blur-md">
@@ -145,16 +158,33 @@
                 </svg>
             </a>
 
+            {{-- Clip board (Orders) --}}
+            <a href="{{ $r('orders.index') }}" {{ $needLogin }}
+                class="relative hidden sm:inline-flex text-neutral-700 hover:text-neutral-900 transition"
+                aria-label="Riwayat Transaksi" title="Riwayat Transaksi">
+                <svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current stroke-2">
+                    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+                    <rect x="9" y="3" width="6" height="4" rx="1" />
+                    <path d="M9 12h6M9 16h4" />
+                </svg>
+                @if ($activeOrderCount > 0)
+                    <span
+                        class="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-lime-400 px-1 text-[10px] font-extrabold leading-none text-neutral-900 ring-2 ring-white">
+                        {{ $activeOrderCount }}
+                    </span>
+                @endif
+            </a>
+
             {{-- Mail (Chat) --}}
             <a href="{{ $r('chat.index') }}" {{ $needLogin }}
-                class="relative hidden sm:inline-flex text-neutral-700 hover:text-neutral-900 transition" aria-label="Inbox">
+                class="relative hidden sm:inline-flex text-neutral-700 hover:text-neutral-900 transition"
+                aria-label="Inbox">
                 <svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current stroke-2">
                     <rect width="20" height="16" x="2" y="4" rx="2" />
                     <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                 </svg>
                 @auth
-                    <span data-chat-badge data-badge-url="{{ route('chat.unread') }}"
-                        style="display:none"
+                    <span data-chat-badge data-badge-url="{{ route('chat.unread') }}" style="display:none"
                         class="absolute -right-2 -top-2 h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">0</span>
                 @endauth
             </a>
@@ -224,6 +254,23 @@
                                     <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                                 </svg>
                                 <span>Edit Profil</span>
+                            </a>
+                            <a href="{{ route('orders.index') }}"
+                                class="flex items-center justify-between rounded-xl px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 transition">
+                                <span class="flex items-center gap-2.5">
+                                    <svg viewBox="0 0 24 24" class="size-4 stroke-current stroke-2 fill-none">
+                                        <path
+                                            d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+                                        <rect x="9" y="3" width="6" height="4" rx="1" />
+                                    </svg>
+                                    <span>Riwayat Transaksi</span>
+                                </span>
+                                @if ($activeOrderCount > 0)
+                                    <span
+                                        class="rounded-full bg-lime-400 px-1.5 py-0.5 text-[10px] font-extrabold text-neutral-900">
+                                        {{ $activeOrderCount }}
+                                    </span>
+                                @endif
                             </a>
                             <a href="{{ route('favorites.index') }}"
                                 class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 transition">
@@ -308,8 +355,8 @@
         aria-label="Navigasi utama">
         @php
             $isHome = request()->routeIs('home');
-            $isDashboard = request()->routeIs('admin.*');
             $isFav = request()->routeIs('favorites.*');
+            $isOrders = request()->routeIs('orders.*');
             $itemCls = 'flex flex-1 flex-col items-center justify-center gap-1 text-xs transition';
             $activeCls = 'font-semibold text-lime-700';
             $inactiveCls = 'text-neutral-700 hover:text-neutral-900';
@@ -324,21 +371,6 @@
             </svg>
             <span class="text-[11px] leading-none">Home</span>
         </a>
-
-        @if (auth()->check() && auth()->user()->isAdmin())
-            <a href="{{ route('admin.dashboard') }}"
-                class="{{ $itemCls }} {{ $isDashboard ? $activeCls : $inactiveCls }}">
-                <svg viewBox="0 0 24 24"
-                    class="size-6 {{ $isDashboard ? 'fill-current stroke-current' : 'fill-none stroke-current' }} stroke-[1.8]"
-                    aria-hidden="true">
-                    <rect x="3" y="3" width="7" height="7" rx="1.5" />
-                    <rect x="14" y="3" width="7" height="7" rx="1.5" />
-                    <rect x="3" y="14" width="7" height="7" rx="1.5" />
-                    <rect x="14" y="14" width="7" height="7" rx="1.5" />
-                </svg>
-                <span class="text-[11px] leading-none">Dashboard</span>
-            </a>
-        @endif
 
         <a href="{{ route('favorites.index') }}" {{ $needLogin }}
             class="{{ $itemCls }} {{ $isFav ? $activeCls : $inactiveCls }}">
@@ -360,6 +392,24 @@
             <span class="text-[11px] leading-none">Jual</span>
         </a>
 
+        <a href="{{ $r('orders.index') }}" {{ $needLogin }}
+            class="{{ $itemCls }} {{ $isOrders ? $activeCls : $inactiveCls }}">
+            <span class="relative inline-flex">
+                <svg viewBox="0 0 24 24" class="size-6 fill-none stroke-current stroke-[1.8]" aria-hidden="true">
+                    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+                    <rect x="9" y="3" width="6" height="4" rx="1" />
+                    <path d="M9 12h6M9 16h4" />
+                </svg>
+                @if ($activeOrderCount > 0)
+                    <span
+                        class="absolute -right-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-lime-400 px-1 text-[10px] font-extrabold leading-none text-neutral-900">
+                        {{ $activeOrderCount }}
+                    </span>
+                @endif
+            </span>
+            <span class="text-[11px] leading-none">Transaksi</span>
+        </a>
+
         <a href="{{ Route::has('chat.index') ? route('chat.index') : '#' }}" {{ $needLogin }}
             class="{{ $itemCls }} {{ request()->routeIs('chat.*') ? $activeCls : $inactiveCls }}">
             <span class="relative inline-flex">
@@ -367,8 +417,7 @@
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
                 @auth
-                    <span data-chat-badge data-badge-url="{{ route('chat.unread') }}"
-                        style="display:none"
+                    <span data-chat-badge data-badge-url="{{ route('chat.unread') }}" style="display:none"
                         class="absolute -right-2 -top-1.5 h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">0</span>
                 @endauth
             </span>
