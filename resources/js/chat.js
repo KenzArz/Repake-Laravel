@@ -8,6 +8,18 @@
  * 3. Polling berantai (bukan setInterval) + dedupe id + pause saat tab tersembunyi.
  */
 
+import { compressImage, isImageFile } from "./image-utils";
+
+const MAX_ATTACHMENTS = 20;
+
+/**
+ * Batas total ukuran satu kiriman di sisi klien. Dijaga di bawah
+ * `post_max_size` PHP (8 MB di server dev) supaya permintaan tidak dibuang
+ * diam-diam oleh PHP dan pengguna melihat error validasi yang membingungkan.
+ * Server sendiri masih punya jaring pengaman 25 MB.
+ */
+const MAX_TOTAL_BYTES = 7 * 1024 * 1024;
+
 const CSRF =
     document.querySelector('meta[name="csrf-token"]')?.content ??
     document.querySelector('input[name="_token"]')?.value ??
@@ -223,13 +235,19 @@ export function initChat() {
     const pollUrl = app.dataset.pollUrl;
     const readUrl = app.dataset.readUrl;
 
-    const previewDialog = document.querySelector("[data-image-preview]");
-    const previewImg = previewDialog?.querySelector("[data-preview-img]");
-    const previewCaption = previewDialog?.querySelector("[data-preview-caption]");
-    const previewSend = previewDialog?.querySelector("[data-preview-send]");
-
     const lightbox = document.querySelector("[data-lightbox]");
     const lightboxImg = lightbox?.querySelector("[data-lightbox-img]");
+    const lightboxCounter = lightbox?.querySelector("[data-lightbox-counter]");
+    const lightboxPrev = lightbox?.querySelector("[data-lightbox-prev]");
+    const lightboxNext = lightbox?.querySelector("[data-lightbox-next]");
+    const lightboxCaption = lightbox?.querySelector("[data-lightbox-caption]");
+
+    const attachPanel = document.querySelector("[data-attach-panel]");
+    const attachImg = attachPanel?.querySelector("[data-attach-img]");
+    const attachCounter = attachPanel?.querySelector("[data-attach-counter]");
+    const attachStrip = app.querySelector("[data-attach-strip]");
+    const attachList = app.querySelector("[data-attach-list]");
+    const editorDialog = document.querySelector("[data-image-editor]");
 
     const offerModal = document.querySelector("[data-offer-modal]");
     const offerForm = offerModal?.querySelector("[data-offer-form]");
@@ -243,8 +261,11 @@ export function initChat() {
     let failures = 0;
     let submitting = false;
     let offerMode = false;
-    let pendingFile = null;
-    let previewUrl = null;
+    let pendingFiles = [];
+    let activeAttachment = 0;
+    let imageEditor = null;
+    let lightboxGroup = [];
+    let lightboxIndex = 0;
     let composeId = null;
     let editingOfferUrl = "";
     let editingOfferId = 0;
@@ -252,7 +273,14 @@ export function initChat() {
     hydrateTimes();
     refreshMeta();
     scrollToBottom();
+    stickImages(box, () => true);
     pollLater(600);
+
+    let pinnedToBottom = true;
+
+    box.addEventListener("scroll", () => {
+        pinnedToBottom = nearBottom();
+    }, { passive: true });
 
     /* ------------------------------------------------------------ helpers */
 
@@ -270,6 +298,20 @@ export function initChat() {
 
     function scrollToBottom() {
         box.scrollTop = box.scrollHeight;
+    }
+
+    /**
+     * Gambar baru belum punya tinggi sampai selesai dimuat, sehingga
+     * scrollToBottom() bisa berhenti di atas bubble foto. Setelah gambar
+     * termuat, tempel lagi ke bawah bila pengguna memang sedang di bawah.
+     */
+    function stickImages(node, shouldStick) {
+        node.querySelectorAll("img").forEach((img) => {
+            if (img.complete) return;
+            img.addEventListener("load", () => {
+                if (shouldStick()) scrollToBottom();
+            }, { once: true });
+        });
     }
 
     function refreshMeta() {
@@ -305,6 +347,7 @@ export function initChat() {
         if (id) lastId = Math.max(lastId, id);
         refreshMeta();
         if (stick) scrollToBottom();
+        stickImages(node, () => stick);
 
         return node;
     }
@@ -363,7 +406,7 @@ export function initChat() {
 
     /* --------------------------------------------------------------- send */
 
-    async function send({ body = "", file = null, type = "text", amount = null }) {
+    async function send({ body = "", files = [], type = "text", amount = null }) {
         if (submitting) return false;
 
         submitting = true;
@@ -380,9 +423,19 @@ export function initChat() {
             data.append("offer_amount", String(amount));
         }
 
-        if (file) data.append("image", file);
+        if (files.length > 0) {
+            files.forEach((file) => data.append("images[]", file, file.name));
+        }
 
-        const pending = pendingBubble(type === "offer" ? "Mengirim tawaran..." : "Mengirim...");
+        const pendingLabel = type === "offer"
+            ? "Mengirim tawaran..."
+            : files.length > 1
+                ? `Mengirim ${files.length} foto...`
+                : files.length === 1
+                    ? "Mengirim foto..."
+                    : "Mengirim...";
+
+        const pending = pendingBubble(pendingLabel);
 
         try {
             const response = await fetch(sendUrl, {
@@ -432,19 +485,12 @@ export function initChat() {
         input.value = "";
         input.style.height = "auto";
         composeId = null;
-        pendingFile = null;
-        if (previewUrl) {
-            URL.revokeObjectURL(previewUrl);
-            previewUrl = null;
-        }
-        if (previewCaption) previewCaption.value = "";
-        if (imageInput) imageInput.value = "";
+        clearAttachments();
         setOfferMode(false);
         input.focus();
     }
 
-    form.addEventListener("submit", (event) => {
-        event.preventDefault();
+    function submitComposer() {
         if (submitting) return;
 
         if (offerMode) {
@@ -461,14 +507,27 @@ export function initChat() {
         }
 
         const body = input.value.trim();
-        if (!body) return;
-        send({ body });
+        const files = pendingFiles.map((item) => item.file);
+
+        if (files.length === 0 && !body) return;
+
+        send({ body, files });
+    }
+
+    form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        submitComposer();
     });
 
+    // Laptop/desktop: Enter kirim, Shift+Enter baris baru.
+    // HP/tablet (layar sentuh): Enter tetap baris baru, kirim lewat tombol.
+    const touchFirst = window.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches ?? false;
+
     input.addEventListener("keydown", (event) => {
-        if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+        if (event.key !== "Enter" || event.shiftKey) return;
+        if (event.isComposing || event.keyCode === 229 || touchFirst) return;
         event.preventDefault();
-        form.requestSubmit();
+        submitComposer();
     });
 
     /* ------------------------------------------------------ offer mode UI */
@@ -481,6 +540,8 @@ export function initChat() {
         modeClose?.classList.toggle("hidden", !active);
         offerPrefix?.classList.toggle("hidden", !active);
         imageBtn?.classList.toggle("hidden", active);
+
+        if (active) clearAttachments();
 
         input.placeholder = active ? "Tawar harga" : "Ketik pesan";
         input.inputMode = active ? "numeric" : "text";
@@ -502,65 +563,244 @@ export function initChat() {
 
     input.addEventListener("input", autoGrow);
 
-    /* --------------------------------------------------- image + preview */
+    /* -------------------------------------------------------- attachments */
 
     imageBtn?.addEventListener("click", () => imageInput?.click());
 
     imageInput?.addEventListener("change", () => {
-        const file = imageInput.files?.[0];
-        if (file) openPreview(file);
+        addFiles([...(imageInput.files ?? [])]);
+        imageInput.value = "";
     });
 
-    function openPreview(file) {
-        if (!previewDialog || !previewImg) return;
+    async function addFiles(files) {
+        if (offerMode) return;
 
-        pendingFile = file;
-        if (previewUrl) URL.revokeObjectURL(previewUrl);
-        previewUrl = URL.createObjectURL(file);
-        previewImg.src = previewUrl;
-        if (previewCaption) previewCaption.value = input.value.trim();
-        if (!previewDialog.open) previewDialog.showModal();
+        const images = files.filter(isImageFile);
+        if (images.length === 0) {
+            if (files.length > 0) {
+                toast("Pilih file gambar: JPG, PNG, WebP, atau GIF.", true);
+            }
+            return;
+        }
+
+        const remaining = MAX_ATTACHMENTS - pendingFiles.length;
+        if (remaining <= 0) {
+            toast(`Maksimal ${MAX_ATTACHMENTS} foto sekali kirim.`, true);
+            return;
+        }
+
+        if (images.length > remaining) {
+            toast(`Hanya ${remaining} foto lagi yang bisa ditambahkan.`, true);
+        }
+
+        const startIndex = pendingFiles.length;
+
+        // Kompres dulu secara paralel, baru terima sesuai sisa kuota ukuran.
+        const prepared = await Promise.all(images.slice(0, remaining).map(async (file) => ({
+            id: uid(),
+            file: await compressImage(file),
+        })));
+
+        let totalBytes = pendingFiles.reduce((sum, item) => sum + item.file.size, 0);
+        const accepted = [];
+
+        prepared.forEach((item) => {
+            if (totalBytes + item.file.size > MAX_TOTAL_BYTES) return;
+
+            totalBytes += item.file.size;
+            accepted.push({ ...item, url: URL.createObjectURL(item.file) });
+        });
+
+        if (accepted.length < prepared.length) {
+            toast(
+                accepted.length === 0
+                    ? "Total foto terlalu besar. Coba kirim beberapa dulu, lalu tambah lagi."
+                    : "Sebagian foto tidak ikut karena totalnya melebihi batas sekali kirim.",
+                true,
+            );
+        }
+
+        pendingFiles.push(...accepted);
+        renderAttachments();
+        setActiveAttachment(startIndex);
     }
 
-    // Reset state baik ditutup lewat tombol, Esc, maupun klik backdrop.
-    previewDialog?.addEventListener("close", () => {
-        pendingFile = null;
-        if (imageInput) imageInput.value = "";
-        if (previewCaption) previewCaption.value = "";
-        if (previewUrl) {
-            URL.revokeObjectURL(previewUrl);
-            previewUrl = null;
+    function renderAttachments() {
+        if (!attachList) return;
+
+        attachList.innerHTML = "";
+
+        pendingFiles.forEach((item, index) => {
+            const tile = document.createElement("div");
+            tile.dataset.attachTile = String(index);
+            tile.setAttribute("role", "listitem");
+            tile.className = "relative size-16 shrink-0 overflow-hidden rounded-xl border-2 border-transparent";
+
+            const openButton = document.createElement("button");
+            openButton.type = "button";
+            openButton.dataset.attachOpen = String(index);
+            openButton.className = "block size-full";
+            openButton.setAttribute("aria-label", `Lihat foto ${index + 1}`);
+
+            const thumb = document.createElement("img");
+            thumb.src = item.url;
+            thumb.alt = "";
+            thumb.className = "size-full object-cover";
+            openButton.appendChild(thumb);
+
+            const removeButton = document.createElement("button");
+            removeButton.type = "button";
+            removeButton.dataset.attachRemove = String(index);
+            removeButton.className = "absolute left-1 top-1 grid size-5 place-items-center rounded-full bg-black/65 text-white transition hover:bg-black";
+            removeButton.setAttribute("aria-label", `Hapus foto ${index + 1}`);
+            removeButton.innerHTML = '<svg viewBox="0 0 24 24" class="size-3 fill-none stroke-current stroke-[2.5]" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" stroke-linecap="round"/></svg>';
+
+            tile.append(openButton, removeButton);
+            attachList.appendChild(tile);
+        });
+
+        if (pendingFiles.length > 0) {
+            const addButton = document.createElement("button");
+            addButton.type = "button";
+            addButton.dataset.attachAdd = "";
+            addButton.className = "grid size-16 shrink-0 place-items-center rounded-xl border-2 border-dashed border-neutral-300 text-neutral-500 transition hover:border-neutral-400 hover:text-neutral-700";
+            addButton.setAttribute("aria-label", "Tambah foto");
+            addButton.innerHTML = '<svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current stroke-2" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>';
+            attachList.appendChild(addButton);
         }
-        previewImg?.removeAttribute("src");
+
+        const hasItems = pendingFiles.length > 0;
+        attachStrip.classList.toggle("hidden", !hasItems);
+        attachPanel?.classList.toggle("hidden", !hasItems);
+        attachPanel?.classList.toggle("flex", hasItems);
+
+        // Panel pratinjau menggantikan area produk + pesan supaya lebih tinggi.
+        app.querySelector("[data-attach-hide]")?.classList.toggle("hidden", hasItems);
+
+        syncCaptionPlaceholder();
+    }
+
+    function setActiveAttachment(index) {
+        if (pendingFiles.length === 0) {
+            if (attachImg) attachImg.removeAttribute("src");
+            if (attachCounter) attachCounter.textContent = "";
+            return;
+        }
+
+        activeAttachment = Math.min(Math.max(index, 0), pendingFiles.length - 1);
+        const item = pendingFiles[activeAttachment];
+
+        if (attachImg) attachImg.src = item.url;
+        if (attachCounter) attachCounter.textContent = `${activeAttachment + 1} / ${pendingFiles.length}`;
+
+        attachList?.querySelectorAll("[data-attach-tile]").forEach((tile) => {
+            const active = Number(tile.dataset.attachTile) === activeAttachment;
+            tile.classList.toggle("border-lime-500", active);
+            tile.classList.toggle("border-transparent", !active);
+        });
+    }
+
+    function removeAttachment(index) {
+        const [removed] = pendingFiles.splice(index, 1);
+        if (removed) URL.revokeObjectURL(removed.url);
+
+        activeAttachment = Math.min(activeAttachment, Math.max(0, pendingFiles.length - 1));
+        renderAttachments();
+        setActiveAttachment(activeAttachment);
+    }
+
+    function clearAttachments() {
+        pendingFiles.forEach((item) => URL.revokeObjectURL(item.url));
+        pendingFiles = [];
+        activeAttachment = 0;
+
+        if (attachImg) attachImg.removeAttribute("src");
+        if (attachCounter) attachCounter.textContent = "";
+        renderAttachments();
+    }
+
+    function syncCaptionPlaceholder() {
+        if (offerMode) return;
+        input.placeholder = pendingFiles.length > 0 ? "Tambah keterangan..." : "Ketik pesan";
+    }
+
+    attachStrip?.addEventListener("click", (event) => {
+        const addButton = event.target.closest("[data-attach-add]");
+        if (addButton) {
+            imageInput?.click();
+            return;
+        }
+
+        const removeButton = event.target.closest("[data-attach-remove]");
+        if (removeButton) {
+            removeAttachment(Number(removeButton.dataset.attachRemove));
+            return;
+        }
+
+        const openButton = event.target.closest("[data-attach-open]");
+        if (openButton) setActiveAttachment(Number(openButton.dataset.attachOpen));
     });
 
-    previewDialog?.querySelector("[data-preview-cancel]")?.addEventListener("click", () => {
-        previewDialog.close();
+    // Aksi untuk foto yang sedang tampil di panel pratinjau.
+    attachPanel?.addEventListener("click", (event) => {
+        if (event.target.closest("[data-attach-edit-active]")) {
+            openEditor(activeAttachment);
+            return;
+        }
+
+        if (event.target.closest("[data-attach-remove-active]")) {
+            removeAttachment(activeAttachment);
+            input.focus();
+        }
     });
 
-    previewSend?.addEventListener("click", async () => {
-        if (!pendingFile || submitting) return;
-
-        const caption = previewCaption?.value.trim() ?? "";
-        previewSend.disabled = true;
-        const ok = await send({ body: caption, file: pendingFile });
-        previewSend.disabled = false;
-
-        if (ok) previewDialog?.close();
+    attachPanel?.querySelector("[data-attach-close]")?.addEventListener("click", () => {
+        clearAttachments();
+        input.focus();
     });
+
+    async function openEditor(index) {
+        const item = pendingFiles[index];
+        if (!item || !editorDialog) return;
+
+        if (item.file.type === "image/gif") {
+            toast("GIF tidak bisa diedit. Kirim apa adanya atau pilih foto biasa.", true);
+            return;
+        }
+
+        try {
+            if (!imageEditor) {
+                const module = await import("./chat-image-editor");
+                imageEditor = module.createImageEditor(editorDialog);
+            }
+
+            const edited = await imageEditor?.open(item.file);
+            if (!edited) return;
+
+            URL.revokeObjectURL(item.url);
+            item.file = edited;
+            item.url = URL.createObjectURL(edited);
+
+            renderAttachments();
+            setActiveAttachment(pendingFiles.indexOf(item));
+        } catch (error) {
+            toast(error.message || "Foto gagal diedit.", true);
+        }
+    }
 
     // Tempel gambar dari clipboard (Ctrl+V hasil copy gambar).
     form.addEventListener("paste", (event) => {
         if (offerMode) return;
-        const items = [...(event.clipboardData?.items ?? [])];
-        const imageItem = items.find((item) => item.type.startsWith("image/"));
-        if (!imageItem) return;
 
-        const file = imageItem.getAsFile();
-        if (!file) return;
+        const files = [...(event.clipboardData?.items ?? [])]
+            .filter((item) => item.type.startsWith("image/"))
+            .map((item) => item.getAsFile())
+            .filter(Boolean);
+
+        if (files.length === 0) return;
 
         event.preventDefault();
-        openPreview(file);
+        addFiles(files);
     });
 
     // Seret & lepas gambar ke area chat.
@@ -572,8 +812,7 @@ export function initChat() {
             }
             event.preventDefault();
             if (type === "drop") {
-                const file = [...(event.dataTransfer.files ?? [])].find((entry) => entry.type.startsWith("image/"));
-                if (file) openPreview(file);
+                addFiles([...(event.dataTransfer?.files ?? [])]);
             }
         });
     });
@@ -581,19 +820,95 @@ export function initChat() {
     /* --------------------------------------------------------- lightbox */
 
     box.addEventListener("click", (event) => {
-        const trigger = event.target.closest("[data-lightbox-src]");
+        const trigger = event.target.closest("[data-lightbox-index]");
         if (!trigger || !lightbox || !lightboxImg) return;
-        lightboxImg.src = trigger.dataset.lightboxSrc;
-        if (!lightbox.open) lightbox.showModal();
+
+        const groupNode = trigger.closest("[data-lightbox-group]");
+        let group = [];
+
+        try {
+            group = JSON.parse(groupNode?.dataset.lightboxGroup ?? "[]");
+        } catch {
+            group = [];
+        }
+
+        openLightbox(
+            Array.isArray(group) && group.length > 0 ? group : [trigger.querySelector("img")?.src ?? ""],
+            Number(trigger.dataset.lightboxIndex) || 0,
+            groupNode?.dataset.lightboxCaption ?? "",
+        );
     });
 
+    function openLightbox(group, index, caption = "") {
+        lightboxGroup = group.filter(Boolean);
+        if (lightboxGroup.length === 0) return;
+
+        lightboxIndex = Math.min(Math.max(index, 0), lightboxGroup.length - 1);
+        if (lightboxCaption) {
+            lightboxCaption.textContent = caption;
+            lightboxCaption.classList.toggle("hidden", caption === "");
+        }
+
+        updateLightbox();
+        if (!lightbox.open) lightbox.showModal();
+    }
+
+    function updateLightbox() {
+        if (!lightboxImg) return;
+
+        lightboxImg.src = lightboxGroup[lightboxIndex] ?? "";
+        const total = lightboxGroup.length;
+
+        if (lightboxCounter) {
+            lightboxCounter.textContent = total > 1 ? `${lightboxIndex + 1} / ${total}` : "Foto";
+        }
+
+        [lightboxPrev, lightboxNext].forEach((button) => {
+            button?.classList.toggle("hidden", total <= 1);
+        });
+
+        if (lightboxPrev) lightboxPrev.disabled = lightboxIndex === 0;
+        if (lightboxNext) lightboxNext.disabled = lightboxIndex >= total - 1;
+    }
+
+    function stepLightbox(step) {
+        if (!lightbox?.open || lightboxGroup.length <= 1) return;
+
+        lightboxIndex = Math.min(Math.max(lightboxIndex + step, 0), lightboxGroup.length - 1);
+        updateLightbox();
+    }
+
     lightbox?.querySelector("[data-lightbox-close]")?.addEventListener("click", () => lightbox.close());
+    lightboxPrev?.addEventListener("click", () => stepLightbox(-1));
+    lightboxNext?.addEventListener("click", () => stepLightbox(1));
     lightbox?.addEventListener("click", (event) => {
         if (event.target === lightbox) lightbox.close();
     });
-    previewDialog?.addEventListener("click", (event) => {
-        if (event.target === previewDialog) previewDialog.close();
+
+    document.addEventListener("keydown", (event) => {
+        if (!lightbox?.open) return;
+
+        if (event.key === "ArrowLeft") {
+            event.preventDefault();
+            stepLightbox(-1);
+        } else if (event.key === "ArrowRight") {
+            event.preventDefault();
+            stepLightbox(1);
+        }
     });
+
+    let lightboxTouchX = null;
+    lightbox?.addEventListener("touchstart", (event) => {
+        lightboxTouchX = event.touches[0]?.clientX ?? null;
+    }, { passive: true });
+    lightbox?.addEventListener("touchend", (event) => {
+        if (lightboxTouchX === null) return;
+
+        const delta = (event.changedTouches[0]?.clientX ?? lightboxTouchX) - lightboxTouchX;
+        lightboxTouchX = null;
+
+        if (Math.abs(delta) > 45) stepLightbox(delta > 0 ? -1 : 1);
+    }, { passive: true });
 
     /* ------------------------------------------------------ offer actions */
 

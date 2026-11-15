@@ -52,7 +52,7 @@ class ChatController extends Controller
         $conversation->load(['product.coverImage', 'buyer', 'seller']);
 
         $messages = $conversation->messages()
-            ->with('sender')
+            ->with(['sender', 'images'])
             ->orderByDesc('id')
             ->limit(self::PAGE_SIZE)
             ->get()
@@ -175,29 +175,52 @@ class ChatController extends Controller
             }
         }
 
-        $imagePath = $request->hasFile('image')
-            ? $request->file('image')->store("chat/{$conversation->id}", 'public')
-            : null;
+        $files = [
+            ...($request->hasFile('image') ? [$request->file('image')] : []),
+            ...($request->file('images') ?? []),
+        ];
+
+        $storedPaths = [];
 
         try {
-            $message = $conversation->messages()->create([
-                'sender_id' => (string) Auth::id(),
-                'client_id' => $clientId,
-                'body' => $validated['body'] ?? null,
-                'image' => $imagePath,
-                'type' => $isOffer ? Message::TYPE_OFFER : Message::TYPE_TEXT,
-                'offer_amount' => $isOffer ? $validated['offer_amount'] : null,
-                'offer_status' => $isOffer ? Message::OFFER_PENDING : null,
-            ]);
+            // Simpan berkas lebih dulu; kalau insert gagal semuanya dibersihkan.
+            foreach ($files as $file) {
+                $storedPaths[] = $file->store("chat/{$conversation->id}", 'public');
+            }
+
+            $message = DB::transaction(function () use ($conversation, $validated, $clientId, $isOffer, $storedPaths) {
+                $message = $conversation->messages()->create([
+                    'sender_id' => (string) Auth::id(),
+                    'client_id' => $clientId,
+                    'body' => $validated['body'] ?? null,
+                    // Kolom lama hanya diisi bila tepat satu foto, supaya klien
+                    // lama dan data lama tetap terbaca.
+                    'image' => count($storedPaths) === 1 ? $storedPaths[0] : null,
+                    'type' => $isOffer ? Message::TYPE_OFFER : Message::TYPE_TEXT,
+                    'offer_amount' => $isOffer ? $validated['offer_amount'] : null,
+                    'offer_status' => $isOffer ? Message::OFFER_PENDING : null,
+                ]);
+
+                foreach ($storedPaths as $index => $path) {
+                    $message->images()->create([
+                        'path' => $path,
+                        'urutan' => $index,
+                    ]);
+                }
+
+                return $message;
+            });
         } catch (UniqueConstraintViolationException) {
             // Balapan dua request identik: pakai baris yang menang.
-            if ($imagePath !== null) {
-                Storage::disk('public')->delete($imagePath);
-            }
+            Storage::disk('public')->delete($storedPaths);
 
             $message = $conversation->messages()->where('client_id', $clientId)->sole();
 
             return $this->sentResponse($conversation, $message);
+        } catch (\Throwable $exception) {
+            Storage::disk('public')->delete($storedPaths);
+
+            throw $exception;
         }
 
         $conversation->update(['last_message_at' => $message->created_at]);
@@ -222,7 +245,7 @@ class ChatController extends Controller
 
         $newMessages = $conversation->messages()
             ->where('id', '>', $after)
-            ->with('sender')
+            ->with(['sender', 'images'])
             ->orderBy('id')
             ->get();
 
@@ -255,6 +278,7 @@ class ChatController extends Controller
 
         $offers = $conversation->messages()
             ->where('type', Message::TYPE_OFFER)
+            ->with('images')
             ->get()
             ->map(fn (Message $message) => [
                 'id' => $message->id,
@@ -447,12 +471,10 @@ class ChatController extends Controller
     {
         abort_unless($message->sender_id === (string) Auth::id(), 403);
 
-        $path = $message->image;
+        $paths = $message->imagePaths();
         $message->delete();
 
-        if ($path !== null) {
-            Storage::disk('public')->delete($path);
-        }
+        Storage::disk('public')->delete($paths);
 
         return back();
     }
@@ -529,7 +551,7 @@ class ChatController extends Controller
                     ->where('type', '!=', Message::TYPE_SYSTEM)
                     ->where('sender_id', '!=', $userId),
             ))
-            ->with(['product.coverImage', 'buyer', 'seller', 'lastMessage', 'latestOffer'])
+            ->with(['product.coverImage', 'buyer', 'seller', 'lastMessage.images', 'latestOffer'])
             ->withCount(['messages as unread_count' => fn ($query) => $query
                 ->whereNull('read_at')
                 ->where('type', '!=', Message::TYPE_SYSTEM)
@@ -704,6 +726,8 @@ class ChatController extends Controller
      */
     private function renderMessage(Conversation $conversation, Message $message): string
     {
+        $message->loadMissing('images');
+
         return view('chat.partials.message', [
             'message' => $message,
             'conversation' => $conversation,

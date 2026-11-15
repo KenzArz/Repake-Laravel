@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Message extends Model
 {
@@ -66,5 +67,35 @@ class Message extends Model
     public function sender(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Semua gambar pada satu pesan, sesuai urutan pilih pengirim.
+     */
+    public function images(): HasMany
+    {
+        return $this->hasMany(MessageImage::class)->orderBy('urutan')->orderBy('id');
+    }
+
+    /**
+     * Path gambar pesan. Kolom `image` lama tetap dipakai sebagai cadangan
+     * untuk data yang belum sempat dibackfill.
+     *
+     * @return array<int, string>
+     */
+    public function imagePaths(): array
+    {
+        $paths = $this->images->pluck('path')->filter()->values()->all();
+
+        if ($paths === [] && $this->image !== null) {
+            return [$this->image];
+        }
+
+        return $paths;
+    }
+
+    public function hasImage(): bool
+    {
+        return $this->imagePaths() !== [];
     }
 }
