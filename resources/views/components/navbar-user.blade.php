@@ -303,6 +303,7 @@
 </script>
 
 {{-- Bottom nav (mobile saja) - Floating Curved Pill Bar --}}
+@unless (request()->routeIs('chat.show'))
 <div class="fixed inset-x-0 bottom-3 z-40 px-4 md:hidden">
     <nav class="mx-auto flex max-w-sm items-center justify-around rounded-[32px] border border-neutral-300 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-md"
         aria-label="Navigasi utama">
@@ -376,3 +377,4 @@
         </a>
     </nav>
 </div>
+@endunless

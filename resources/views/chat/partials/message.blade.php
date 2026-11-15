@@ -12,6 +12,11 @@
 
     $amount = 'Rp '.number_format((int) $message->offer_amount, 0, ',', '.');
     $time = $message->created_at?->copy()->timezone('Asia/Jakarta')->format('H.i');
+
+    $imageUrls = array_map(fn ($path) => Storage::url($path), $message->imagePaths());
+    $imageCount = count($imageUrls);
+    $visibleImages = array_slice($imageUrls, 0, 4);
+    $remainingImages = max(0, $imageCount - 4);
 @endphp
 
 @if ($isSystem)
@@ -28,7 +33,7 @@
             <img src="{{ $otherAvatar }}" alt="" class="mt-0.5 size-6 shrink-0 rounded-full object-cover">
         @endunless
 
-        <div class="flex max-w-[min(80%,26rem)] flex-col {{ $isMine ? 'items-end' : 'items-start' }}">
+        <div class="flex {{ $imageCount > 0 ? 'max-w-[min(76%,18rem)]' : 'max-w-[min(80%,26rem)]' }} flex-col {{ $isMine ? 'items-end' : 'items-start' }}">
             @if ($isOffer)
                 @php
                     $cardTone = $isMine ? 'bg-lime-400' : 'bg-neutral-200';
@@ -94,14 +99,63 @@
                     @endif
                 </div>
             @else
-                <div class="rounded-2xl {{ $isMine ? 'bg-lime-400 rounded-br-md' : 'bg-neutral-200 rounded-bl-md' }} {{ $message->image !== null ? 'p-1' : 'px-4 py-2' }} text-[15px] leading-[1.35] text-neutral-900">
-                    @if ($message->image !== null)
-                        <button type="button" class="block overflow-hidden rounded-xl" data-lightbox-src="{{ Storage::url($message->image) }}" aria-label="Lihat gambar penuh">
-                            <img src="{{ Storage::url($message->image) }}"
-                                 alt="Gambar pesan"
-                                 class="max-h-72 w-auto max-w-full cursor-zoom-in object-cover"
-                                 loading="lazy">
-                        </button>
+                <div class="rounded-2xl {{ $isMine ? 'bg-lime-400 rounded-br-md' : 'bg-neutral-200 rounded-bl-md' }} {{ $imageCount > 0 ? 'p-1' : 'px-4 py-2' }} text-[15px] leading-[1.35] text-neutral-900">
+                    @if ($imageCount > 0)
+                        <div class="overflow-hidden rounded-xl"
+                             data-lightbox-group="{{ json_encode($imageUrls) }}"
+                             data-lightbox-caption="{{ $message->body }}">
+                            @if ($imageCount === 1)
+                                <button type="button"
+                                        class="block cursor-zoom-in"
+                                        data-lightbox-index="0"
+                                        aria-label="Buka foto">
+                                    <img src="{{ $imageUrls[0] }}"
+                                         alt="Foto pesan"
+                                         class="max-h-72 w-auto max-w-full object-cover"
+                                         loading="lazy">
+                                </button>
+                            @elseif ($imageCount === 3)
+                                {{-- 1 foto besar di kiri, 2 foto bertumpuk di kanan. --}}
+                                <div class="grid grid-cols-2 gap-[3px] bg-white">
+                                    <button type="button"
+                                            class="relative row-span-2 h-full cursor-zoom-in bg-neutral-200 after:pointer-events-none after:absolute after:inset-0 after:shadow-[inset_0_0_0_1px_rgba(0,0,0,0.10)]"
+                                            data-lightbox-index="0"
+                                            aria-label="Buka foto 1 dari {{ $imageCount }}">
+                                        <img src="{{ $imageUrls[0] }}" alt="Foto pesan 1"
+                                             class="h-full w-full object-cover" loading="lazy">
+                                    </button>
+                                    @foreach ([1, 2] as $index)
+                                        <button type="button"
+                                                class="relative cursor-zoom-in bg-neutral-200 after:pointer-events-none after:absolute after:inset-0 after:shadow-[inset_0_0_0_1px_rgba(0,0,0,0.10)]"
+                                                data-lightbox-index="{{ $index }}"
+                                                aria-label="Buka foto {{ $index + 1 }} dari {{ $imageCount }}">
+                                            <img src="{{ $imageUrls[$index] }}" alt="Foto pesan {{ $index + 1 }}"
+                                                 class="aspect-square w-full object-cover" loading="lazy">
+                                        </button>
+                                    @endforeach
+                                </div>
+                            @else
+                                {{-- 2, 4, atau lebih: grid 2x2. Foto ke-4 menampilkan sisa foto. --}}
+                                <div class="grid grid-cols-2 gap-[3px] bg-white">
+                                    @foreach ($visibleImages as $index => $url)
+                                        <button type="button"
+                                                class="relative cursor-zoom-in bg-neutral-200 after:pointer-events-none after:absolute after:inset-0 after:shadow-[inset_0_0_0_1px_rgba(0,0,0,0.10)]"
+                                                data-lightbox-index="{{ $index }}"
+                                                aria-label="Buka foto {{ $index + 1 }} dari {{ $imageCount }}">
+                                            <img src="{{ $url }}" alt="Foto pesan {{ $index + 1 }}"
+                                                 class="aspect-square w-full object-cover" loading="lazy">
+                                            @if ($index === 3 && $remainingImages > 0)
+                                                {{-- Scrim gelap + blur tipis supaya angka sisa foto tetap terbaca
+                                                     walau fotonya ramai. --}}
+                                                <span class="absolute inset-0 z-10 grid select-none place-items-center bg-neutral-950/60 text-[26px] font-black leading-none text-white backdrop-blur-[2px]"
+                                                      aria-hidden="true">+{{ $remainingImages }}</span>
+                                            @endif
+                                        </button>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+
                         @if ($message->body)
                             <p class="whitespace-pre-line break-words px-2 pb-1 pt-1.5">{{ $message->body }}</p>
                         @endif
