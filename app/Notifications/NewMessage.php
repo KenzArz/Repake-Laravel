@@ -28,9 +28,11 @@ class NewMessage extends Notification
     public function toArray(object $notifiable): array
     {
         return [
+            'kind' => 'new_message',
             'title' => "Pesan baru dari {$this->senderName}",
             'body' => "{$this->senderName} mengirim pesan untukmu.",
             'url' => route('chat.show', ['conversation' => $this->conversationId]),
+            'conversation_id' => $this->conversationId,
         ];
     }
 }

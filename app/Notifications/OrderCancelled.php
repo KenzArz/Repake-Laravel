@@ -25,11 +25,13 @@ class OrderCancelled extends Notification
     public function toArray(object $notifiable): array
     {
         return [
+            'kind' => 'order_cancelled',
             'title' => 'Transaksi dibatalkan',
             'body' => "Produk \"{$this->productTitle}\" sudah terjual ke pembeli lain.",
             'url' => $this->conversationId
                 ? route('chat.show', ['conversation' => $this->conversationId])
                 : route('home'),
+            'conversation_id' => $this->conversationId,
         ];
     }
 }

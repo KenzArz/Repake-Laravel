@@ -9,13 +9,20 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Akun yang diblokir admin tidak boleh memakai fitur apa pun,
- * meskipun session-nya masih aktif.
+ * meskipun session atau token-nya masih aktif.
  */
 class EnsureUserIsNotBanned
 {
     public function handle(Request $request, Closure $next): Response
     {
         if ($request->user()?->is_banned) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Akun Anda diblokir. Hubungi admin RePake untuk informasi lebih lanjut.',
+                    'errors' => (object) [],
+                ], 403);
+            }
+
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();

@@ -31,9 +31,11 @@ class OfferDecided extends Notification
         $status = $this->accepted ? 'Diterima ✅' : 'Ditolak ❌';
 
         return [
+            'kind' => 'offer_decided',
             'title' => "Tawaranmu {$status}",
             'body' => 'Tawaran Rp'.number_format($this->offerAmount, 0, ',', '.')." {$status} oleh penjual.",
             'url' => route('chat.show', ['conversation' => $this->conversationId]),
+            'conversation_id' => $this->conversationId,
         ];
     }
 }
