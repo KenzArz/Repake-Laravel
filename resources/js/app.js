@@ -151,15 +151,17 @@ initLocationDetect();
 /* Form jual barang — hanya dimuat bila halamannya memang punya form tersebut */
 if (document.getElementById("productForm")) {
     import("./product-create").then((module) => module.initProductCreate());
-    import("./product-location").then((module) => module.initProductLocation());
 }
 
 /* Form edit barang — hanya dimuat di halaman edit produk */
 if (document.getElementById("productEditForm")) {
     import("./product-edit").then((module) => module.initProductEdit());
-    import("./product-location").then((module) => module.initProductLocation());
 }
 
+/* Autocomplete & GPS lokasi — aktif di jual barang, edit barang, dan edit profil */
+if (document.getElementById("location_search")) {
+    import("./product-location").then((module) => module.initProductLocation());
+}
 /* Detail produk — hanya dimuat di halaman detail produk */
 if (
     document.getElementById("product-desc") ||

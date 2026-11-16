@@ -61,6 +61,8 @@ Route::middleware(['auth', 'banned'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'catalog'])->name('profile.catalog');
     Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+
+    Route::patch('/profile/location', [ProfileController::class, 'updateLocation'])->name('profile.location');
 });
 
 // Profil publik penjual lain (dibuka dari detail produk, kartu produk, dan header chat).

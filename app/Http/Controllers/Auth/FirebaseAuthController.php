@@ -81,7 +81,7 @@ class FirebaseAuthController extends Controller
         $user->email_verified_at ??= now();
         $user->role = $user->isAdmin() ? User::ROLE_ADMIN : User::ROLE_MAHASISWA;
         $user->save();
-        
+
         Auth::login($user, true);
         $request->session()->regenerate();
 
@@ -89,7 +89,7 @@ class FirebaseAuthController extends Controller
             'name' => $user->name,
             'email' => $user->email,
             'username' => $user->username,
-            'kota' => $user->kota ?: 'Karawang',
+            'kota' => $user->kota,
             'avatar' => $user->avatar_url,
             'is_verified' => true,
         ]);
@@ -106,7 +106,7 @@ class FirebaseAuthController extends Controller
     public function logout(Request $request): RedirectResponse
     {
         Auth::logout();
-        $request->session()->forget(['auth_user', 'user_profile']);
+        $request->session()->forget(['auth_user', 'user_profile', 'user_location']);
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 

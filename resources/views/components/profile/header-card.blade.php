@@ -19,26 +19,56 @@
 
             <div class="min-w-0 flex-1">
                 <h1
-                    class="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-neutral-900 break-words leading-snug">
-                    {{ $profile['name'] ?? 'Midou Wijaya' }}
+                    class="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-neutral-900 wrap-break-wordbreak-words leading-snug">
+                    {{ $profile['name'] }}
                 </h1>
 
                 <p class="text-xs font-bold text-neutral-800 truncate">
-                    @<span>{{ $profile['username'] ?? 'midou_kun' }}</span>
+                    @<span>{{ $profile['username']}}</span>
                 </p>
 
-                <p class="mt-1 text-xs text-neutral-600 line-clamp-2 break-words">
-                    {{ $profile['bio'] ?? 'Jual apa aja demi bisa nikahin hiura' }}
-                </p>
+                @php
+                    $bio = trim((string) ($profile['bio'] ?? ''));
+                    $kota = trim((string) ($profile['kota'] ?? ($isOwner ? session('user_location.kota', '') : '')));
+                @endphp
 
-                <p class="mt-2 flex items-center gap-1 text-xs text-neutral-600">
+                {{-- Bio / Deskripsi --}}
+                @if ($bio !== '')
+                    <p class="mt-1 text-xs text-neutral-600 line-clamp-2 wrap-break-words">
+                        {{ $bio }}
+                    </p>
+                @elseif ($isOwner)
+                    <a href="{{ route('profile.edit') }}"
+                        class="mt-1 inline-flex items-center gap-1 text-xs font-medium italic text-neutral-400 transition hover:text-lime-700 hover:underline">
+                        <span>+ Tambahkan deskripsi</span>
+                    </a>
+                @endif
+
+                {{-- Lokasi --}}
+                <div id="profile-location-row" class="mt-2 flex items-center gap-1.5 text-xs text-neutral-600">
                     <svg viewBox="0 0 24 24"
                         class="size-3.5 shrink-0 fill-none stroke-current stroke-2 text-neutral-700">
                         <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
                         <circle cx="12" cy="10" r="3" />
                     </svg>
-                    <span class="truncate">{{ $profile['kota'] ?? 'Bekasi' }}</span>
-                </p>
+
+                    @if ($kota !== '')
+                        <span class="truncate">{{ $kota }}</span>
+                    @elseif ($isOwner)
+                        <button type="button" id="profile-use-current-location"
+                            data-save-url="{{ route('profile.location') }}"
+                            class="inline-flex items-center gap-1 font-semibold text-lime-700 hover:underline cursor-pointer">
+                            <span>Gunakan lokasi saat ini</span>
+                        </button>
+                        <span class="text-neutral-300">·</span>
+                        <a href="{{ route('profile.edit') }}"
+                            class="text-[11px] text-neutral-500 hover:text-neutral-800 hover:underline">
+                            Atur manual
+                        </a>
+                    @else
+                        <span class="italic text-neutral-400">Lokasi belum diatur</span>
+                    @endif
+                </div>
             </div>
         </div>
 
@@ -128,3 +158,100 @@
         </div>
     </div>
 </div>
+
+@if ($isOwner && $kota === '')
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const btn = document.getElementById('profile-use-current-location');
+            const row = document.getElementById('profile-location-row');
+            if (!btn || !row) return;
+
+            const saveUrl = btn.dataset.saveUrl;
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+            const cleanCityName = (raw) =>
+                String(raw || '').replace(/^(Kabupaten|Kota)\s+/i, '').trim();
+
+            const renderSavedLocation = (city) => {
+                row.innerHTML = `
+                        <svg viewBox="0 0 24 24" class="size-3.5 shrink-0 fill-none stroke-current stroke-2 text-neutral-700">
+                            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                            <circle cx="12" cy="10" r="3" />
+                        </svg>
+                        <span class="truncate">${city}</span>
+                    `;
+                const navLabel = document.getElementById('current-location-label');
+                if (navLabel && navLabel.textContent.trim() === 'Pilih Lokasimu') {
+                    navLabel.textContent = city;
+                }
+            };
+
+            const persistLocation = async (city) => {
+                const res = await fetch(saveUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrf,
+                    },
+                    body: JSON.stringify({ kota: city }),
+                });
+                if (!res.ok) throw new Error('Gagal menyimpan lokasi');
+                const data = await res.json();
+                renderSavedLocation(data.kota || city);
+            };
+
+            // 1. Ambil otomatis jika user sebelumnya sudah memilih lokasi di navbar
+            try {
+                const stored = JSON.parse(localStorage.getItem('repake_location_data') || 'null');
+                if (stored?.label && stored.label !== 'Pilih Lokasimu') {
+                    const parts = stored.label.split(',');
+                    const inferredCity = cleanCityName(parts[parts.length - 1]);
+                    if (inferredCity) {
+                        persistLocation(inferredCity).catch(() => { });
+                        return;
+                    }
+                }
+            } catch {
+                // Abaikan jika localStorage tidak tersedia
+            }
+
+            // 2. Deteksi GPS saat tombol "Gunakan lokasi saat ini" diklik
+            btn.addEventListener('click', () => {
+                if (!navigator.geolocation) {
+                    btn.textContent = 'Browser tidak mendukung GPS';
+                    return;
+                }
+
+                btn.disabled = true;
+                btn.textContent = 'Mendeteksi lokasi...';
+
+                navigator.geolocation.getCurrentPosition(
+                    async (pos) => {
+                        const { latitude, longitude } = pos.coords;
+                        try {
+                            const geoRes = await fetch(
+                                `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=id`
+                            );
+                            const geoData = geoRes.ok ? await geoRes.json() : {};
+                            const city = cleanCityName(
+                                geoData.city || geoData.locality || geoData.principalSubdivision
+                            );
+
+                            if (!city) throw new Error('Kota tidak terdeteksi');
+                            await persistLocation(city);
+                        } catch {
+                            btn.disabled = false;
+                            btn.textContent = 'Gagal mendeteksi, coba lagi';
+                        }
+                    },
+                    () => {
+                        btn.disabled = false;
+                        btn.textContent = 'Izin lokasi ditolak';
+                    },
+                    { timeout: 6000, maximumAge: 60000 }
+                );
+            });
+        });
+    </script>
+@endif

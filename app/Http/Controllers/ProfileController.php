@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Http\JsonResponse;
 
 class ProfileController extends Controller
 {
@@ -127,7 +128,7 @@ class ProfileController extends Controller
             : null;
 
         $user->phone = ! empty($validated['phone']) ? trim($validated['phone']) : null;
-        $user->kota = ! empty($validated['kota']) ? trim($validated['kota']) : 'Karawang';
+        $user->kota = ! empty($validated['kota']) ? trim($validated['kota']) : null;
         $user->bio = ! empty($validated['bio']) ? trim($validated['bio']) : null;
 
         // Upload foto profil jika pengguna memilih gambar baru (otomatis convert ke .webp)
@@ -149,12 +150,35 @@ class ProfileController extends Controller
             'name' => $user->name,
             'email' => $user->email,
             'username' => $user->username,
-            'kota' => $user->kota ?: 'Karawang',
+            'kota' => $user->kota,
             'avatar' => $user->avatar_url,
             'is_verified' => true,
         ]);
 
         return redirect()->route('profile.catalog')->with('success', 'Profil berhasil diperbarui!');
+    }
+
+    /**
+     * Simpan lokasi cepat dari tombol GPS di kartu profil.
+     */
+    public function updateLocation(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'kota' => ['required', 'string', 'max:100'],
+        ]);
+
+        $user = $request->user();
+        $kota = trim($validated['kota']);
+
+        $user->kota = $kota;
+        $user->save();
+
+        session()->put('user_profile.kota', $kota);
+        session()->put('user_location.kota', $kota);
+
+        return response()->json([
+            'kota' => $kota,
+        ]);
     }
 
     /**
@@ -450,7 +474,7 @@ class ProfileController extends Controller
             'username' => $user->username ?: str($user->email)->before('@')->replace('.', '_')->toString(),
             'email' => $user->email,
             'phone' => $user->phone,
-            'kota' => $user->kota ?: 'Karawang',
+            'kota' => $user->kota,
             'bio' => $user->bio,
             'avatar' => $user->avatar,
             'avatar_url' => $user->avatar_url,

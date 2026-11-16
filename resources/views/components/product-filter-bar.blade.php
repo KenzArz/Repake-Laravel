@@ -2,7 +2,7 @@
     'action' => route('products.index'),
     'target' => 'search-results',
     'categories' => collect(),
-    'kondisiOptions' => ['Baru', 'Seperti baru', 'Dirawat dengan baik', 'Layak pakai'],
+    'kondisiOptions' => ['Seperti baru', 'Dirawat dengan baik', 'Bekas pakai'],
     'activeKota' => '',
     'sortOptions' => [
         'terbaru' => 'Terbaru',

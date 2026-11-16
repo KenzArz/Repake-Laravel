@@ -1,53 +1,76 @@
 const STORAGE_KEY = "repake_location_data";
+const DEFAULT_LOCATION_LABEL = "Semua Lokasi";
+
+function parseCoord(raw) {
+    if (raw === null || raw === undefined || raw === "") return null;
+    const num = Number(raw);
+    return Number.isFinite(num) ? num : null;
+}
 
 function applySelectedLocation({ label, lat = null, lng = null }) {
     const wrapper = document.getElementById("navbar-location-wrapper");
-    const homeUrl = wrapper?.dataset.homeUrl || "/";
     const searchUrl = wrapper?.dataset.searchUrl || "/products";
     const currentLabel = document.getElementById("current-location-label");
     const dropdown = document.getElementById("location-picker-dropdown");
 
+    const cleanLabel = (label || "").trim();
+    const isReset =
+        !cleanLabel ||
+        cleanLabel.toLowerCase() === DEFAULT_LOCATION_LABEL.toLowerCase() ||
+        cleanLabel.toLowerCase() === "pilih lokasimu";
+
+    const parsedLat = parseCoord(lat);
+    const parsedLng = parseCoord(lng);
+
     if (currentLabel) {
-        currentLabel.textContent = label || "Pilih Lokasimu";
+        currentLabel.textContent = isReset
+            ? DEFAULT_LOCATION_LABEL
+            : cleanLabel;
     }
     dropdown?.classList.add("hidden");
 
     try {
-        if (!label || label === "Pilih Lokasimu") {
+        if (isReset) {
             localStorage.removeItem(STORAGE_KEY);
         } else {
             localStorage.setItem(
                 STORAGE_KEY,
-                JSON.stringify({ label, lat, lng }),
+                JSON.stringify({
+                    label: cleanLabel,
+                    lat: parsedLat,
+                    lng: parsedLng,
+                }),
             );
         }
     } catch {
         // Abaikan jika storage penuh/diblokir
     }
 
-    const currentPath = window.location.pathname;
-    const homePath = new URL(homeUrl, window.location.origin).pathname;
     const searchPath = new URL(searchUrl, window.location.origin).pathname;
+    const isOnSearchPage = window.location.pathname === searchPath;
 
-    // Jika sedang di halaman Home atau halaman Pencarian (/products), tetap di halaman tersebut
-    const isStayPage = currentPath === homePath || currentPath === searchPath;
-    const targetUrl = new URL(
-        isStayPage ? window.location.href : searchUrl,
-        window.location.origin,
-    );
+    // Jika memilih lokasi -> selalu arahkan ke halaman pencarian (/products)
+    // Jika sudah di /products -> pertahankan filter/kata kunci yang sedang aktif
+    // Jika klik Reset di luar /products -> tetap di halaman saat ini sambil menghapus session lokasi
+    const baseHref =
+        isReset && !isOnSearchPage
+            ? window.location.href
+            : isOnSearchPage
+              ? window.location.href
+              : searchUrl;
 
-    // Reset pagination saat lokasi berubah
+    const targetUrl = new URL(baseHref, window.location.origin);
     targetUrl.searchParams.delete("page");
 
-    if (!label || label === "Pilih Lokasimu") {
+    if (isReset) {
         targetUrl.searchParams.set("kota", "");
         targetUrl.searchParams.delete("lat");
         targetUrl.searchParams.delete("lng");
     } else {
-        targetUrl.searchParams.set("kota", label);
-        if (lat !== null && lng !== null) {
-            targetUrl.searchParams.set("lat", String(lat));
-            targetUrl.searchParams.set("lng", String(lng));
+        targetUrl.searchParams.set("kota", cleanLabel);
+        if (parsedLat !== null && parsedLng !== null) {
+            targetUrl.searchParams.set("lat", String(parsedLat));
+            targetUrl.searchParams.set("lng", String(parsedLng));
         } else {
             targetUrl.searchParams.delete("lat");
             targetUrl.searchParams.delete("lng");
@@ -154,7 +177,6 @@ function attachLocationSearch(input, resultsBox) {
         }, 300);
     });
 
-    // Tekan Enter: pilih hasil teratas jika ada, atau pakai teks yang diketik
     input.addEventListener("keydown", (e) => {
         if (e.key !== "Enter") return;
         e.preventDefault();
@@ -176,8 +198,8 @@ function attachLocationSearch(input, resultsBox) {
         if (!btn) return;
         applySelectedLocation({
             label: btn.dataset.label,
-            lat: Number(btn.dataset.lat),
-            lng: Number(btn.dataset.lng),
+            lat: btn.dataset.lat,
+            lng: btn.dataset.lng,
         });
     });
 }
@@ -207,22 +229,22 @@ export function initNavbarLocation() {
         }
     });
 
-    // Klik preset lokasi populer
+    // Klik preset lokasi populer maupun pintasan lokasi profil
     wrapper.querySelectorAll("[data-preset-location]").forEach((btn) => {
         btn.addEventListener("click", () => {
             applySelectedLocation({
                 label: btn.dataset.label,
-                lat: Number(btn.dataset.lat),
-                lng: Number(btn.dataset.lng),
+                lat: btn.dataset.lat,
+                lng: btn.dataset.lng,
             });
         });
     });
 
-    // Reset lokasi
+    // Reset lokasi ke Semua Lokasi
     wrapper
         .querySelector("[data-reset-location]")
         ?.addEventListener("click", () => {
-            applySelectedLocation({ label: "Pilih Lokasimu" });
+            applySelectedLocation({ label: DEFAULT_LOCATION_LABEL });
         });
 
     // Tombol GPS: Gunakan lokasi saat ini
