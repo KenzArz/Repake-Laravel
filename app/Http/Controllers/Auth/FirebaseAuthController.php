@@ -4,16 +4,17 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\FirebaseTokenVerifier;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
 
 class FirebaseAuthController extends Controller
 {
+    public function __construct(private readonly FirebaseTokenVerifier $verifier) {}
+
     /**
      * Verifikasi ID token Firebase lalu buat session login Laravel.
      */
@@ -23,26 +24,15 @@ class FirebaseAuthController extends Controller
             'id_token' => ['required', 'string'],
         ]);
 
-        try {
-            $response = Http::asJson()->post(
-                'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' . config('services.firebase.api_key'),
-                ['idToken' => $request->string('id_token')->toString()]
-            )->throw();
-        } catch (RequestException) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Token login tidak valid. Silakan coba lagi.',
-            ], 401);
+        $account = $this->verifier->verify($request->string('id_token')->toString());
+
+        if ($account === null) {
+            return $this->reject($request, 401);
         }
 
-        $account = $response->json('users.0');
-        $email = is_array($account) ? strtolower(trim((string) ($account['email'] ?? ''))) : '';
+        $email = $account['email'];
 
-        if (! is_array($account) || empty($account['localId']) || $email === '' || ($account['emailVerified'] ?? false) !== true) {
-            return $this->reject($request);
-        }
-
-        if (! $this->isAllowedDomain($email)) {
+        if ($email === '' || $account['emailVerified'] !== true || ! $this->verifier->isAllowedDomain($email)) {
             return $this->reject($request);
         }
 
@@ -78,10 +68,8 @@ class FirebaseAuthController extends Controller
             $user->avatar = $account['photoUrl'] ?? $user->avatar;
         }
 
-        $user->email_verified_at ??= now();
-        $user->role = $user->isAdmin() ? User::ROLE_ADMIN : User::ROLE_MAHASISWA;
         $user->save();
-        
+
         Auth::login($user, true);
         $request->session()->regenerate();
 
@@ -116,7 +104,7 @@ class FirebaseAuthController extends Controller
     /**
      * Tolak login dan pastikan tidak ada session aktif.
      */
-    private function reject(Request $request): JsonResponse
+    private function reject(Request $request, int $status = 422): JsonResponse
     {
         Auth::logout();
         $request->session()->forget(['auth_user', 'user_profile']);
@@ -126,25 +114,7 @@ class FirebaseAuthController extends Controller
         return response()->json([
             'success' => false,
             'message' => 'Akses ditolak: gunakan akun Google UNSIKA yang sudah terverifikasi.',
-        ], 422);
-    }
-
-    /**
-     * Pastikan domain email sama dengan atau subdomain dari domain yang diizinkan.
-     */
-    private function isAllowedDomain(string $email): bool
-    {
-        $domain = (string) str($email)->after('@');
-
-        foreach (config('services.firebase.allowed_domains', []) as $allowed) {
-            $allowed = strtolower(trim($allowed));
-
-            if ($allowed !== '' && ($domain === $allowed || str_ends_with($domain, '.' . $allowed))) {
-                return true;
-            }
-        }
-
-        return false;
+        ], $status);
     }
 
     /**
@@ -157,7 +127,7 @@ class FirebaseAuthController extends Controller
         $suffix = 1;
 
         while (User::where('username', $username)->exists()) {
-            $username = $base . '_' . $suffix++;
+            $username = $base.'_'.$suffix++;
         }
 
         return $username;

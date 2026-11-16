@@ -29,9 +29,11 @@ class OfferReceived extends Notification
     public function toArray(object $notifiable): array
     {
         return [
+            'kind' => 'offer_received',
             'title' => "Tawaran dari {$this->buyerName}",
             'body' => "{$this->buyerName} menawar Rp".number_format($this->offerAmount, 0, ',', '.').'.',
             'url' => route('chat.show', ['conversation' => $this->conversationId]),
+            'conversation_id' => $this->conversationId,
         ];
     }
 }
