@@ -12,11 +12,10 @@ beforeEach(function () {
     $this->seller = User::factory()->create();
     $this->buyer = User::factory()->create();
     $this->product = Product::factory()->create(['user_id' => $this->seller->id]);
-    $this->order = Order::factory()->create([
+    $this->order = Order::factory()->selesai()->create([
         'seller_id' => $this->seller->id,
         'buyer_id' => $this->buyer->id,
         'product_id' => $this->product->id,
-        'status' => Order::STATUS_DISEPAKATI,
     ]);
 });
 
@@ -272,4 +271,25 @@ test('profile rating is the combined average of every review received', function
     $this->get($this->seller->profileUrl())
         ->assertOk()
         ->assertSee('4.0');
+});
+
+test('a buyer can review each completed order for the same product', function () {
+    $secondOrder = Order::factory()->selesai()->create([
+        'seller_id' => $this->seller->id,
+        'buyer_id' => $this->buyer->id,
+        'product_id' => $this->product->id,
+    ]);
+
+    $this->actingAs($this->buyer)
+        ->post(route('reviews.store', $this->order), ['rating' => 5, 'komentar' => 'Pembelian pertama.'])
+        ->assertRedirect();
+
+    $this->actingAs($this->buyer)
+        ->post(route('reviews.store', $secondOrder), ['rating' => 4, 'komentar' => 'Pembelian kedua.'])
+        ->assertRedirect();
+
+    expect(Review::query()
+        ->where('product_id', $this->product->id)
+        ->where('reviewer_id', $this->buyer->id)
+        ->count())->toBe(2);
 });

@@ -32,9 +32,9 @@ class ReviewController extends Controller
         );
 
         abort_unless(
-            in_array($order->status, [Order::STATUS_DISEPAKATI, Order::STATUS_SELESAI], true),
+            $order->status === Order::STATUS_SELESAI,
             403,
-            'Transaksi ini belum dapat diulas.',
+            'Ulasan hanya bisa diberikan setelah transaksi selesai.',
         );
 
         abort_if(
