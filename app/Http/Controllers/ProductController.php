@@ -89,7 +89,7 @@ class ProductController extends Controller
             ->where('name', 'like', "%{$q}%")
             ->take(3)
             ->get()
-            ->map(fn (Category $cat): array => [
+            ->map(fn(Category $cat): array => [
                 'name' => $cat->name,
                 'slug' => $cat->slug,
                 'url' => route('products.index', ['kategori' => [$cat->slug]]),
@@ -102,10 +102,10 @@ class ProductController extends Controller
             ->latest()
             ->take(6)
             ->get()
-            ->map(fn (Product $product): array => [
+            ->map(fn(Product $product): array => [
                 'id' => $product->id,
                 'judul' => $product->judul,
-                'harga' => 'Rp '.number_format((int) $product->harga, 0, ',', '.'),
+                'harga' => 'Rp ' . number_format((int) $product->harga, 0, ',', '.'),
                 'kota' => $product->kota ?: 'Sekitar Kampus',
                 'kondisi' => $product->kondisi,
                 'category' => $product->category?->name ?? 'Produk',
@@ -132,14 +132,21 @@ class ProductController extends Controller
         // Resolve & sinkronkan lokasi dari query parameter atau session navbar
         $userLocation = $this->resolveUserLocation($request);
         $activeKota = $userLocation['kota'] ?? '';
-        $targetLat = $userLocation['lat'];
-        $targetLng = $userLocation['lng'];
 
         $defaultSort = 'terbaru';
         $sort = (string) $request->query('sort', $defaultSort);
 
-        $locationTarget = ($activeKota !== '' || $targetLat !== null)
-            ? $this->resolveLocationTarget($userLocation)
+        // Titik acuan jarak: prioritaskan filter aktif -> kota profil user -> default Kampus 1 Unsika
+        $referenceLocation = $userLocation;
+        if ($referenceLocation['kota'] === null && $referenceLocation['lat'] === null && $sort === 'terdekat') {
+            $profileCity = trim((string) ($request->user()?->kota ?? session('user_profile.kota', '')));
+            $referenceLocation = ($profileCity !== '' && ! in_array(mb_strtolower($profileCity), ['pilih lokasimu', 'semua lokasi'], true))
+                ? ['kota' => $profileCity, 'lat' => null, 'lng' => null]
+                : ['kota' => 'Kampus 1 Unsika', 'lat' => -6.3236, 'lng' => 107.3065];
+        }
+
+        $locationTarget = ($referenceLocation['kota'] !== null || $referenceLocation['lat'] !== null)
+            ? $this->resolveLocationTarget($referenceLocation)
             : ['lat' => null, 'lng' => null, 'keywords' => []];
 
         $targetLat = $locationTarget['lat'];
@@ -148,20 +155,20 @@ class ProductController extends Controller
 
         $query = Product::with(['primaryImage', 'user', 'category', 'codAreas'])
             ->dijual()
-            ->when($q !== '', fn (Builder $qb) => $qb->cari($q))
+            ->when($q !== '', fn(Builder $qb) => $qb->cari($q))
             ->when($selectedKategori !== [], function (Builder $qb) use ($selectedKategori): void {
-                $qb->whereHas('category', fn (Builder $cq) => $cq->whereIn('slug', $selectedKategori));
+                $qb->whereHas('category', fn(Builder $cq) => $cq->whereIn('slug', $selectedKategori));
             })
             ->when($selectedKondisi !== [], function (Builder $qb) use ($selectedKondisi): void {
                 $lowered = array_map('mb_strtolower', $selectedKondisi);
                 $qb->whereIn(DB::raw('LOWER(kondisi)'), $lowered);
             })
-            ->when($minPrice !== null && $minPrice !== '' && is_numeric($minPrice), fn (Builder $qb) => $qb->where('harga', '>=', (int) $minPrice))
-            ->when($maxPrice !== null && $maxPrice !== '' && is_numeric($maxPrice), fn (Builder $qb) => $qb->where('harga', '<=', (int) $maxPrice))
-            ->when($negoOnly, fn (Builder $qb) => $qb->where('is_negotiable', true));
+            ->when($minPrice !== null && $minPrice !== '' && is_numeric($minPrice), fn(Builder $qb) => $qb->where('harga', '>=', (int) $minPrice))
+            ->when($maxPrice !== null && $maxPrice !== '' && is_numeric($maxPrice), fn(Builder $qb) => $qb->where('harga', '<=', (int) $maxPrice))
+            ->when($negoOnly, fn(Builder $qb) => $qb->where('is_negotiable', true));
 
-        // Jika lokasi aktif atau urutkan terdekat dipilih
-        if ($activeKota !== '' || $radiusKm !== null || ($sort === 'terdekat' && $targetLat !== null && $targetLng !== null)) {
+        // Jika filter lokasi aktif atau urutkan terdekat dipilih
+        if ($activeKota !== '' || $radiusKm !== null || $sort === 'terdekat') {
             $maxRadius = $radiusKm ?? 15.0;
 
             $all = $query->latest()->get()->map(function (Product $product) use ($targetLat, $targetLng): Product {
@@ -172,6 +179,7 @@ class ProductController extends Controller
                 return $product;
             });
 
+            // Saring hasil HANYA jika filter lokasi eksplisit aktif (bukan sekadar sort=terdekat)
             if ($activeKota !== '' || $radiusKm !== null) {
                 $all = $all->filter(function (Product $p) use ($locationKeywords, $maxRadius): bool {
                     $keywordMatch = $this->matchesLocationKeywords($p, $locationKeywords);
@@ -184,9 +192,10 @@ class ProductController extends Controller
             $sorted = match ($sort) {
                 'termurah' => $all->sortBy('harga'),
                 'termahal' => $all->sortByDesc('harga'),
-                'terdekat' => $all->sortBy(fn (Product $p): array => [
+                'terdekat' => $all->sortBy(fn(Product $p): array => [
                     $p->distance_km ?? 9999.0,
-                    -($p->created_at?->timestamp ?? 0),
+                    $this->matchesLocationKeywords($p, $locationKeywords) ? 0 : 1,
+                    - ($p->created_at?->timestamp ?? 0),
                 ]),
                 default => $all->sortByDesc('created_at'),
             };
@@ -208,10 +217,9 @@ class ProductController extends Controller
 
         $categories = Category::urut()->get();
         $kondisiOptions = [
-            'Baru',
             'Seperti baru',
             'Dirawat dengan baik',
-            'Layak pakai',
+            'Bekas pakai',
         ];
 
         return view('products.index', compact(
@@ -230,21 +238,31 @@ class ProductController extends Controller
     }
 
     /**
+     * Lokasi filter aktif hanya diambil dari query URL (?kota=...)
+     * atau pilihan eksplisit pengguna di navbar (session user_location).
+     *
      * @return array{kota: ?string, lat: ?float, lng: ?float}
-     */
-    private function resolveUserLocation(Request $request): array
+     */ private function resolveUserLocation(Request $request): array
     {
         if ($request->has('kota')) {
             $rawCity = trim((string) $request->query('kota', ''));
 
-            if ($rawCity === '' || strcasecmp($rawCity, 'Pilih Lokasimu') === 0) {
+            if ($rawCity === '' || in_array(mb_strtolower($rawCity), ['pilih lokasimu', 'semua lokasi'], true)) {
                 session()->forget('user_location');
 
                 return ['kota' => null, 'lat' => null, 'lng' => null];
             }
 
-            $lat = is_numeric($request->query('lat')) ? (float) $request->query('lat') : null;
-            $lng = is_numeric($request->query('lng')) ? (float) $request->query('lng') : null;
+            $existing = session('user_location', []);
+            $isSameCity = isset($existing['kota']) && strcasecmp((string) $existing['kota'], $rawCity) === 0;
+
+            $lat = is_numeric($request->query('lat'))
+                ? (float) $request->query('lat')
+                : ($isSameCity ? ($existing['lat'] ?? null) : null);
+
+            $lng = is_numeric($request->query('lng'))
+                ? (float) $request->query('lng')
+                : ($isSameCity ? ($existing['lng'] ?? null) : null);
 
             $saved = ['kota' => $rawCity, 'lat' => $lat, 'lng' => $lng];
             session()->put('user_location', $saved);
@@ -256,14 +274,7 @@ class ProductController extends Controller
             return session('user_location');
         }
 
-        $fallbackCity = $request->user()?->kota ?? session('user_profile.kota');
-        $fallbackCity = is_string($fallbackCity) ? trim($fallbackCity) : '';
-
-        if ($fallbackCity === '' || strcasecmp($fallbackCity, 'Pilih Lokasimu') === 0) {
-            return ['kota' => null, 'lat' => null, 'lng' => null];
-        }
-
-        return ['kota' => $fallbackCity, 'lat' => null, 'lng' => null];
+        return ['kota' => null, 'lat' => null, 'lng' => null];
     }
 
     /**
@@ -392,8 +403,8 @@ class ProductController extends Controller
 
         if ($files->count() > ProductImageStorage::MAX_IMAGES) {
             return $this->error(
-                'Maksimal gambar yang dapat diunggah adalah '.ProductImageStorage::MAX_IMAGES.' gambar.',
-                ['images' => ['Maksimal gambar yang dapat diunggah adalah '.ProductImageStorage::MAX_IMAGES.' gambar.']],
+                'Maksimal gambar yang dapat diunggah adalah ' . ProductImageStorage::MAX_IMAGES . ' gambar.',
+                ['images' => ['Maksimal gambar yang dapat diunggah adalah ' . ProductImageStorage::MAX_IMAGES . ' gambar.']],
                 $request,
             );
         }
@@ -473,7 +484,7 @@ class ProductController extends Controller
     private function invalidUploadError(Request $request): JsonResponse|RedirectResponse|null
     {
         $file = collect((array) $request->file('images'))
-            ->first(fn ($item): bool => $item instanceof UploadedFile && ! $item->isValid());
+            ->first(fn($item): bool => $item instanceof UploadedFile && ! $item->isValid());
 
         if (! $file instanceof UploadedFile) {
             return null;
@@ -544,7 +555,7 @@ class ProductController extends Controller
             'cover_image_id' => ['nullable', 'integer'],
             'delete_images' => ['nullable', 'array'],
             'delete_images.*' => ['integer'],
-            'images' => ['nullable', 'array', 'max:'.ProductImageStorage::MAX_IMAGES],
+            'images' => ['nullable', 'array', 'max:' . ProductImageStorage::MAX_IMAGES],
             'images.*' => ['image', 'mimes:jpeg,png,jpg,webp', 'max:5120'],
         ], [
             'images.*.mimes' => 'Format gambar harus JPG, PNG, atau WebP.',
@@ -552,7 +563,7 @@ class ProductController extends Controller
         ]);
 
         $newFiles = $this->images->validFiles($request->file('images'));
-        $deleteIds = collect($validated['delete_images'] ?? [])->map(fn ($id) => (int) $id)->all();
+        $deleteIds = collect($validated['delete_images'] ?? [])->map(fn($id) => (int) $id)->all();
 
         $product->load('images');
         $remainingExisting = $product->images->whereNotIn('id', $deleteIds);
@@ -566,7 +577,7 @@ class ProductController extends Controller
 
         if ($totalPhotos > ProductImageStorage::MAX_IMAGES) {
             return back()
-                ->withErrors(['images' => 'Maksimal total gambar produk adalah '.ProductImageStorage::MAX_IMAGES.' gambar.'])
+                ->withErrors(['images' => 'Maksimal total gambar produk adalah ' . ProductImageStorage::MAX_IMAGES . ' gambar.'])
                 ->withInput();
         }
 

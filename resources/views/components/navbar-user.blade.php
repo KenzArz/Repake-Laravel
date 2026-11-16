@@ -6,8 +6,7 @@
 
     $activeKota = request('kota')
         ?? session('user_location.kota')
-        ?? auth()->user()?->kota
-        ?? session('user_profile.kota', 'Pilih Lokasimu');
+        ?? 'Semua Lokasi';
 
     $locationPresets = [
         ['label' => 'Kampus 1 Unsika (Telukjambe)', 'lat' => -6.3236, 'lng' => 107.3065],
@@ -107,6 +106,20 @@
                 </button>
                 <p id="navbar-location-status" class="hidden px-2.5 pb-1 text-[11px] font-medium text-neutral-500"></p>
 
+                {{-- Pintasan Lokasi Profil User --}}
+                @if (auth()->check() && filled(auth()->user()->kota))
+                    <button type="button" data-preset-location data-label="{{ auth()->user()->kota }}" data-lat=""
+                        data-lng=""
+                        class="mt-1 flex w-full items-center justify-between rounded-xl bg-neutral-50 px-2.5 py-2 text-xs font-semibold text-neutral-800 hover:bg-neutral-100 transition text-left cursor-pointer">
+                        <span class="truncate">Sekitar profil saya ({{ auth()->user()->kota }})</span>
+                        @if ($activeKota === auth()->user()->kota)
+                            <svg viewBox="0 0 24 24" class="size-3.5 shrink-0 fill-none stroke-lime-600 stroke-2">
+                                <path d="M20 6 9 17l-5-5" />
+                            </svg>
+                        @endif
+                    </button>
+                @endif
+
                 <div class="my-2 border-t border-neutral-100"></div>
 
                 {{-- Daftar Preset Lokasi Populer --}}
@@ -200,11 +213,12 @@
                             class="size-8 rounded-full overflow-hidden border border-neutral-300 bg-neutral-100 shrink-0 shadow-2xs">
                             @if (!empty($userAvatar))
                                 <img src="{{ str_starts_with($userAvatar, 'http') ? $userAvatar : asset($userAvatar) }}"
-                                    alt="{{ auth()->user()->name }}" class="size-full object-cover">
+                                    alt="{{ auth()->user()->name }}" referrerpolicy="no-referrer"
+                                    onerror="this.onerror=null; this.src='{{ asset('images/default-avatar.png') }}';"
+                                    class="size-full object-cover">
                             @else
                                 <img src="{{ asset('images/default-avatar.png') }}" alt="{{ auth()->user()->name }}"
-                                    class="size-full object-cover"
-                                    onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name={{ urlencode(auth()->user()->name) }}&background=B8E639&color=1c1917';">
+                                    class="size-full object-cover">
                             @endif
                         </div>
                         <svg viewBox="0 0 24 24"
