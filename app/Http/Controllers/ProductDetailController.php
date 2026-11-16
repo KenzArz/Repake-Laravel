@@ -108,9 +108,11 @@ class ProductDetailController extends Controller
                 ->latest('id')
                 ->first();
 
-        // Ulasan milik pengunjung (bila sudah pernah mengulas produk ini).
-        $viewerReview = $viewer !== null
-            ? $productReviews->first(fn (Review $review): bool => $review->reviewer_id === $viewer->id)
+        // Ulasan milik pengunjung untuk order selesai terbaru. Ulasan dibuka
+        // per transaksi, jadi pembelian ulang pada produk yang sama tetap
+        // mendapat kesempatan mengulas order barunya.
+        $viewerReview = $viewer !== null && $viewerOrder !== null
+            ? $viewerOrder->reviewBy($viewer->id)
             : null;
 
         // Order aktif (menunggu COD) milik pengunjung untuk banner status di

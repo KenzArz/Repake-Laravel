@@ -57,13 +57,14 @@ test('the chat shows no review action but a complete button once the offer is ag
         'status' => Order::STATUS_DISEPAKATI,
     ]);
 
-    // Pembeli tidak boleh mengulas sebelum transaksi selesai, dan tidak
-    // melihat aksi selesaikan milik penjual.
+    // Pembeli tidak boleh mengulas sebelum transaksi selesai, tetapi bisa
+    // menyelesaikan sendiri dengan konfirmasi terima barang.
     $this->actingAs($this->buyer)
         ->get(route('chat.show', $this->conversation))
         ->assertOk()
         ->assertDontSee('Nilai')
-        ->assertDontSee(route('chat.sold', $this->conversation));
+        ->assertDontSee(route('chat.sold', $this->conversation))
+        ->assertSee('Barang Diterima');
 
     // Penjual melihat aksi "Selesaikan".
     $this->actingAs($this->seller)
@@ -362,4 +363,31 @@ test('polling new photo messages includes their grid markup', function () {
         ->assertOk()
         ->assertJsonCount(1, 'messages')
         ->assertJsonPath('messages.0.html', fn ($html) => str_contains($html, 'data-lightbox-group'));
+});
+
+test('the offer control is hidden while a transaction is active but returns after completion', function () {
+    $order = Order::factory()->create([
+        'conversation_id' => $this->conversation->id,
+        'seller_id' => $this->seller->id,
+        'buyer_id' => $this->buyer->id,
+        'product_id' => $this->product->id,
+        'status' => Order::STATUS_DISEPAKATI,
+    ]);
+
+    $this->actingAs($this->buyer)
+        ->get(route('chat.show', $this->conversation))
+        ->assertOk()
+        ->assertDontSee('data-offer-mode-toggle', false);
+
+    $order->update([
+        'status' => Order::STATUS_SELESAI,
+        'completed_at' => now(),
+        'completion_type' => Order::COMPLETION_STOCK_AVAILABLE,
+        'completed_by' => Order::COMPLETED_BY_BUYER,
+    ]);
+
+    $this->actingAs($this->buyer)
+        ->get(route('chat.show', $this->conversation))
+        ->assertOk()
+        ->assertSee('data-offer-mode-toggle', false);
 });

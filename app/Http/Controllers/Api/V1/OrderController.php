@@ -81,9 +81,26 @@ class OrderController extends Controller
         ]);
 
         if ($validated['status'] === Order::STATUS_SELESAI) {
-            abort_unless(filled($validated['completion_type'] ?? null), 422, 'Pilih status stok untuk menyelesaikan transaksi.');
+            if ((string) $order->buyer_id === $userId) {
+                // Pembeli menyelesaikan dengan konfirmasi terima barang.
+                $this->orders->confirmReceipt($order, $userId);
+            } else {
+                abort_unless((string) $order->seller_id === $userId, 403, 'Anda bukan pihak pada transaksi ini.');
 
-            $this->orders->complete($order, $userId, $validated['completion_type']);
+                if ($order->status === Order::STATUS_SELESAI) {
+                    abort_unless(
+                        ($validated['completion_type'] ?? null) === Order::COMPLETION_STOCK_OUT,
+                        422,
+                        'Transaksi sudah selesai. Pilih "Stok habis" untuk menutup iklan.',
+                    );
+
+                    $this->orders->markStockOut($order, $userId);
+                } else {
+                    abort_unless(filled($validated['completion_type'] ?? null), 422, 'Pilih status stok untuk menyelesaikan transaksi.');
+
+                    $this->orders->complete($order, $userId, $validated['completion_type']);
+                }
+            }
         } else {
             $this->orders->cancel($order, $userId, $validated['cancel_reason'] ?? null);
         }

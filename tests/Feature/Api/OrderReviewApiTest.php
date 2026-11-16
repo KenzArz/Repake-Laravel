@@ -63,14 +63,36 @@ test('penjual dapat menandai produk terjual', function () {
     expect($product->refresh()->status)->toBe(Product::STATUS_TERJUAL);
 });
 
-test('pembeli tidak bisa menandai produk terjual', function () {
-    ['buyer' => $buyer, 'order' => $order] = apiOrderFixture();
+test('pembeli dapat menyelesaikan dengan konfirmasi terima barang', function () {
+    ['buyer' => $buyer, 'order' => $order, 'product' => $product] = apiOrderFixture();
     Sanctum::actingAs($buyer);
+
+    $this->patchJson('/api/v1/orders/'.$order->id.'/status', ['status' => 'selesai'])
+        ->assertOk()
+        ->assertJsonPath('data.status', Order::STATUS_SELESAI)
+        ->assertJsonPath('data.completed_by', Order::COMPLETED_BY_BUYER);
+
+    // Pembeli tidak boleh mengubah status produk; stok tetap urusan penjual.
+    expect($product->refresh()->status)->toBe(Product::STATUS_DIJUAL);
+});
+
+test('penjual dapat menandai stok habis setelah pembeli konfirmasi', function () {
+    ['seller' => $seller, 'order' => $order, 'product' => $product] = apiOrderFixture();
+    $order->update([
+        'status' => Order::STATUS_SELESAI,
+        'completed_at' => now(),
+        'completed_by' => Order::COMPLETED_BY_BUYER,
+    ]);
+    Sanctum::actingAs($seller);
 
     $this->patchJson('/api/v1/orders/'.$order->id.'/status', [
         'status' => 'selesai',
         'completion_type' => Order::COMPLETION_STOCK_OUT,
-    ])->assertStatus(403);
+    ])
+        ->assertOk()
+        ->assertJsonPath('data.completion_type', Order::COMPLETION_STOCK_OUT);
+
+    expect($product->refresh()->status)->toBe(Product::STATUS_TERJUAL);
 });
 
 test('pihak luar tidak bisa mengubah order', function () {

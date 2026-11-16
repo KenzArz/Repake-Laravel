@@ -298,7 +298,7 @@ test('a completion that keeps stock available leaves other orders untouched', fu
 test('a conversation without an order cannot be completed', function () {
     $this->actingAs($this->seller)
         ->post(route('chat.sold', $this->conversation), ['completion_type' => Order::COMPLETION_STOCK_OUT])
-        ->assertNotFound();
+        ->assertStatus(409);
 
     expect($this->product->refresh()->status)->toBe(Product::STATUS_DIJUAL);
 });
@@ -427,4 +427,137 @@ test('the seller rejects an offer and no order is created', function () {
 
     expect(Order::count())->toBe(0)
         ->and($message->refresh()->offer_status)->toBe(Message::OFFER_REJECTED);
+});
+
+test('an offer is rejected while a transaction is still active', function () {
+    Order::factory()->create([
+        'conversation_id' => $this->conversation->id,
+        'seller_id' => $this->seller->id,
+        'buyer_id' => $this->buyer->id,
+        'product_id' => $this->product->id,
+        'status' => Order::STATUS_DISEPAKATI,
+    ]);
+
+    $this->actingAs($this->buyer)
+        ->postJson(route('chat.messages.store', $this->conversation), [
+            'type' => 'offer',
+            'offer_amount' => 100000,
+        ])
+        ->assertStatus(409);
+
+    expect($this->conversation->messages()->where('type', Message::TYPE_OFFER)->count())->toBe(0);
+});
+
+test('the buyer can buy again after a completed transaction with stock still available', function () {
+    Order::factory()->create([
+        'conversation_id' => $this->conversation->id,
+        'seller_id' => $this->seller->id,
+        'buyer_id' => $this->buyer->id,
+        'product_id' => $this->product->id,
+        'status' => Order::STATUS_SELESAI,
+        'completed_at' => now(),
+        'completion_type' => Order::COMPLETION_STOCK_AVAILABLE,
+        'completed_by' => Order::COMPLETED_BY_SELLER,
+    ]);
+
+    $this->actingAs($this->buyer)
+        ->postJson(route('chat.messages.store', $this->conversation), [
+            'type' => 'offer',
+            'offer_amount' => 90000,
+        ])
+        ->assertOk()
+        ->assertJsonPath('message.offer_status', 'pending');
+
+    $offer = $this->conversation->messages()->where('type', Message::TYPE_OFFER)->sole();
+
+    $this->actingAs($this->seller)
+        ->postJson(route('chat.offers.accept', [$this->conversation, $offer]))
+        ->assertOk();
+
+    expect(Order::query()->where('status', Order::STATUS_DISEPAKATI)->count())->toBe(1)
+        ->and(Order::count())->toBe(2);
+});
+
+test('the buyer confirms receipt and completes the transaction herself', function () {
+    $order = Order::factory()->create([
+        'conversation_id' => $this->conversation->id,
+        'seller_id' => $this->seller->id,
+        'buyer_id' => $this->buyer->id,
+        'product_id' => $this->product->id,
+        'status' => Order::STATUS_DISEPAKATI,
+    ]);
+
+    $this->actingAs($this->buyer)
+        ->patch(route('orders.update-status', $order), ['status' => Order::STATUS_SELESAI])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    expect($order->refresh()->status)->toBe(Order::STATUS_SELESAI)
+        ->and($order->completed_by)->toBe(Order::COMPLETED_BY_BUYER)
+        ->and($order->completed_at)->not->toBeNull()
+        ->and($this->product->refresh()->status)->toBe(Product::STATUS_DIJUAL)
+        ->and($this->seller->notifications()->count())->toBe(1);
+});
+
+test('a non-participant cannot confirm receipt', function () {
+    $order = Order::factory()->create([
+        'conversation_id' => $this->conversation->id,
+        'seller_id' => $this->seller->id,
+        'buyer_id' => $this->buyer->id,
+        'product_id' => $this->product->id,
+        'status' => Order::STATUS_DISEPAKATI,
+    ]);
+
+    $this->actingAs(User::factory()->create())
+        ->patch(route('orders.update-status', $order), ['status' => Order::STATUS_SELESAI])
+        ->assertForbidden();
+
+    expect($order->refresh()->status)->toBe(Order::STATUS_DISEPAKATI);
+});
+
+test('the seller closes the listing after the buyer confirmed receipt', function () {
+    $order = Order::factory()->create([
+        'conversation_id' => $this->conversation->id,
+        'seller_id' => $this->seller->id,
+        'buyer_id' => $this->buyer->id,
+        'product_id' => $this->product->id,
+        'status' => Order::STATUS_SELESAI,
+        'completed_at' => now(),
+        'completion_type' => null,
+        'completed_by' => Order::COMPLETED_BY_BUYER,
+    ]);
+
+    $this->actingAs($this->seller)
+        ->patch(route('orders.update-status', $order), [
+            'status' => Order::STATUS_SELESAI,
+            'completion_type' => Order::COMPLETION_STOCK_OUT,
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    expect($order->refresh()->completion_type)->toBe(Order::COMPLETION_STOCK_OUT)
+        ->and($this->product->refresh()->status)->toBe(Product::STATUS_TERJUAL);
+});
+
+test('completing a transaction cancels offers that are still pending', function () {
+    $offer = Message::factory()->offer(150000)->create([
+        'conversation_id' => $this->conversation->id,
+        'sender_id' => $this->buyer->id,
+    ]);
+
+    Order::factory()->create([
+        'conversation_id' => $this->conversation->id,
+        'seller_id' => $this->seller->id,
+        'buyer_id' => $this->buyer->id,
+        'product_id' => $this->product->id,
+        'status' => Order::STATUS_DISEPAKATI,
+    ]);
+
+    $this->actingAs($this->seller)
+        ->post(route('chat.sold', $this->conversation), [
+            'completion_type' => Order::COMPLETION_STOCK_AVAILABLE,
+        ])
+        ->assertRedirect();
+
+    expect($offer->refresh()->offer_status)->toBe(Message::OFFER_CANCELLED);
 });

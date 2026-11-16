@@ -193,10 +193,15 @@ class ChatController extends Controller
     public function sold(Request $request, Conversation $conversation): JsonResponse
     {
         $validated = $request->validate([
-            'completion_type' => ['required', 'in:'.Order::COMPLETION_STOCK_OUT.','.Order::COMPLETION_STOCK_AVAILABLE],
+            // Opsional demi kompatibilitas aplikasi lama; default-nya stok habis.
+            'completion_type' => ['nullable', 'in:'.Order::COMPLETION_STOCK_OUT.','.Order::COMPLETION_STOCK_AVAILABLE],
         ]);
 
-        $this->service->markSold($conversation, (string) $request->user()->id, $validated['completion_type']);
+        $this->service->markSold(
+            $conversation,
+            (string) $request->user()->id,
+            $validated['completion_type'] ?? Order::COMPLETION_STOCK_OUT,
+        );
 
         $conversation->load(['product.coverImage', 'buyer', 'seller']);
         $order = $this->service->orderFor($conversation)?->load(['product.primaryImage', 'buyer', 'seller']);

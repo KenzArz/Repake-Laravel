@@ -59,6 +59,15 @@ class Conversation extends Model
     }
 
     /**
+     * Seluruh order pada percakapan ini. Dipakai untuk mencari transaksi yang
+     * masih berjalan (`disepakati`) tanpa tertukar dengan riwayat selesai.
+     */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    /**
      * Pesan terakhir untuk daftar percakapan.
      */
     public function lastMessage(): HasOne

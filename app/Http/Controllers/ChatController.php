@@ -11,6 +11,8 @@ use App\Models\User;
 use App\Notifications\NewMessage;
 use App\Notifications\OfferDecided;
 use App\Notifications\OfferReceived;
+use App\Services\ConversationService;
+use App\Services\OrderService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -27,6 +29,8 @@ class ChatController extends Controller
      * Jumlah pesan terakhir yang dimuat saat ruang chat dibuka.
      */
     private const PAGE_SIZE = 100;
+
+    public function __construct(private readonly ConversationService $conversations) {}
 
     /**
      * Daftar percakapan user (sebagai pembeli maupun penjual).
@@ -62,12 +66,23 @@ class ChatController extends Controller
         $latestOffer = $conversation->latestOffer()->first();
         $order = $conversation->order()->first();
 
-        // Ulasan pengguna ini (jika ada) + apakah penjual masih bisa tandai terjual.
-        $myReview = $order?->reviewBy((string) Auth::id());
-        $canMarkSold = $order !== null
-            && $conversation->seller_id === (string) Auth::id()
-            && $order->status === Order::STATUS_DISEPAKATI
+        // Transaksi yang masih berjalan dicari eksplisit (bukan order terbaru)
+        // supaya riwayat `selesai` tidak menutupi kesepakatan baru.
+        $activeOrder = $conversation->orders()
+            ->where('status', Order::STATUS_DISEPAKATI)
+            ->latest('id')
+            ->first();
+
+        $userId = (string) Auth::id();
+        $isSeller = $conversation->seller_id === $userId;
+        $isBuyer = $conversation->buyer_id === $userId;
+
+        // Ulasan pengguna ini (jika ada) + aksi penyelesaian tiap pihak.
+        $myReview = $order?->reviewBy($userId);
+        $canMarkSold = $activeOrder !== null
+            && $isSeller
             && $conversation->product?->status === Product::STATUS_DIJUAL;
+        $canConfirmReceipt = $activeOrder !== null && $isBuyer;
 
         // Membuka ruang chat berarti pesan lawan sudah terbaca.
         $this->markMessagesRead($conversation);
@@ -78,9 +93,11 @@ class ChatController extends Controller
             'other' => $other,
             'latestOffer' => $latestOffer,
             'order' => $order,
+            'activeOrder' => $activeOrder,
             'myReview' => $myReview,
             'canMarkSold' => $canMarkSold,
-            'sidebarConversations' => $this->conversationsFor((string) Auth::id()),
+            'canConfirmReceipt' => $canConfirmReceipt,
+            'sidebarConversations' => $this->conversationsFor($userId),
             'filter' => 'semua',
         ]);
     }
@@ -95,51 +112,13 @@ class ChatController extends Controller
             'offer_amount' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $product = Product::query()->findOrFail($data['product_id']);
-        abort_if(
-            $product->user_id === (string) Auth::id(),
-            403,
-            'Tidak bisa memulai chat pada produk milik sendiri.',
+        // Delegasi ke service agar tawaran dari halaman detail produk ikut
+        // melewati aturan yang sama dengan tawaran dari dalam chat.
+        $conversation = $this->conversations->start(
+            (string) Auth::id(),
+            $data['product_id'],
+            isset($data['offer_amount']) ? (int) $data['offer_amount'] : null,
         );
-
-        // Produk yang ditangguhkan/draft dan penjual yang dibanned tidak boleh
-        // dimulai percakapan baru, sama seperti detail produknya yang 404.
-        abort_if($product->status !== Product::STATUS_DIJUAL, 404);
-        abort_if($product->user?->is_banned, 404);
-
-        $attributes = [
-            'buyer_id' => (string) Auth::id(),
-            'seller_id' => $product->user_id,
-            'product_id' => $product->id,
-        ];
-
-        try {
-            $conversation = Conversation::query()->firstOrCreate(
-                $attributes,
-                ['last_message_at' => now()],
-            );
-        } catch (UniqueConstraintViolationException) {
-            // Dua klik hampir bersamaan: pakai percakapan yang sudah dibuat request lain.
-            $conversation = Conversation::query()->where($attributes)->firstOrFail();
-        }
-
-        // Tawaran langsung dari halaman detail produk: buat pesan tawaran pertama.
-        if (($offerAmount = $data['offer_amount'] ?? null) !== null) {
-            $offer = $conversation->messages()->create([
-                'sender_id' => (string) Auth::id(),
-                'type' => Message::TYPE_OFFER,
-                'offer_amount' => $offerAmount,
-                'offer_status' => Message::OFFER_PENDING,
-            ]);
-
-            $conversation->update(['last_message_at' => $offer->created_at]);
-
-            $conversation->seller()->first()?->notify(new OfferReceived(
-                (string) Auth::user()?->name,
-                $offerAmount,
-                $conversation->id,
-            ));
-        }
 
         return redirect()->route('chat.show', $conversation);
     }
@@ -169,7 +148,7 @@ class ChatController extends Controller
 
             $active = Order::query()
                 ->where('conversation_id', $conversation->id)
-                ->whereIn('status', [Order::STATUS_DISEPAKATI, Order::STATUS_SELESAI])
+                ->where('status', Order::STATUS_DISEPAKATI)
                 ->exists();
             abort_if($active, 409, 'Transaksi sudah berjalan, tawaran baru tidak bisa dikirim.');
 
@@ -351,6 +330,12 @@ class ChatController extends Controller
 
         abort_if($conversation->product !== null && $conversation->product->harga !== null && $data['offer_amount'] > $conversation->product->harga, 422, 'Tawaran tidak boleh melebihi harga produk.');
 
+        $active = Order::query()
+            ->where('conversation_id', $conversation->id)
+            ->where('status', Order::STATUS_DISEPAKATI)
+            ->exists();
+        abort_if($active, 409, 'Transaksi sudah berjalan, tawaran tidak bisa diubah.');
+
         $message->update(['offer_amount' => $data['offer_amount']]);
 
         return $this->offerResponse($conversation, $message);
@@ -377,9 +362,15 @@ class ChatController extends Controller
     {
         $this->authorizeOfferDecision($conversation, $message);
 
+        abort_if(
+            $conversation->product?->status !== Product::STATUS_DIJUAL,
+            409,
+            'Produk ini sudah tidak dapat ditawar.',
+        );
+
         $active = Order::query()
             ->where('conversation_id', $conversation->id)
-            ->whereIn('status', [Order::STATUS_DISEPAKATI, Order::STATUS_SELESAI])
+            ->where('status', Order::STATUS_DISEPAKATI)
             ->exists();
         abort_if($active, 409, 'Percakapan ini sudah memiliki transaksi berjalan.');
 
@@ -428,10 +419,14 @@ class ChatController extends Controller
             'completion_type' => ['required', 'in:'.Order::COMPLETION_STOCK_OUT.','.Order::COMPLETION_STOCK_AVAILABLE],
         ]);
 
-        $order = $conversation->order()->first();
-        abort_if($order === null, 404, 'Belum ada kesepakatan untuk produk ini.');
+        $order = Order::query()
+            ->where('conversation_id', $conversation->id)
+            ->where('status', Order::STATUS_DISEPAKATI)
+            ->latest('id')
+            ->first();
+        abort_if($order === null, 409, 'Belum ada kesepakatan aktif untuk produk ini.');
 
-        (new \App\Services\OrderService)->complete($order, (string) Auth::id(), $validated['completion_type']);
+        app(OrderService::class)->complete($order, (string) Auth::id(), $validated['completion_type']);
 
         $message = $validated['completion_type'] === Order::COMPLETION_STOCK_OUT
             ? 'Transaksi selesai. Produk telah ditandai habis dan order lain dibatalkan.'

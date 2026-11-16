@@ -51,6 +51,16 @@
         && $order->status === Order::STATUS_DISEPAKATI
         && $product?->status === Product::STATUS_DIJUAL;
 
+    // Pembeli bisa menyelesaikan sendiri dengan konfirmasi terima barang.
+    $canConfirmReceipt = ! $isSelling && $order->status === Order::STATUS_DISEPAKATI;
+
+    // Penjual bisa menutup iklan setelah transaksi selesai (mis. pembeli lebih
+    // dulu konfirmasi, ternyata unit terakhir habis).
+    $canMarkStockOut = $isSelling
+        && $order->status === Order::STATUS_SELESAI
+        && $order->completion_type !== Order::COMPLETION_STOCK_OUT
+        && $product?->status === Product::STATUS_DIJUAL;
+
     $canReview = $order->status === Order::STATUS_SELESAI && !($order->has_reviewed ?? false);
 @endphp
 
@@ -144,10 +154,13 @@
                         @if ($order->completion_type === \App\Models\Order::COMPLETION_STOCK_AVAILABLE)
                             · stok masih tersedia
                         @endif
+                        @if ($order->completed_by === \App\Models\Order::COMPLETED_BY_BUYER)
+                            · dikonfirmasi pembeli
+                        @endif
                     </p>
                 @elseif (!$isSelling && $order->status === Order::STATUS_DISEPAKATI)
                     <p class="mt-1 text-[11px] text-neutral-500">
-                        Menunggu penjual menyelesaikan transaksi setelah COD/serah-terima.
+                        Sudah COD? Konfirmasi "Barang Diterima" agar transaksi selesai dan bisa diulas.
                     </p>
                 @endif
             </div>
@@ -180,6 +193,21 @@
                     </button>
                 </form>
 
+                @if ($canConfirmReceipt)
+                    <form method="POST" action="{{ route('orders.update-status', $order) }}">
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="status" value="{{ Order::STATUS_SELESAI }}">
+                        <button type="button" data-confirm-trigger data-confirm-variant="primary"
+                            data-confirm-title="Konfirmasi Barang Diterima?"
+                            data-confirm-message="Pastikan Anda sudah menerima '{{ $productTitle }}' dari {{ $counterpartyName }}. Transaksi akan selesai dan Anda bisa memberi ulasan."
+                            data-confirm-btn="Ya, Sudah Diterima"
+                            class="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-2xs transition hover:bg-emerald-700 cursor-pointer">
+                            Barang Diterima
+                        </button>
+                    </form>
+                @endif
+
                 @if ($canComplete)
                     <button type="button" data-complete-trigger
                         data-complete-action="{{ Route::has('orders.update-status') ? route('orders.update-status', $order) : '#' }}"
@@ -190,6 +218,22 @@
                     </button>
                 @endif
             @elseif ($order->status === Order::STATUS_SELESAI)
+                @if ($canMarkStockOut)
+                    <form method="POST" action="{{ route('orders.update-status', $order) }}">
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="status" value="{{ Order::STATUS_SELESAI }}">
+                        <input type="hidden" name="completion_type" value="{{ Order::COMPLETION_STOCK_OUT }}">
+                        <button type="button" data-confirm-trigger data-confirm-variant="danger"
+                            data-confirm-title="Tandai Stok Habis?"
+                            data-confirm-message="Produk '{{ $productTitle }}' akan ditutup dan order lain yang masih menunggu COD otomatis dibatalkan."
+                            data-confirm-btn="Ya, Stok Habis"
+                            class="rounded-lg border border-neutral-300 bg-white px-3.5 py-2 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 cursor-pointer">
+                            Tandai Stok Habis
+                        </button>
+                    </form>
+                @endif
+
                 @if ($canReview)
                     <button type="button" data-order-review-toggle
                         class="rounded-lg bg-lime-400 px-4 py-2 text-xs font-bold text-neutral-900 shadow-2xs transition hover:bg-lime-500 cursor-pointer">

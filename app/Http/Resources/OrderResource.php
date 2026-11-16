@@ -23,6 +23,7 @@ class OrderResource extends JsonResource
             'status' => $this->status,
             'status_label' => $this->statusLabel(),
             'completion_type' => $this->completion_type,
+            'completed_by' => $this->completed_by,
             'cancelled_by' => $this->cancelled_by,
             'cancel_reason' => $this->cancel_reason,
             'harga_final' => $this->harga_final,

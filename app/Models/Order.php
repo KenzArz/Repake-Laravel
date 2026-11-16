@@ -28,6 +28,12 @@ class Order extends Model
     /** Order dibatalkan otomatis karena produk terjual ke pembeli lain. */
     public const CANCEL_REASON_SOLD_ELSEWHERE = 'sold_elsewhere';
 
+    /** Transaksi diselesaikan oleh penjual setelah COD. */
+    public const COMPLETED_BY_SELLER = 'penjual';
+
+    /** Transaksi diselesaikan oleh pembeli lewat konfirmasi terima barang. */
+    public const COMPLETED_BY_BUYER = 'pembeli';
+
     protected $fillable = [
         'conversation_id',
         'buyer_id',
@@ -37,6 +43,7 @@ class Order extends Model
         'status',
         'completed_at',
         'completion_type',
+        'completed_by',
         'cancelled_by',
         'cancel_reason',
     ];

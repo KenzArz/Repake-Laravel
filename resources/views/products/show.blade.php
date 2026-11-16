@@ -343,7 +343,12 @@
                             </form>
 
                             {{-- Tawar Harga (hanya bila produk bisa dinegosiasikan) --}}
-                            @if ($product->is_negotiable)
+                            @if ($activeOrder !== null)
+                                <button type="button" disabled
+                                    class="h-10 w-full cursor-not-allowed rounded-lg border border-neutral-200 bg-neutral-50 text-xs font-semibold text-neutral-400 sm:text-sm">
+                                    Transaksi sedang berjalan
+                                </button>
+                            @elseif ($product->is_negotiable)
                                 <form method="POST" action="{{ Route::has('chat.store') ? route('chat.store') : '#' }}"
                                     class="flex w-full items-center">
                                     @csrf
@@ -470,7 +475,7 @@
                             </div>
 
                             {{-- Menu kelola untuk ulasan milik pengunjung --}}
-                            @if ($viewerReview !== null && $review->id === $viewerReview->id)
+                            @if ((string) $review->reviewer_id === (string) auth()->id())
                                 <div class="relative shrink-0" data-review-menu-root>
                                     <button type="button" data-review-menu-toggle
                                         class="grid size-7 place-items-center rounded-full text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700"
@@ -517,7 +522,7 @@
                         </p>
 
                         {{-- Panel edit (tersembunyi sampai menu Edit diklik) --}}
-                        @if ($viewerReview !== null && $review->id === $viewerReview->id)
+                        @if ((string) $review->reviewer_id === (string) auth()->id())
                             <form method="POST" action="{{ route('reviews.update', $review) }}" hidden data-edit-review-form
                                 class="mt-4 rounded-xl border border-lime-200 bg-lime-50 p-4">
                                 @csrf

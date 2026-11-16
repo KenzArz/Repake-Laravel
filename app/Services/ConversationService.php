@@ -78,6 +78,8 @@ class ConversationService
         }
 
         if ($offerAmount !== null) {
+            $this->assertCanOffer($conversation, $userId, $offerAmount);
+
             $offer = $this->createOfferMessage($conversation, $userId, $offerAmount);
             $conversation->update(['last_message_at' => $offer->created_at]);
             $conversation->seller()->first()?->notify(new OfferReceived(
@@ -222,20 +224,7 @@ class ConversationService
         $isOffer = ($validated['type'] ?? null) === Message::TYPE_OFFER;
 
         if ($isOffer) {
-            abort_unless($conversation->buyer_id === $userId, 403, 'Hanya pembeli yang bisa mengirim tawaran.');
-
-            $product = $conversation->product;
-            abort_if($product === null, 404, 'Produk tidak ditemukan.');
-            abort_if($product->status !== Product::STATUS_DIJUAL, 409, 'Produk ini sudah tidak dapat ditawar.');
-            abort_if(! $product->is_negotiable, 409, 'Penjual tidak menerima tawaran.');
-
-            $active = Order::where('conversation_id', $conversation->id)
-                ->whereIn('status', [Order::STATUS_DISEPAKATI, Order::STATUS_SELESAI])
-                ->exists();
-            abort_if($active, 409, 'Transaksi sudah berjalan, tawaran baru tidak bisa dikirim.');
-
-            $amount = (int) ($validated['offer_amount'] ?? 0);
-            abort_if($product->harga !== null && $amount > $product->harga, 422, 'Tawaran tidak boleh melebihi harga produk.');
+            $this->assertCanOffer($conversation, $userId, (int) ($validated['offer_amount'] ?? 0));
         }
 
         $clientId = $validated['client_id'] ?? null;
@@ -291,7 +280,7 @@ class ConversationService
     public function updateOffer(Conversation $conversation, Message $message, string $userId, int $amount): Message
     {
         $this->authorizeOfferSender($conversation, $message, $userId);
-        abort_if($conversation->product !== null && $conversation->product->harga !== null && $amount > $conversation->product->harga, 422, 'Tawaran tidak boleh melebihi harga produk.');
+        $this->assertCanOffer($conversation, $userId, $amount);
         $message->update(['offer_amount' => $amount]);
 
         return $message;
@@ -309,10 +298,10 @@ class ConversationService
     {
         $this->authorizeOfferDecision($conversation, $message, $userId);
 
-        $active = Order::where('conversation_id', $conversation->id)
-            ->whereIn('status', [Order::STATUS_DISEPAKATI, Order::STATUS_SELESAI])
-            ->exists();
-        abort_if($active, 409, 'Percakapan ini sudah memiliki transaksi berjalan.');
+        $product = $conversation->product;
+        abort_if($product === null, 404, 'Produk tidak ditemukan.');
+        abort_if($product->status !== Product::STATUS_DIJUAL, 409, 'Produk ini sudah tidak dapat ditawar.');
+        abort_if($this->hasActiveOrder($conversation), 409, 'Percakapan ini sudah memiliki transaksi berjalan.');
 
         DB::transaction(function () use ($conversation, $message): void {
             $locked = Message::query()->lockForUpdate()->findOrFail($message->getKey());
@@ -346,8 +335,13 @@ class ConversationService
 
     public function markSold(Conversation $conversation, string $userId, string $completionType = Order::COMPLETION_STOCK_OUT): void
     {
-        $order = $conversation->order()->first();
-        abort_if($order === null, 404, 'Belum ada kesepakatan untuk produk ini.');
+        $order = Order::query()
+            ->where('conversation_id', $conversation->id)
+            ->where('status', Order::STATUS_DISEPAKATI)
+            ->latest('id')
+            ->first();
+
+        abort_if($order === null, 409, 'Belum ada kesepakatan aktif untuk produk ini.');
 
         (new OrderService)->complete($order, $userId, $completionType);
     }
@@ -375,6 +369,32 @@ class ConversationService
     public function orderFor(Conversation $conversation): ?Order
     {
         return $conversation->order()->first();
+    }
+
+    /**
+     * Aturan tunggal untuk tawaran: hanya pembeli, produk masih dijual dan
+     * menerima tawaran, belum ada transaksi berjalan, serta nominal tidak
+     * melebihi harga produk. `selesai` sengaja tidak dianggap transaksi
+     * berjalan supaya pembeli bisa membeli lagi bila stok masih tersedia.
+     */
+    private function assertCanOffer(Conversation $conversation, string $userId, int $amount): void
+    {
+        abort_unless($conversation->buyer_id === $userId, 403, 'Hanya pembeli yang bisa mengirim tawaran.');
+
+        $product = $conversation->product;
+        abort_if($product === null, 404, 'Produk tidak ditemukan.');
+        abort_if($product->status !== Product::STATUS_DIJUAL, 409, 'Produk ini sudah tidak dapat ditawar.');
+        abort_if(! $product->is_negotiable, 409, 'Penjual tidak menerima tawaran.');
+        abort_if($this->hasActiveOrder($conversation), 409, 'Transaksi sudah berjalan, tawaran baru tidak bisa dikirim.');
+        abort_if($product->harga !== null && $amount > $product->harga, 422, 'Tawaran tidak boleh melebihi harga produk.');
+    }
+
+    private function hasActiveOrder(Conversation $conversation): bool
+    {
+        return Order::query()
+            ->where('conversation_id', $conversation->id)
+            ->where('status', Order::STATUS_DISEPAKATI)
+            ->exists();
     }
 
     private function createOfferMessage(Conversation $conversation, string $userId, int $amount): Message

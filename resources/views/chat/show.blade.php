@@ -122,17 +122,20 @@
                         }
                     }
 
-                    // Pembeli boleh menawar hanya sebelum ada transaksi berjalan
-                    // dan produk masih bisa ditawar.
+                    // Pembeli boleh menawar selama produk masih dijual, menerima
+                    // tawaran, dan tidak ada transaksi yang sedang berjalan.
+                    // Order `selesai` tidak menghalangi pembelian ulang.
                     $isBuyerHere = (string) $conversation->buyer_id === (string) auth()->id();
                     $canOffer = $isBuyerHere
                         && $conversation->product?->status === \App\Models\Product::STATUS_DIJUAL
                         && $conversation->product?->is_negotiable
-                        && ($order === null || $order->status === \App\Models\Order::STATUS_BATAL);
+                        && $activeOrder === null;
 
-                    // Jumlah tombol aksi di bar kanan (ulasan + selesaikan);
-                    // padding dipadatkan bila lebih dari satu agar tidak meluber.
-                    $actionCount = ($reviewUrl !== null ? 1 : 0) + ($canMarkSold ? 1 : 0);
+                    // Jumlah tombol aksi di bar kanan (ulasan + selesaikan +
+                    // konfirmasi terima); padding dipadatkan bila lebih dari satu.
+                    $actionCount = ($reviewUrl !== null ? 1 : 0)
+                        + ($canMarkSold ? 1 : 0)
+                        + ($canConfirmReceipt ? 1 : 0);
                 @endphp
 
                 {{-- Strip produk + aksi transaksi digabung dalam 1 bar kompak --}}
@@ -162,13 +165,26 @@
                             @include('chat.partials.offer-badge', ['offer' => $latestOffer])
                         </div>
 
-                        @if ($hasOrderBar && ($reviewUrl || $canMarkSold))
+                        @if ($hasOrderBar && ($reviewUrl || $canMarkSold || $canConfirmReceipt))
                             <div class="flex items-center gap-1.5 border-l border-neutral-200/80 pl-2.5">
                                 @if ($reviewUrl)
                                     <a href="{{ $reviewUrl }}"
                                         class="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[12px] font-bold text-white transition hover:bg-emerald-700 sm:px-3.5 sm:py-2 sm:text-xs">
                                         {{ $myReview ? 'Edit' : 'Nilai' }}
                                     </a>
+                                @endif
+
+                                @if ($canConfirmReceipt && $activeOrder !== null)
+                                    <form method="POST" action="{{ route('orders.update-status', $activeOrder) }}"
+                                        onsubmit="return confirm('Konfirmasi bahwa barang sudah Anda terima dari penjual?');">
+                                        @csrf
+                                        @method('PATCH')
+                                        <input type="hidden" name="status" value="{{ \App\Models\Order::STATUS_SELESAI }}">
+                                        <button type="submit"
+                                            class="inline-flex w-full items-center justify-center whitespace-nowrap rounded-lg bg-emerald-600 {{ $actionCount > 1 ? 'px-2.5 py-1 text-[12px] sm:px-3.5 sm:py-2 sm:text-xs' : 'px-3.5 py-2 text-xs' }} font-bold text-white transition hover:bg-emerald-700 cursor-pointer">
+                                            Barang Diterima
+                                        </button>
+                                    </form>
                                 @endif
 
                                 @if ($canMarkSold)

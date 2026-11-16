@@ -93,7 +93,30 @@ class OrderController extends Controller
         ]);
 
         if ($validated['status'] === Order::STATUS_SELESAI) {
-            abort_unless($isSeller, 403, 'Hanya penjual yang bisa menyelesaikan transaksi.');
+            // Pembeli boleh menyelesaikan sendiri dengan mengonfirmasi barang
+            // diterima, supaya ulasan tidak bergantung pada penjual.
+            if ($isBuyer) {
+                $this->orders->confirmReceipt($order, $userId);
+
+                return back()->with('success', 'Terima kasih! Transaksi selesai dan Anda dapat memberi ulasan.');
+            }
+
+            abort_unless($isSeller, 403, 'Hanya pembeli atau penjual yang bisa menyelesaikan transaksi.');
+
+            // Transaksi sudah selesai (mis. dikonfirmasi pembeli) dan penjual
+            // ingin menutup iklan karena stok benar-benar habis.
+            if ($order->status === Order::STATUS_SELESAI) {
+                abort_unless(
+                    ($validated['completion_type'] ?? null) === Order::COMPLETION_STOCK_OUT,
+                    422,
+                    'Transaksi sudah selesai. Pilih "Stok habis" untuk menutup iklan.',
+                );
+
+                $this->orders->markStockOut($order, $userId);
+
+                return back()->with('success', 'Produk ditandai habis. Order lain yang masih menunggu COD dibatalkan.');
+            }
+
             abort_unless(filled($validated['completion_type'] ?? null), 422, 'Pilih status stok untuk menyelesaikan transaksi.');
 
             $this->orders->complete($order, $userId, $validated['completion_type']);
