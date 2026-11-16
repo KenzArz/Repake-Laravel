@@ -120,6 +120,10 @@
                             $reviewUrl .= $sep . 'tab=ulasan&order=' . $order->id;
                         }
                     }
+
+                    // Jumlah tombol aksi di bar kanan (ulasan + tandai terjual);
+                    // padding dipadatkan bila lebih dari satu agar tidak meluber.
+                    $actionCount = ($reviewUrl !== null ? 1 : 0) + ($canMarkSold ? 1 : 0);
                 @endphp
 
                 {{-- Strip produk + aksi transaksi digabung dalam 1 bar kompak --}}
