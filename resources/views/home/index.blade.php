@@ -5,28 +5,30 @@
 @section('content')
 
     {{-- Banner Stacking Carousel (Full-width agar peek kiri & kanan tidak terpotong) --}}
-    <section aria-label="Promo" class="pt-4 sm:pt-6">
-        <x-banner-slider :images="$banners" />
-    </section>
+    <div class="relative w-full overflow-hidden rounded-2xl">
+        <section aria-label="Promo" class="pt-4 sm:pt-6">
+            <x-banner-slider :images="$banners" />
+        </section>
+    </div>
 
     <div class="mx-auto max-w-6xl px-4 py-2 sm:px-6">
 
         {{-- Mau cari apa? (1 Baris Horizontal Scroll & Responsif untuk >8 Kategori) --}}
         <section x-data="{
-                        canLeft: false,
-                        canRight: false,
-                        checkScroll() {
-                            const el = this.$refs.track;
-                            if (!el) return;
-                            this.canLeft = el.scrollLeft > 4;
-                            this.canRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
-                        },
-                        scrollByAmount(dir) {
-                            const el = this.$refs.track;
-                            if (!el) return;
-                            el.scrollBy({ left: dir * 320, behavior: 'smooth' });
-                        }
-                    }" x-init="$nextTick(() => checkScroll())" @resize.window.debounce.150ms="checkScroll()"
+                            canLeft: false,
+                            canRight: false,
+                            checkScroll() {
+                                const el = this.$refs.track;
+                                if (!el) return;
+                                this.canLeft = el.scrollLeft > 4;
+                                this.canRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+                            },
+                            scrollByAmount(dir) {
+                                const el = this.$refs.track;
+                                if (!el) return;
+                                el.scrollBy({ left: dir * 320, behavior: 'smooth' });
+                            }
+                        }" x-init="$nextTick(() => checkScroll())" @resize.window.debounce.150ms="checkScroll()"
             class="group/cat relative mt-8">
 
             <div class="mb-4 flex items-center justify-between">
@@ -57,12 +59,12 @@
                     <a href="{{ route('products.index', ['kategori' => [$category->slug]]) }}"
                         class="group flex w-[72px] shrink-0 snap-start flex-col items-center text-center sm:w-[84px]">
                         <div class="relative flex size-16 shrink-0 items-center justify-center rounded-full
-                                                    bg-[radial-gradient(circle_at_30%_25%,var(--color-neutral-700),var(--color-neutral-900)_70%)]
-                                                    shadow-[inset_0_0_0_1px_rgb(184_217_78/0.35),inset_0_-8px_14px_-6px_rgb(184_217_78/0.30),0_6px_16px_-6px_rgb(184_217_78/0.45)]
-                                                    transition-all duration-200 ease-out
-                                                    group-hover:-translate-y-1.5
-                                                    group-hover:shadow-[inset_0_0_0_1px_rgb(184_217_78/0.7),inset_0_-10px_16px_-6px_rgb(184_217_78/0.5),0_10px_24px_-6px_rgb(184_217_78/0.7)]
-                                                    sm:size-[72px]">
+                                                            bg-[radial-gradient(circle_at_30%_25%,var(--color-neutral-700),var(--color-neutral-900)_70%)]
+                                                            shadow-[inset_0_0_0_1px_rgb(184_217_78/0.35),inset_0_-8px_14px_-6px_rgb(184_217_78/0.30),0_6px_16px_-6px_rgb(184_217_78/0.45)]
+                                                            transition-all duration-200 ease-out
+                                                            group-hover:-translate-y-1.5
+                                                            group-hover:shadow-[inset_0_0_0_1px_rgb(184_217_78/0.7),inset_0_-10px_16px_-6px_rgb(184_217_78/0.5),0_10px_24px_-6px_rgb(184_217_78/0.7)]
+                                                            sm:size-[72px]">
                             @if ($category->icon_url)
                                 <img src="{{ $category->icon_url }}" alt="{{ $category->name }}"
                                     class="size-8 object-contain transition-transform duration-200 ease-out group-hover:scale-110 sm:size-9"

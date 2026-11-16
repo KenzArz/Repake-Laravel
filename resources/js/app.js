@@ -181,9 +181,11 @@ if (
 if (
     document.body.dataset.authed === "1" ||
     document.getElementById("chat-app") ||
-    document.querySelector("[data-conversation-list]")
+    document.querySelector("[data-conversation-list]") ||
+    document.querySelector("time[data-local-time]")
 ) {
     import("./chat").then((module) => {
+        module.hydrateTimes();
         module.initChatSidebar();
         module.initChat();
         module.initChatBadge();

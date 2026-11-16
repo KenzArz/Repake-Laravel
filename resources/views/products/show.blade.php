@@ -138,9 +138,8 @@
                 <div>
                     {{-- Header Penjual & Opsi 3 Titik --}}
                     <div class="flex items-start justify-between">
-                        <a href="{{ $product->user?->profileUrl() ?? '#' }}"
-                           class="group flex items-center gap-3"
-                           title="Lihat profil {{ $product->penjual }}">
+                        <a href="{{ $product->user?->profileUrl() ?? '#' }}" class="group flex items-center gap-3"
+                            title="Lihat profil {{ $product->penjual }}">
                             <div
                                 class="size-9 shrink-0 overflow-hidden rounded-full border border-neutral-300 bg-neutral-200 transition group-hover:ring-2 group-hover:ring-lime-400">
                                 <img src="{{ $seller?->avatar_url ?? $product->penjual_avatar }}"
@@ -150,7 +149,8 @@
                             </div>
                             <div>
                                 <div class="flex items-center gap-2">
-                                    <h2 class="text-sm font-bold text-neutral-900 group-hover:underline">{{ $product->penjual ?? 'Midou_kun' }}
+                                    <h2 class="text-sm font-bold text-neutral-900 group-hover:underline">
+                                        {{ $product->penjual ?? 'Midou_kun' }}
                                     </h2>
                                     <span class="inline-flex items-center gap-1 text-xs font-bold text-neutral-900">
                                         <svg viewBox="0 0 24 24" class="size-3.5 fill-amber-500 text-amber-500">
@@ -178,9 +178,26 @@
                     </p>
 
                     {{-- Badges / Tags --}}
+                    @php
+                        $statusBadge = match ($product->status) {
+                            \App\Models\Product::STATUS_TERJUAL => [
+                                'label' => 'Terjual',
+                                'classes' => 'bg-neutral-900 text-white',
+                            ],
+                            \App\Models\Product::STATUS_DIJUAL => [
+                                'label' => $product->status_label ?? 'Dijual',
+                                'classes' => 'bg-lime-400 text-neutral-900',
+                            ],
+                            default => [
+                                'label' => $product->status_label ?? ucfirst((string) $product->status),
+                                'classes' => 'bg-amber-100 text-amber-800',
+                            ],
+                        };
+                    @endphp
+
                     <div class="mt-3 flex flex-wrap items-center gap-2">
-                        <span class="rounded bg-lime-400 px-2.5 py-0.5 text-xs font-bold text-neutral-900">
-                            {{ $product->status_label ?? 'Dijual' }}
+                        <span class="rounded px-2.5 py-0.5 text-xs font-bold {{ $statusBadge['classes'] }}">
+                            {{ $statusBadge['label'] }}
                         </span>
                         <span class="rounded bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600">
                             {{ $product->kondisi ?? 'Dirawat dengan baik' }}
@@ -289,7 +306,8 @@
                         </form>
                     </div>
                 @else
-                    <div class="mt-6 rounded-lg border border-neutral-200 bg-neutral-50 py-3 text-center text-xs font-semibold text-neutral-500">
+                    <div
+                        class="mt-6 rounded-lg border border-neutral-200 bg-neutral-50 py-3 text-center text-xs font-semibold text-neutral-500">
                         Produk ini sudah tidak dijual.
                     </div>
                 @endif
@@ -321,9 +339,8 @@
 
             {{-- Form ulasan — pembeli dengan order disepakati/selesai yang belum mengulas --}}
             @if ($canReview)
-                <form method="POST" action="{{ route('reviews.store', $viewerOrder) }}"
-                      data-review-form
-                      class="mt-4 rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xs">
+                <form method="POST" action="{{ route('reviews.store', $viewerOrder) }}" data-review-form
+                    class="mt-4 rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xs">
                     @csrf
                     <p class="text-sm font-bold text-neutral-900">Bagaimana produk ini menurut Anda?</p>
 
@@ -331,11 +348,11 @@
                         <input type="hidden" name="rating" value="" required>
                         <div class="flex items-center gap-1">
                             @for ($i = 1; $i <= 5; $i++)
-                                <button type="button" data-rating-star="{{ $i }}"
-                                        aria-label="{{ $i }} bintang"
-                                        class="text-neutral-300 transition hover:scale-110 cursor-pointer">
+                                <button type="button" data-rating-star="{{ $i }}" aria-label="{{ $i }} bintang"
+                                    class="text-neutral-300 transition hover:scale-110 cursor-pointer">
                                     <svg viewBox="0 0 24 24" class="size-8 fill-current" aria-hidden="true">
-                                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                        <path
+                                            d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                                     </svg>
                                 </button>
                             @endfor
@@ -346,12 +363,12 @@
                     </div>
 
                     <textarea name="komentar" rows="3" maxlength="500"
-                              placeholder="Ceritakan pengalaman Anda dengan produk ini (opsional)..."
-                              class="mt-3 w-full rounded-lg border border-neutral-300 bg-white p-2.5 text-xs font-medium leading-relaxed text-neutral-900 focus:border-neutral-900 focus:outline-none"></textarea>
+                        placeholder="Ceritakan pengalaman Anda dengan produk ini (opsional)..."
+                        class="mt-3 w-full rounded-lg border border-neutral-300 bg-white p-2.5 text-xs font-medium leading-relaxed text-neutral-900 focus:border-neutral-900 focus:outline-none"></textarea>
 
                     <div class="mt-3 flex items-center justify-end">
                         <button type="submit"
-                                class="rounded-lg bg-lime-500 px-4 py-2 text-xs font-bold text-neutral-900 transition hover:bg-lime-600">
+                            class="rounded-lg bg-lime-500 px-4 py-2 text-xs font-bold text-neutral-900 transition hover:bg-lime-600">
                             Kirim Ulasan
                         </button>
                     </div>
@@ -361,22 +378,22 @@
             {{-- Daftar ulasan khusus produk ini --}}
             <div class="mt-5 space-y-4">
                 @forelse ($productReviews as $review)
-                    <article class="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6 shadow-2xs"
-                             data-review-card>
+                    <article class="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6 shadow-2xs" data-review-card>
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-2.5">
-                                <div class="size-8 overflow-hidden rounded-full border border-neutral-200 bg-neutral-200 shrink-0">
+                                <div
+                                    class="size-8 overflow-hidden rounded-full border border-neutral-200 bg-neutral-200 shrink-0">
                                     <img src="{{ $review->reviewer?->avatar_url ?? asset('images/default-avatar.png') }}"
-                                         alt="{{ $review->reviewer?->name ?? 'Pembeli' }}"
-                                         class="size-full object-cover"
-                                         onerror="this.onerror=null; this.src='{{ asset('images/default-avatar.png') }}';">
+                                        alt="{{ $review->reviewer?->name ?? 'Pembeli' }}" class="size-full object-cover"
+                                        onerror="this.onerror=null; this.src='{{ asset('images/default-avatar.png') }}';">
                                 </div>
                                 <div class="flex items-baseline gap-2">
                                     <h3 class="text-xs sm:text-sm font-bold text-neutral-900">
                                         {{ $review->reviewer?->name ?? 'Pembeli' }}
                                     </h3>
                                     <span class="text-xs text-neutral-400 font-normal">
-                                        {{ $review->created_at?->locale('id')->diffForHumans(['syntax' => \Carbon\CarbonInterface::DIFF_ABSOLUTE]) }} lalu
+                                        {{ $review->created_at?->locale('id')->diffForHumans(['syntax' => \Carbon\CarbonInterface::DIFF_ABSOLUTE]) }}
+                                        lalu
                                     </span>
                                 </div>
                             </div>
@@ -385,24 +402,26 @@
                             @if ($viewerReview !== null && $review->id === $viewerReview->id)
                                 <div class="relative shrink-0" data-review-menu-root>
                                     <button type="button" data-review-menu-toggle
-                                            class="grid size-7 place-items-center rounded-full text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700"
-                                            aria-label="Opsi ulasan" aria-expanded="false">
+                                        class="grid size-7 place-items-center rounded-full text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700"
+                                        aria-label="Opsi ulasan" aria-expanded="false">
                                         <svg viewBox="0 0 24 24" class="size-4 fill-current">
-                                            <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                                            <circle cx="12" cy="5" r="1.5" />
+                                            <circle cx="12" cy="12" r="1.5" />
+                                            <circle cx="12" cy="19" r="1.5" />
                                         </svg>
                                     </button>
                                     <div data-review-menu
-                                         class="absolute right-0 top-full z-30 mt-1 hidden w-40 overflow-hidden rounded-xl border border-neutral-200 bg-white py-1 shadow-xl">
+                                        class="absolute right-0 top-full z-30 mt-1 hidden w-40 overflow-hidden rounded-xl border border-neutral-200 bg-white py-1 shadow-xl">
                                         <button type="button" data-edit-review-toggle
-                                                class="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-neutral-700 transition hover:bg-neutral-100">
+                                            class="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-neutral-700 transition hover:bg-neutral-100">
                                             Edit ulasan
                                         </button>
                                         <form method="POST" action="{{ route('reviews.destroy', $review) }}"
-                                              onsubmit="return confirm('Hapus ulasan Anda?');">
+                                            onsubmit="return confirm('Hapus ulasan Anda?');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit"
-                                                    class="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-red-600 transition hover:bg-red-50">
+                                                class="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-red-600 transition hover:bg-red-50">
                                                 Hapus ulasan
                                             </button>
                                         </form>
@@ -414,9 +433,10 @@
                         <div class="mt-2.5 flex items-center gap-1" data-review-stars>
                             @for ($i = 1; $i <= 5; $i++)
                                 <svg viewBox="0 0 24 24"
-                                     class="{{ $i <= $review->rating ? 'fill-amber-400 text-amber-400' : 'fill-neutral-200 text-neutral-200' }} size-4"
-                                     aria-hidden="true">
-                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                    class="{{ $i <= $review->rating ? 'fill-amber-400 text-amber-400' : 'fill-neutral-200 text-neutral-200' }} size-4"
+                                    aria-hidden="true">
+                                    <path
+                                        d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                                 </svg>
                             @endfor
                         </div>
@@ -427,10 +447,8 @@
 
                         {{-- Panel edit (tersembunyi sampai menu Edit diklik) --}}
                         @if ($viewerReview !== null && $review->id === $viewerReview->id)
-                            <form method="POST" action="{{ route('reviews.update', $review) }}"
-                                  hidden
-                                  data-edit-review-form
-                                  class="mt-4 rounded-xl border border-lime-200 bg-lime-50 p-4">
+                            <form method="POST" action="{{ route('reviews.update', $review) }}" hidden data-edit-review-form
+                                class="mt-4 rounded-xl border border-lime-200 bg-lime-50 p-4">
                                 @csrf
                                 @method('PATCH')
                                 <p class="text-xs font-bold text-neutral-900">Perbarui ulasan</p>
@@ -439,11 +457,11 @@
                                     <input type="hidden" name="rating" value="{{ $review->rating }}" required>
                                     <div class="flex items-center gap-1">
                                         @for ($i = 1; $i <= 5; $i++)
-                                            <button type="button" data-rating-star="{{ $i }}"
-                                                    aria-label="{{ $i }} bintang"
-                                                    class="text-neutral-300 transition hover:scale-110 cursor-pointer">
+                                            <button type="button" data-rating-star="{{ $i }}" aria-label="{{ $i }} bintang"
+                                                class="text-neutral-300 transition hover:scale-110 cursor-pointer">
                                                 <svg viewBox="0 0 24 24" class="size-7 fill-current" aria-hidden="true">
-                                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                                    <path
+                                                        d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                                                 </svg>
                                             </button>
                                         @endfor
@@ -454,16 +472,16 @@
                                 </div>
 
                                 <textarea name="komentar" rows="3" maxlength="500"
-                                          placeholder="Perbarui pengalaman Anda... (opsional)"
-                                          class="mt-2 w-full rounded-lg border border-neutral-300 bg-white p-2.5 text-xs font-medium leading-relaxed text-neutral-900 focus:border-neutral-900 focus:outline-none">{{ old('komentar', $review->komentar) }}</textarea>
+                                    placeholder="Perbarui pengalaman Anda... (opsional)"
+                                    class="mt-2 w-full rounded-lg border border-neutral-300 bg-white p-2.5 text-xs font-medium leading-relaxed text-neutral-900 focus:border-neutral-900 focus:outline-none">{{ old('komentar', $review->komentar) }}</textarea>
 
                                 <div class="mt-3 flex items-center justify-end gap-2">
                                     <button type="button" data-edit-review-cancel
-                                            class="rounded-lg border border-neutral-300 px-3.5 py-2 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100">
+                                        class="rounded-lg border border-neutral-300 px-3.5 py-2 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100">
                                         Batal
                                     </button>
                                     <button type="submit"
-                                            class="rounded-lg bg-lime-500 px-4 py-2 text-xs font-bold text-neutral-900 transition hover:bg-lime-600">
+                                        class="rounded-lg bg-lime-500 px-4 py-2 text-xs font-bold text-neutral-900 transition hover:bg-lime-600">
                                         Simpan
                                     </button>
                                 </div>
