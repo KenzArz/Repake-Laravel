@@ -132,23 +132,21 @@ class ProductController extends Controller
         // Resolve & sinkronkan lokasi dari query parameter atau session navbar
         $userLocation = $this->resolveUserLocation($request);
         $activeKota = $userLocation['kota'] ?? '';
-        $targetLat = $userLocation['lat'];
-        $targetLng = $userLocation['lng'];
 
         $defaultSort = 'terbaru';
         $sort = (string) $request->query('sort', $defaultSort);
 
-        // Untuk urutan "Terdekat", gunakan lokasi filter jika ada, atau fallback ke kota profil user
+        // Titik acuan jarak: prioritaskan filter aktif -> kota profil user -> default Kampus 1 Unsika
         $referenceLocation = $userLocation;
         if ($referenceLocation['kota'] === null && $referenceLocation['lat'] === null && $sort === 'terdekat') {
             $profileCity = trim((string) ($request->user()?->kota ?? session('user_profile.kota', '')));
-            if ($profileCity !== '' && strcasecmp($profileCity, 'Pilih Lokasimu') !== 0) {
-                $referenceLocation = ['kota' => $profileCity, 'lat' => null, 'lng' => null];
-            }
+            $referenceLocation = ($profileCity !== '' && ! in_array(mb_strtolower($profileCity), ['pilih lokasimu', 'semua lokasi'], true))
+                ? ['kota' => $profileCity, 'lat' => null, 'lng' => null]
+                : ['kota' => 'Kampus 1 Unsika', 'lat' => -6.3236, 'lng' => 107.3065];
         }
 
-        $locationTarget = ($activeKota !== '' || $targetLat !== null)
-            ? $this->resolveLocationTarget($userLocation)
+        $locationTarget = ($referenceLocation['kota'] !== null || $referenceLocation['lat'] !== null)
+            ? $this->resolveLocationTarget($referenceLocation)
             : ['lat' => null, 'lng' => null, 'keywords' => []];
 
         $targetLat = $locationTarget['lat'];
@@ -169,8 +167,8 @@ class ProductController extends Controller
             ->when($maxPrice !== null && $maxPrice !== '' && is_numeric($maxPrice), fn(Builder $qb) => $qb->where('harga', '<=', (int) $maxPrice))
             ->when($negoOnly, fn(Builder $qb) => $qb->where('is_negotiable', true));
 
-        // Jika lokasi aktif atau urutkan terdekat dipilih
-        if ($activeKota !== '' || $radiusKm !== null || ($sort === 'terdekat' && $targetLat !== null && $targetLng !== null)) {
+        // Jika filter lokasi aktif atau urutkan terdekat dipilih
+        if ($activeKota !== '' || $radiusKm !== null || $sort === 'terdekat') {
             $maxRadius = $radiusKm ?? 15.0;
 
             $all = $query->latest()->get()->map(function (Product $product) use ($targetLat, $targetLng): Product {
@@ -181,6 +179,7 @@ class ProductController extends Controller
                 return $product;
             });
 
+            // Saring hasil HANYA jika filter lokasi eksplisit aktif (bukan sekadar sort=terdekat)
             if ($activeKota !== '' || $radiusKm !== null) {
                 $all = $all->filter(function (Product $p) use ($locationKeywords, $maxRadius): bool {
                     $keywordMatch = $this->matchesLocationKeywords($p, $locationKeywords);
@@ -195,6 +194,7 @@ class ProductController extends Controller
                 'termahal' => $all->sortByDesc('harga'),
                 'terdekat' => $all->sortBy(fn(Product $p): array => [
                     $p->distance_km ?? 9999.0,
+                    $this->matchesLocationKeywords($p, $locationKeywords) ? 0 : 1,
                     - ($p->created_at?->timestamp ?? 0),
                 ]),
                 default => $all->sortByDesc('created_at'),
@@ -242,8 +242,7 @@ class ProductController extends Controller
      * atau pilihan eksplisit pengguna di navbar (session user_location).
      *
      * @return array{kota: ?string, lat: ?float, lng: ?float}
-     */
-    private function resolveUserLocation(Request $request): array
+     */ private function resolveUserLocation(Request $request): array
     {
         if ($request->has('kota')) {
             $rawCity = trim((string) $request->query('kota', ''));
@@ -254,8 +253,16 @@ class ProductController extends Controller
                 return ['kota' => null, 'lat' => null, 'lng' => null];
             }
 
-            $lat = is_numeric($request->query('lat')) ? (float) $request->query('lat') : null;
-            $lng = is_numeric($request->query('lng')) ? (float) $request->query('lng') : null;
+            $existing = session('user_location', []);
+            $isSameCity = isset($existing['kota']) && strcasecmp((string) $existing['kota'], $rawCity) === 0;
+
+            $lat = is_numeric($request->query('lat'))
+                ? (float) $request->query('lat')
+                : ($isSameCity ? ($existing['lat'] ?? null) : null);
+
+            $lng = is_numeric($request->query('lng'))
+                ? (float) $request->query('lng')
+                : ($isSameCity ? ($existing['lng'] ?? null) : null);
 
             $saved = ['kota' => $rawCity, 'lat' => $lat, 'lng' => $lng];
             session()->put('user_location', $saved);

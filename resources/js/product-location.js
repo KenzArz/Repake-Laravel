@@ -295,21 +295,18 @@ export function initProductLocation() {
         }
     });
 
-    // Tombol Lokasi Saat Ini (Live GPS)
+    // Tombol Lokasi Saat Ini (Live GPS — cepat seperti navbar)
     liveBtn?.addEventListener("click", () => {
         if (!navigator.geolocation) {
             setStatus("Browser tidak mendukung fitur GPS.", true);
             return;
         }
 
-        // Cegah spam klik (batas 1 req/detik Nominatim)
         liveBtn.disabled = true;
         liveBtn.classList.add("opacity-50", "pointer-events-none");
         const unlockBtn = () => {
-            setTimeout(() => {
-                liveBtn.disabled = false;
-                liveBtn.classList.remove("opacity-50", "pointer-events-none");
-            }, 1200);
+            liveBtn.disabled = false;
+            liveBtn.classList.remove("opacity-50", "pointer-events-none");
         };
 
         hideDropdown();
@@ -317,47 +314,57 @@ export function initProductLocation() {
 
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
-                const lat = pos.coords.latitude;
-                const lng = pos.coords.longitude;
-
-                if (useGooglePlaces && window.google?.maps?.Geocoder) {
-                    const geocoder = new google.maps.Geocoder();
-                    geocoder.geocode(
-                        { location: { lat, lng } },
-                        async (results, status) => {
-                            if (status === "OK" && results[0]) {
-                                const { city, province } = extractRegion(
-                                    results[0].address_components,
-                                );
-                                const shortAddr = results[0].formatted_address
-                                    .split(",")
-                                    .slice(0, 2)
-                                    .join(",");
-                                applyLocation({
-                                    name: shortAddr,
-                                    city,
-                                    province,
-                                    lat,
-                                    lng,
-                                    sourceLabel: "Lokasi GPS aktif",
-                                });
-                            } else {
-                                useGooglePlaces = false;
-                                await reverseWithNominatim(lat, lng);
-                            }
-                        },
-                    );
-                    return;
+                try {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    await reverseFast(lat, lng);
+                } finally {
+                    unlockBtn();
                 }
-
-                await reverseWithNominatim(lat, lng);
             },
-            () => setStatus("Izin lokasi ditolak atau GPS tidak aktif.", true),
-            { enableHighAccuracy: true, timeout: 8000 },
+            () => {
+                unlockBtn();
+                setStatus("Izin lokasi ditolak atau GPS tidak aktif.", true);
+            },
+            { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 },
         );
     });
 
-    const reverseWithNominatim = async (lat, lng) => {
+    const reverseFast = async (lat, lng) => {
+        // 1. Primary cepat via BigDataCloud (sama seperti navbar)
+        try {
+            const res = await fetch(
+                `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=id`,
+            );
+            if (res.ok) {
+                const data = await res.json();
+                const city = data.city || data.principalSubdivision || "";
+                const province = data.principalSubdivision || "";
+                const locality = data.locality || "";
+                const placeName =
+                    locality &&
+                    city &&
+                    locality.toLowerCase() !== city.toLowerCase()
+                        ? `${locality}, ${city.replace(/^(Kabupaten|Kota)\s+/i, "")}`
+                        : locality || city;
+
+                if (placeName) {
+                    applyLocation({
+                        name: placeName,
+                        city: city || placeName,
+                        province,
+                        lat,
+                        lng,
+                        sourceLabel: "Lokasi GPS aktif",
+                    });
+                    return;
+                }
+            }
+        } catch {
+            // Lanjut ke fallback Nominatim
+        }
+
+        // 2. Fallback via OpenStreetMap Nominatim
         try {
             const res = await fetch(
                 `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=id`,
