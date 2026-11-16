@@ -53,7 +53,10 @@ test('penjual dapat menandai produk terjual', function () {
     ['seller' => $seller, 'order' => $order, 'product' => $product] = apiOrderFixture();
     Sanctum::actingAs($seller);
 
-    $this->patchJson('/api/v1/orders/'.$order->id.'/status', ['status' => 'selesai'])
+    $this->patchJson('/api/v1/orders/'.$order->id.'/status', [
+        'status' => 'selesai',
+        'completion_type' => Order::COMPLETION_STOCK_OUT,
+    ])
         ->assertOk()
         ->assertJsonPath('data.status', Order::STATUS_SELESAI);
 
@@ -64,7 +67,10 @@ test('pembeli tidak bisa menandai produk terjual', function () {
     ['buyer' => $buyer, 'order' => $order] = apiOrderFixture();
     Sanctum::actingAs($buyer);
 
-    $this->patchJson('/api/v1/orders/'.$order->id.'/status', ['status' => 'selesai'])->assertStatus(403);
+    $this->patchJson('/api/v1/orders/'.$order->id.'/status', [
+        'status' => 'selesai',
+        'completion_type' => Order::COMPLETION_STOCK_OUT,
+    ])->assertStatus(403);
 });
 
 test('pihak luar tidak bisa mengubah order', function () {
@@ -76,6 +82,7 @@ test('pihak luar tidak bisa mengubah order', function () {
 
 test('pembeli dapat menulis ulasan pada order', function () {
     ['buyer' => $buyer, 'order' => $order, 'product' => $product] = apiOrderFixture();
+    $order->update(['status' => Order::STATUS_SELESAI, 'completed_at' => now()]);
     Sanctum::actingAs($buyer);
 
     $this->postJson('/api/v1/orders/'.$order->id.'/reviews', [
@@ -89,7 +96,7 @@ test('pembeli dapat menulis ulasan pada order', function () {
 
 test('ulasan ganda untuk transaksi yang sama ditolak', function () {
     ['buyer' => $buyer, 'order' => $order] = apiOrderFixture();
-    $order->update(['status' => Order::STATUS_DISEPAKATI]);
+    $order->update(['status' => Order::STATUS_SELESAI, 'completed_at' => now()]);
     Review::create([
         'order_id' => $order->id,
         'product_id' => $order->product_id,

@@ -11,7 +11,6 @@ use App\Models\User;
 use App\Notifications\NewMessage;
 use App\Notifications\OfferDecided;
 use App\Notifications\OfferReceived;
-use App\Notifications\OrderCancelled;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -162,6 +161,20 @@ class ChatController extends Controller
                 403,
                 'Hanya pembeli yang bisa mengirim tawaran.',
             );
+
+            $product = $conversation->product;
+            abort_if($product === null, 404, 'Produk tidak ditemukan.');
+            abort_if($product->status !== Product::STATUS_DIJUAL, 409, 'Produk ini sudah tidak dapat ditawar.');
+            abort_if(! $product->is_negotiable, 409, 'Penjual tidak menerima tawaran.');
+
+            $active = Order::query()
+                ->where('conversation_id', $conversation->id)
+                ->whereIn('status', [Order::STATUS_DISEPAKATI, Order::STATUS_SELESAI])
+                ->exists();
+            abort_if($active, 409, 'Transaksi sudah berjalan, tawaran baru tidak bisa dikirim.');
+
+            $amount = (int) ($validated['offer_amount'] ?? 0);
+            abort_if($product->harga !== null && $amount > $product->harga, 422, 'Tawaran tidak boleh melebihi harga produk.');
         }
 
         $clientId = $validated['client_id'] ?? null;
@@ -336,6 +349,8 @@ class ChatController extends Controller
             'offer_amount' => ['required', 'integer', 'min:1'],
         ]);
 
+        abort_if($conversation->product !== null && $conversation->product->harga !== null && $data['offer_amount'] > $conversation->product->harga, 422, 'Tawaran tidak boleh melebihi harga produk.');
+
         $message->update(['offer_amount' => $data['offer_amount']]);
 
         return $this->offerResponse($conversation, $message);
@@ -361,6 +376,12 @@ class ChatController extends Controller
     public function acceptOffer(Conversation $conversation, Message $message): JsonResponse|RedirectResponse
     {
         $this->authorizeOfferDecision($conversation, $message);
+
+        $active = Order::query()
+            ->where('conversation_id', $conversation->id)
+            ->whereIn('status', [Order::STATUS_DISEPAKATI, Order::STATUS_SELESAI])
+            ->exists();
+        abort_if($active, 409, 'Percakapan ini sudah memiliki transaksi berjalan.');
 
         DB::transaction(function () use ($conversation, $message): void {
             // Kunci baris agar dua tap "Terima" tidak membuat dua order.
@@ -394,56 +415,29 @@ class ChatController extends Controller
     }
 
     /**
-     * Penjual menandai produk terjual.
+     * Penjual menyelesaikan transaksi setelah COD/serah-terima barang.
      *
-     * Finalisasi transaksi sepenuhnya di tangan penjual: produk menjadi
-     * "terjual" (tidak dihapus), order percakapan ini selesai, dan order
-     * "disepakati" lain untuk produk yang sama otomatis dibatalkan.
+     * Pilihan stok (habis / masih tersedia) menentukan apakah produk ikut
+     * ditandai terjual dan order lain dibatalkan atau tidak.
      */
-    public function markSold(Conversation $conversation): RedirectResponse
+    public function markSold(Request $request, Conversation $conversation): RedirectResponse
     {
         $this->authorizeParticipant($conversation);
 
-        abort_if(
-            $conversation->seller_id !== (string) Auth::id(),
-            403,
-            'Hanya penjual yang bisa menandai produk terjual.',
-        );
-
-        $product = $conversation->product;
-
-        abort_if($product === null, 404, 'Produk tidak ditemukan.');
-        abort_if($product->user_id !== (string) Auth::id(), 403);
-        abort_if($product->status !== Product::STATUS_DIJUAL, 409, 'Produk ini sudah tidak dijual.');
+        $validated = $request->validate([
+            'completion_type' => ['required', 'in:'.Order::COMPLETION_STOCK_OUT.','.Order::COMPLETION_STOCK_AVAILABLE],
+        ]);
 
         $order = $conversation->order()->first();
+        abort_if($order === null, 404, 'Belum ada kesepakatan untuk produk ini.');
 
-        DB::transaction(function () use ($order, $product): void {
-            $product->update(['status' => Product::STATUS_TERJUAL]);
+        (new \App\Services\OrderService)->complete($order, (string) Auth::id(), $validated['completion_type']);
 
-            if ($order !== null) {
-                $order->update([
-                    'status' => Order::STATUS_SELESAI,
-                    'completed_at' => now(),
-                ]);
-            }
+        $message = $validated['completion_type'] === Order::COMPLETION_STOCK_OUT
+            ? 'Transaksi selesai. Produk telah ditandai habis dan order lain dibatalkan.'
+            : 'Transaksi selesai. Produk masih tersedia dan tetap ditayangkan.';
 
-            // Barang tunggal: order lain untuk produk yang sama tidak mungkin
-            // dilanjutkan, jadi dibatalkan dan pembelinya diberi tahu.
-            $others = Order::query()
-                ->where('product_id', $product->id)
-                ->whereKeyNot($order?->getKey() ?? 0)
-                ->where('status', Order::STATUS_DISEPAKATI)
-                ->get();
-
-            foreach ($others as $other) {
-                $other->update(['status' => Order::STATUS_BATAL]);
-
-                $other->buyer?->notify(new OrderCancelled($product->judul, $other->conversation_id));
-            }
-        });
-
-        return back()->with('success', 'Produk ditandai terjual. Order lain untuk produk ini otomatis dibatalkan.');
+        return back()->with('success', $message);
     }
 
     /**

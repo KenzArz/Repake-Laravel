@@ -300,7 +300,7 @@ class ProfileController extends Controller
         $order = Order::query()
             ->where('seller_id', $viewerId)
             ->where('buyer_id', $user->id)
-            ->whereIn('status', [Order::STATUS_DISEPAKATI, Order::STATUS_SELESAI])
+            ->where('status', Order::STATUS_SELESAI)
             ->latest('id')
             ->first();
 
@@ -345,7 +345,9 @@ class ProfileController extends Controller
         } elseif ($status === 'terjual') {
             $query->where('status', Product::STATUS_TERJUAL);
         } elseif (! $isOwner) {
-            $query->whereIn('status', [Product::STATUS_DIJUAL, Product::STATUS_TERJUAL]);
+            // Profil publik hanya menampilkan produk yang masih aktif; produk
+            // terjual berpindah ke riwayat transaksi penjual.
+            $query->where('status', Product::STATUS_DIJUAL);
         }
 
         return $this->applySort($query, $sort)->get();
@@ -364,13 +366,15 @@ class ProfileController extends Controller
     }
 
     /**
-     * Jumlah produk berstatus terjual untuk angka "Terjual" pada kartu profil.
+     * Jumlah transaksi penjualan yang sudah diselesaikan, untuk angka
+     * "Terjual" pada kartu profil. Diukur dari order `selesai` agar konsisten
+     * dengan riwayat transaksi berbasis penyelesaian COD.
      */
     private function soldCount(User $user): int
     {
-        return Product::query()
-            ->where('user_id', $user->id)
-            ->where('status', Product::STATUS_TERJUAL)
+        return Order::query()
+            ->where('seller_id', $user->id)
+            ->where('status', Order::STATUS_SELESAI)
             ->count();
     }
 

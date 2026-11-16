@@ -192,14 +192,19 @@ class ChatController extends Controller
 
     public function sold(Request $request, Conversation $conversation): JsonResponse
     {
-        $this->service->markSold($conversation, (string) $request->user()->id);
+        $validated = $request->validate([
+            'completion_type' => ['required', 'in:'.Order::COMPLETION_STOCK_OUT.','.Order::COMPLETION_STOCK_AVAILABLE],
+        ]);
+
+        $this->service->markSold($conversation, (string) $request->user()->id, $validated['completion_type']);
+
         $conversation->load(['product.coverImage', 'buyer', 'seller']);
         $order = $this->service->orderFor($conversation)?->load(['product.primaryImage', 'buyer', 'seller']);
 
         return ApiResponse::success([
             'conversation' => new ConversationResource($conversation),
             'order' => $order ? new OrderResource($order) : null,
-        ], 'Produk ditandai terjual.');
+        ], 'Transaksi diselesaikan.');
     }
 
     public function destroy(Request $request, Message $message): JsonResponse

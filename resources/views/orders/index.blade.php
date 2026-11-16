@@ -1,14 +1,14 @@
 @extends('layouts.app')
 
-@section('title', 'Riwayat Transaksi - RePake')
+@section('title', 'Transaksi - RePake')
 
 @section('content')
     @php
         use App\Models\Order;
 
+        $viewOptions = ['aktif' => 'Transaksi Aktif', 'riwayat' => 'Riwayat'];
         $statusOptions = [
             'semua' => 'Semua',
-            Order::STATUS_DISEPAKATI => 'Disepakati',
             Order::STATUS_SELESAI => 'Selesai',
             Order::STATUS_BATAL => 'Dibatalkan',
         ];
@@ -17,9 +17,9 @@
     <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         {{-- Header Halaman --}}
         <div class="mb-6">
-            <h1 class="text-xl sm:text-2xl font-black tracking-tight text-neutral-900">Riwayat Transaksi</h1>
+            <h1 class="text-xl sm:text-2xl font-black tracking-tight text-neutral-900">Transaksi</h1>
             <p class="mt-1 text-xs text-neutral-500">
-                Pantau kesepakatan pembelian, penjualan, dan ulasan transaksi Anda.
+                Pantau kesepakatan menunggu COD dan riwayat transaksi Anda.
             </p>
         </div>
 
@@ -38,39 +38,53 @@
             </div>
         @endif
 
-        {{-- Tingkat 1: Tab Peran (Pembelian vs Penjualan) --}}
-        <div class="border-b border-neutral-200">
-            <div class="flex items-center gap-6">
-                <a href="{{ route('orders.index', ['role' => 'pembelian']) }}"
-                    class="inline-flex items-center gap-2 pb-2.5 text-xs font-bold transition {{ $role === 'pembelian' ? 'border-b-2 border-neutral-900 text-neutral-900' : 'text-neutral-500 hover:text-neutral-800' }}">
-                    <span>Pembelian</span>
-                    @if ($activeBuyingCount > 0)
-                        <span class="rounded-full bg-lime-400 px-1.5 py-0.5 text-[10px] font-extrabold text-neutral-900">
-                            {{ $activeBuyingCount }}
-                        </span>
-                    @endif
-                </a>
+        <div class="flex flex-col gap-4">
+            {{-- Tingkat 1: Tab Peran (Pembelian vs Penjualan) --}}
+            <div class="border-b border-neutral-200">
+                <div class="flex items-center gap-6">
+                    <a href="{{ route('orders.index', ['role' => 'pembelian', 'view' => $view]) }}"
+                        class="inline-flex items-center gap-2 pb-2.5 text-xs font-bold transition {{ $role === 'pembelian' ? 'border-b-2 border-neutral-900 text-neutral-900' : 'text-neutral-500 hover:text-neutral-800' }}">
+                        <span>Pembelian</span>
+                        @if ($activeBuyingCount > 0)
+                            <span class="rounded-full bg-lime-400 px-1.5 py-0.5 text-[10px] font-extrabold text-neutral-900">
+                                {{ $activeBuyingCount }}
+                            </span>
+                        @endif
+                    </a>
 
-                <a href="{{ route('orders.index', ['role' => 'penjualan']) }}"
-                    class="inline-flex items-center gap-2 pb-2.5 text-xs font-bold transition {{ $role === 'penjualan' ? 'border-b-2 border-neutral-900 text-neutral-900' : 'text-neutral-500 hover:text-neutral-800' }}">
-                    <span>Penjualan</span>
-                    @if ($activeSellingCount > 0)
-                        <span class="rounded-full bg-lime-400 px-1.5 py-0.5 text-[10px] font-extrabold text-neutral-900">
-                            {{ $activeSellingCount }}
-                        </span>
-                    @endif
-                </a>
+                    <a href="{{ route('orders.index', ['role' => 'penjualan', 'view' => $view]) }}"
+                        class="inline-flex items-center gap-2 pb-2.5 text-xs font-bold transition {{ $role === 'penjualan' ? 'border-b-2 border-neutral-900 text-neutral-900' : 'text-neutral-500 hover:text-neutral-800' }}">
+                        <span>Penjualan</span>
+                        @if ($activeSellingCount > 0)
+                            <span class="rounded-full bg-lime-400 px-1.5 py-0.5 text-[10px] font-extrabold text-neutral-900">
+                                {{ $activeSellingCount }}
+                            </span>
+                        @endif
+                    </a>
+                </div>
             </div>
-        </div>
 
-        {{-- Tingkat 2: Filter Status (Pill Chips) --}}
-        <div class="mt-4 flex items-center gap-2 overflow-x-auto pb-1">
-            @foreach ($statusOptions as $statusKey => $statusLabel)
-                <a href="{{ route('orders.index', ['role' => $role, 'status' => $statusKey]) }}"
-                    class="shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition {{ $status === $statusKey ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100' }}">
-                    {{ $statusLabel }}
-                </a>
-            @endforeach
+            {{-- Tingkat 2: Tab Aktif vs Riwayat --}}
+            <div class="flex items-center gap-2">
+                @foreach ($viewOptions as $viewKey => $viewLabel)
+                    <a href="{{ route('orders.index', ['role' => $role, 'view' => $viewKey]) }}"
+                        class="shrink-0 rounded-full border px-4 py-1.5 text-xs font-semibold transition {{ $view === $viewKey ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100' }}">
+                        {{ $viewLabel }}
+                    </a>
+                @endforeach
+            </div>
+
+            {{-- Filter status hanya untuk Riwayat --}}
+            @if ($view === 'riwayat')
+                <div class="flex items-center gap-2 overflow-x-auto pb-1">
+                    @foreach ($statusOptions as $statusKey => $statusLabel)
+                        <a href="{{ route('orders.index', ['role' => $role, 'view' => 'riwayat', 'status' => $statusKey]) }}"
+                            class="shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition {{ $status === $statusKey ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100' }}">
+                            {{ $statusLabel }}
+                        </a>
+                    @endforeach
+                </div>
+            @endif
         </div>
 
         {{-- Daftar Kartu Transaksi --}}
@@ -87,29 +101,25 @@
                             <path d="M9 12h6M9 16h4" />
                         </svg>
                     </div>
-                    <h2 class="mt-4 text-sm font-bold text-neutral-900">
-                        Belum Ada Transaksi {{ $role === 'penjualan' ? 'Penjualan' : 'Pembelian' }}
-                    </h2>
-                    <p class="mt-1.5 max-w-sm text-xs leading-relaxed text-neutral-500">
-                        @if ($status !== 'semua')
-                            Tidak ada transaksi dengan status "{{ $statusOptions[$status] ?? $status }}". Coba pilih filter status
-                            lainnya.
-                        @elseif ($role === 'penjualan')
-                            Transaksi akan muncul di sini saat pembeli menyepakati pembelian barang yang kamu jual.
-                        @else
-                            Mulai temukan barang bekas berkualitas dan ajukan kesepakatan dengan penjual.
-                        @endif
-                    </p>
-                    @if ($status !== 'semua')
-                        <a href="{{ route('orders.index', ['role' => $role]) }}"
-                            class="mt-5 inline-flex items-center rounded-lg border border-neutral-300 bg-white px-4 py-2 text-xs font-bold text-neutral-800 transition hover:bg-neutral-100">
-                            Tampilkan Semua Status
-                        </a>
+                    @if ($view === 'aktif')
+                        <h2 class="mt-4 text-sm font-bold text-neutral-900">Belum Ada Transaksi Aktif</h2>
+                        <p class="mt-1.5 max-w-sm text-xs leading-relaxed text-neutral-500">
+                            @if ($role === 'penjualan')
+                                Kesepakatan yang menunggu COD akan muncul di sini saat pembeli menyepakati tawaran.
+                            @else
+                                Kesepakatan yang tawarannya sudah disetujui penjual akan muncul di sini. Lanjutkan
+                                transaksinya lewat chat.
+                            @endif
+                        </p>
                     @else
-                        <a href="{{ route('home') }}"
-                            class="mt-5 inline-flex items-center rounded-lg bg-lime-400 px-5 py-2.5 text-xs font-bold text-neutral-900 transition hover:bg-lime-500">
-                            Jelajah Produk
-                        </a>
+                        <h2 class="mt-4 text-sm font-bold text-neutral-900">Belum Ada Riwayat Transaksi</h2>
+                        <p class="mt-1.5 max-w-sm text-xs leading-relaxed text-neutral-500">
+                            @if ($status !== 'semua')
+                                Tidak ada transaksi dengan status "{{ $statusOptions[$status] ?? $status }}".
+                            @else
+                                Transaksi yang sudah diselesaikan atau dibatalkan akan tercatat di sini.
+                            @endif
+                        </p>
                     @endif
                 </div>
             @endforelse
@@ -123,26 +133,21 @@
         @endif
     </div>
 
-    {{-- Modal Konfirmasi Aksi Transaksi --}}
+    {{-- Modal Konfirmasi Pembatalan --}}
     <div id="order-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="order-confirm-title"
         class="fixed inset-0 z-50 hidden items-center justify-center p-4">
 
-        {{-- Backdrop --}}
         <div data-modal-backdrop class="fixed inset-0 bg-neutral-900/50 backdrop-blur-xs transition-opacity"></div>
 
-        {{-- Panel Modal --}}
         <div class="relative z-10 w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6 shadow-xl">
             <div class="flex items-start gap-3.5">
-                {{-- Ikon Status Dinamis --}}
                 <div id="order-confirm-icon-wrap"
                     class="grid size-10 shrink-0 place-items-center rounded-xl bg-lime-100 text-lime-700">
-                    {{-- Ikon Check (Primary / Tandai Terjual) --}}
                     <svg id="order-confirm-icon-primary" viewBox="0 0 24 24"
                         class="size-5 fill-none stroke-current stroke-2">
                         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                         <polyline points="22 4 12 14.01 9 11.01" />
                     </svg>
-                    {{-- Ikon Peringatan (Danger / Batalkan) --}}
                     <svg id="order-confirm-icon-danger" viewBox="0 0 24 24"
                         class="hidden size-5 fill-none stroke-current stroke-2">
                         <circle cx="12" cy="12" r="10" />
@@ -171,6 +176,9 @@
             </div>
         </div>
     </div>
+
+    {{-- Modal Selesaikan Transaksi (dipakai tombol pada kartu order penjual) --}}
+    <x-order-complete-modal />
 @endsection
 
 @push('scripts')
@@ -217,7 +225,7 @@
                 }
             });
 
-            // 2. Modal Konfirmasi Aksi Transaksi
+            // 2. Modal Konfirmasi Pembatalan
             const modal = document.getElementById('order-confirm-modal');
             if (!modal) return;
 
@@ -235,14 +243,13 @@
                 activeForm = trigger.closest('form');
                 if (!activeForm) return;
 
-                const variant = trigger.dataset.confirmVariant || 'primary';
+                const variant = trigger.dataset.confirmVariant || 'danger';
                 const isDanger = variant === 'danger';
 
                 titleEl.textContent = trigger.dataset.confirmTitle || 'Konfirmasi';
                 messageEl.textContent = trigger.dataset.confirmMessage || '';
                 submitBtn.textContent = trigger.dataset.confirmBtn || 'Ya, Lanjutkan';
 
-                // Atur tema warna ikon & tombol sesuai jenis aksi
                 iconWrap.className = isDanger
                     ? 'grid size-10 shrink-0 place-items-center rounded-xl bg-red-100 text-red-600'
                     : 'grid size-10 shrink-0 place-items-center rounded-xl bg-lime-100 text-lime-700';

@@ -12,11 +12,10 @@ beforeEach(function () {
     $this->seller = User::factory()->create();
     $this->buyer = User::factory()->create();
     $this->product = Product::factory()->create(['user_id' => $this->seller->id]);
-    $this->order = Order::factory()->create([
+    $this->order = Order::factory()->selesai()->create([
         'seller_id' => $this->seller->id,
         'buyer_id' => $this->buyer->id,
         'product_id' => $this->product->id,
-        'status' => Order::STATUS_DISEPAKATI,
     ]);
 });
 

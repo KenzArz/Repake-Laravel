@@ -107,8 +107,9 @@
                     $hasOrderBar = $order !== null
                         && in_array($order->status, [\App\Models\Order::STATUS_DISEPAKATI, \App\Models\Order::STATUS_SELESAI], true);
 
+                    // Ulasan hanya dibuka setelah transaksi selesai (bukan saat menunggu COD).
                     $reviewUrl = null;
-                    if ($hasOrderBar) {
+                    if ($order !== null && $order->status === \App\Models\Order::STATUS_SELESAI) {
                         $isBuyer = (string) $conversation->buyer_id === (string) auth()->id();
                         $product = $conversation->product;
 
@@ -121,7 +122,15 @@
                         }
                     }
 
-                    // Jumlah tombol aksi di bar kanan (ulasan + tandai terjual);
+                    // Pembeli boleh menawar hanya sebelum ada transaksi berjalan
+                    // dan produk masih bisa ditawar.
+                    $isBuyerHere = (string) $conversation->buyer_id === (string) auth()->id();
+                    $canOffer = $isBuyerHere
+                        && $conversation->product?->status === \App\Models\Product::STATUS_DIJUAL
+                        && $conversation->product?->is_negotiable
+                        && ($order === null || $order->status === \App\Models\Order::STATUS_BATAL);
+
+                    // Jumlah tombol aksi di bar kanan (ulasan + selesaikan);
                     // padding dipadatkan bila lebih dari satu agar tidak meluber.
                     $actionCount = ($reviewUrl !== null ? 1 : 0) + ($canMarkSold ? 1 : 0);
                 @endphp
@@ -163,14 +172,14 @@
                                 @endif
 
                                 @if ($canMarkSold)
-                                    <form method="POST" action="{{ route('chat.sold', $conversation) }}"
-                                        onsubmit="return confirm('Tandai produk ini terjual? Order lain untuk produk ini akan otomatis dibatalkan.');">
-                                        @csrf
-                                        <button type="submit"
-                                            class="inline-flex w-full items-center justify-center whitespace-nowrap rounded-lg border border-neutral-800 bg-white {{ $actionCount > 1 ? 'px-2.5 py-1 text-[12px] sm:px-3.5 sm:py-2 sm:text-xs' : 'px-3.5 py-2 text-xs' }} font-bold text-neutral-900 transition hover:bg-neutral-900 hover:text-white">
-                                            Terjual
-                                        </button>
-                                    </form>
+                                    <button type="button" data-complete-trigger
+                                        data-complete-action="{{ route('chat.sold', $conversation) }}"
+                                        data-complete-method="POST"
+                                        data-complete-product="{{ $conversation->product?->judul }}"
+                                        data-complete-counter="{{ $other?->name }}"
+                                        class="inline-flex w-full items-center justify-center whitespace-nowrap rounded-lg border border-neutral-800 bg-white {{ $actionCount > 1 ? 'px-2.5 py-1 text-[12px] sm:px-3.5 sm:py-2 sm:text-xs' : 'px-3.5 py-2 text-xs' }} font-bold text-neutral-900 transition hover:bg-neutral-900 hover:text-white cursor-pointer">
+                                        Selesaikan
+                                    </button>
                                 @endif
                             </div>
                         @endif
@@ -284,15 +293,17 @@
                             </svg>
                         </button>
 
-                        <button type="button" data-offer-mode-toggle
-                            class="grid size-8 shrink-0 place-items-center rounded-full text-neutral-700 transition hover:bg-neutral-100"
-                            aria-pressed="false" aria-label="Mode tawar harga" title="Ajukan tawaran harga">
-                            <span class="text-[13px] font-extrabold" data-offer-mode-icon>$</span>
-                            <svg viewBox="0 0 24 24" class="hidden size-4 fill-none stroke-current stroke-2"
-                                data-offer-mode-close aria-hidden="true">
-                                <path d="M18 6 6 18M6 6l12 12" stroke-linecap="round" />
-                            </svg>
-                        </button>
+                        @if ($canOffer)
+                            <button type="button" data-offer-mode-toggle
+                                class="grid size-8 shrink-0 place-items-center rounded-full text-neutral-700 transition hover:bg-neutral-100"
+                                aria-pressed="false" aria-label="Mode tawar harga" title="Ajukan tawaran harga">
+                                <span class="text-[13px] font-extrabold" data-offer-mode-icon>$</span>
+                                <svg viewBox="0 0 24 24" class="hidden size-4 fill-none stroke-current stroke-2"
+                                    data-offer-mode-close aria-hidden="true">
+                                    <path d="M18 6 6 18M6 6l12 12" stroke-linecap="round" />
+                                </svg>
+                            </button>
+                        @endif
                     </div>
 
                     <button type="submit" data-chat-submit
@@ -492,4 +503,7 @@
             </div>
         </form>
     </dialog>
+
+    {{-- Modal Selesaikan Transaksi (dipakai tombol aksi penjual di chat) --}}
+    <x-order-complete-modal />
 @endsection

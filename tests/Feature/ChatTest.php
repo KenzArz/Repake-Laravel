@@ -48,7 +48,7 @@ test('a participant opens the conversation with its messages', function () {
     expect($message->exists)->toBeTrue();
 });
 
-test('the chat shows the review action and no complete button once the offer is agreed', function () {
+test('the chat shows no review action but a complete button once the offer is agreed', function () {
     Order::factory()->create([
         'conversation_id' => $this->conversation->id,
         'seller_id' => $this->seller->id,
@@ -57,30 +57,35 @@ test('the chat shows the review action and no complete button once the offer is 
         'status' => Order::STATUS_DISEPAKATI,
     ]);
 
-    // Pembeli melihat tautan ulasan, bukan aksi tandai terjual milik penjual.
+    // Pembeli tidak boleh mengulas sebelum transaksi selesai, dan tidak
+    // melihat aksi selesaikan milik penjual.
     $this->actingAs($this->buyer)
         ->get(route('chat.show', $this->conversation))
         ->assertOk()
-        ->assertSee('Nilai')
-        ->assertSee('#ulasan-produk')
+        ->assertDontSee('Nilai')
         ->assertDontSee(route('chat.sold', $this->conversation));
 
-    // Penjual melihat aksi "Terjual".
+    // Penjual melihat aksi "Selesaikan".
     $this->actingAs($this->seller)
         ->get(route('chat.show', $this->conversation))
         ->assertOk()
         ->assertSee(route('chat.sold', $this->conversation))
-        ->assertSee('Terjual');
+        ->assertSee('Selesaikan');
 });
 
-test('the review action turns into edit ulasan after the buyer reviews', function () {
-    $order = Order::factory()->create([
+test('the review action appears once the order is completed and turns into edit after review', function () {
+    $order = Order::factory()->selesai()->create([
         'conversation_id' => $this->conversation->id,
         'seller_id' => $this->seller->id,
         'buyer_id' => $this->buyer->id,
         'product_id' => $this->product->id,
-        'status' => Order::STATUS_DISEPAKATI,
     ]);
+
+    $this->actingAs($this->buyer)
+        ->get(route('chat.show', $this->conversation))
+        ->assertOk()
+        ->assertSee('Nilai')
+        ->assertSee('#ulasan-produk');
 
     Review::create([
         'order_id' => $order->id,

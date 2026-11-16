@@ -160,7 +160,7 @@
                                         <span>{{ number_format($seller->rating ?? 4.5, 1) }}</span>
                                     </span>
                                 </div>
-                                <p class="text-[11px] text-neutral-500">{{ $product->kota }} · 2 jam lalu</p>
+                                <p class="text-[11px] text-neutral-500">{{ $product->kota }} · {{ $seller->online_status }}</p>
                             </div>
                         </a>
 
@@ -278,37 +278,108 @@
                 </div>
 
                 {{-- Bagian Bawah: Tombol Aksi Sejajar Bawah Gambar --}}
-                @if ($product->status === \App\Models\Product::STATUS_DIJUAL)
+                @php($isOwner = $isOwner ?? false)
+                @if ($product->status !== \App\Models\Product::STATUS_DIJUAL)
+                    <div
+                        class="mt-6 rounded-lg border border-neutral-200 bg-neutral-50 py-3 text-center text-xs font-semibold text-neutral-500">
+                        Produk ini sudah tidak dijual.
+                    </div>
+                @elseif ($isOwner)
                     <div class="mt-6 space-y-2.5">
-                        <form method="POST" action="{{ Route::has('chat.store') ? route('chat.store') : '#' }}">
-                            @csrf
-                            <input type="hidden" name="product_id" value="{{ $product->id }}">
-                            <button type="submit"
+                        <button type="button" disabled
+                            class="flex w-full items-center justify-center gap-2 rounded-lg bg-neutral-200 py-3 text-xs font-bold text-neutral-500 sm:text-sm disabled:cursor-not-allowed">
+                            <svg viewBox="0 0 24 24" class="size-4.5 fill-none stroke-current stroke-2">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                            </svg>
+                            <span>Ini produk Anda</span>
+                        </button>
+                        <button type="button" disabled
+                            class="flex w-full items-center justify-center gap-2 rounded-lg bg-neutral-200 py-3 text-xs font-bold text-neutral-500 sm:text-sm disabled:cursor-not-allowed">
+                            <span>Tawar Harga</span>
+                        </button>
+                    </div>
+                @else
+                    {{-- Banner transaksi aktif (menunggu COD) --}}
+                    @if ($activeOrder !== null)
+                        <div class="mt-6 flex items-center gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3.5">
+                            <span class="grid size-8 shrink-0 place-items-center rounded-full bg-amber-100 text-amber-700">
+                                <svg viewBox="0 0 24 24" class="size-4 fill-none stroke-current stroke-2">
+                                    <path d="M12 8v4l2.5 2.5" stroke-linecap="round" />
+                                    <circle cx="12" cy="12" r="9" />
+                                </svg>
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-xs font-bold text-amber-900">Tawaran disepakati · Menunggu COD</p>
+                                <p class="text-[11px] text-amber-800">
+                                    @if ((string) $activeOrder->seller_id === (string) auth()->id())
+                                        Buka chat untuk menyelesaikan transaksi setelah COD.
+                                    @else
+                                        Sepakati waktu &amp; lokasi COD dengan penjual.
+                                    @endif
+                                </p>
+                            </div>
+                            @if ($activeOrder->conversation_id && Route::has('chat.show'))
+                                <a href="{{ route('chat.show', $activeOrder->conversation_id) }}"
+                                    class="shrink-0 rounded-lg bg-amber-500 px-3.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-amber-600">
+                                    Buka Chat
+                                </a>
+                            @endif
+                        </div>
+                    @endif
+
+                    <div class="mt-6 space-y-2.5">
+                        @auth
+                            {{-- Chat Penjual --}}
+                            <form method="POST" action="{{ Route::has('chat.store') ? route('chat.store') : '#' }}">
+                                @csrf
+                                <input type="hidden" name="product_id" value="{{ $product->id }}">
+                                <button type="submit"
+                                    class="flex w-full items-center justify-center gap-2 rounded-lg bg-lime-400 py-3 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 sm:text-sm">
+                                    <svg viewBox="0 0 24 24" class="size-4.5 fill-none stroke-current stroke-2">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                    </svg>
+                                    <span>Chat Penjual</span>
+                                </button>
+                            </form>
+
+                            {{-- Tawar Harga (hanya bila produk bisa dinegosiasikan) --}}
+                            @if ($product->is_negotiable)
+                                <form method="POST" action="{{ Route::has('chat.store') ? route('chat.store') : '#' }}"
+                                    class="flex w-full items-center">
+                                    @csrf
+                                    <input type="hidden" name="product_id" value="{{ $product->id }}">
+                                    <input type="number" name="offer_amount" id="tawar-input" value="{{ $product->harga }}"
+                                        min="1" max="{{ $product->harga }}" required
+                                        placeholder="Masukkan tawaran harga..."
+                                        class="h-10 flex-1 rounded-l-lg border border-r-0 border-neutral-300 bg-white px-3 text-xs font-medium text-neutral-800 outline-none focus:border-neutral-900 sm:text-sm">
+                                    <button type="submit"
+                                        class="h-10 whitespace-nowrap rounded-r-lg bg-lime-400 px-5 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 sm:text-sm">
+                                        Tawar Harga
+                                    </button>
+                                </form>
+                            @else
+                                <button type="button" disabled
+                                    class="h-10 w-full cursor-not-allowed rounded-lg border border-neutral-200 bg-neutral-50 text-xs font-semibold text-neutral-400 sm:text-sm">
+                                    Penjual tidak menerima tawaran harga
+                                </button>
+                            @endif
+                        @endauth
+
+                        @guest
+                            <button type="button" data-open-login
                                 class="flex w-full items-center justify-center gap-2 rounded-lg bg-lime-400 py-3 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 sm:text-sm">
                                 <svg viewBox="0 0 24 24" class="size-4.5 fill-none stroke-current stroke-2">
                                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                                 </svg>
                                 <span>Chat Penjual</span>
                             </button>
-                        </form>
-
-                        <form method="POST" action="{{ Route::has('chat.store') ? route('chat.store') : '#' }}"
-                            class="flex w-full items-center">
-                            @csrf
-                            <input type="hidden" name="product_id" value="{{ $product->id }}">
-                            <input type="number" name="offer_amount" id="tawar-input" value="{{ $product->harga }}" min="1"
-                                required placeholder="Masukkan tawaran harga..."
-                                class="h-10 flex-1 rounded-l-lg border border-r-0 border-neutral-300 bg-white px-3 text-xs font-medium text-neutral-800 outline-none focus:border-neutral-900 sm:text-sm">
-                            <button type="submit"
-                                class="h-10 whitespace-nowrap rounded-r-lg bg-lime-400 px-5 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 sm:text-sm">
-                                Tawar Harga
-                            </button>
-                        </form>
-                    </div>
-                @else
-                    <div
-                        class="mt-6 rounded-lg border border-neutral-200 bg-neutral-50 py-3 text-center text-xs font-semibold text-neutral-500">
-                        Produk ini sudah tidak dijual.
+                            @if ($product->is_negotiable)
+                                <button type="button" data-open-login
+                                    class="w-full rounded-lg bg-lime-400 py-3 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 sm:text-sm">
+                                    Tawar Harga
+                                </button>
+                            @endif
+                        @endguest
                     </div>
                 @endif
 

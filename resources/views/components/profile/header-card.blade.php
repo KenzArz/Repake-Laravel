@@ -97,7 +97,7 @@
             </div>
 
             @if ($isOwner)
-                <div class="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+                <div class="grid w-full sm:w-auto">
                     <a href="{{ route('profile.edit') }}"
                         class="flex items-center justify-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3.5 sm:px-4 py-2.5 text-xs font-bold text-neutral-800 transition hover:bg-neutral-100 shadow-2xs whitespace-nowrap">
                         <svg viewBox="0 0 24 24" class="size-3.5 shrink-0 stroke-current stroke-2 fill-none">
@@ -105,13 +105,6 @@
                             <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                         </svg>
                         <span>Edit Profil</span>
-                    </a>
-                    <a href="{{ Route::has('chat.index') ? route('chat.index') : '#' }}"
-                        class="flex items-center justify-center gap-1.5 sm:gap-2 rounded-lg bg-lime-400 px-3.5 sm:px-6 py-2.5 text-xs font-bold text-neutral-900 transition hover:bg-lime-500 shadow-2xs whitespace-nowrap">
-                        <svg viewBox="0 0 24 24" class="size-4 shrink-0 fill-none stroke-current stroke-2">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                        </svg>
-                        <span>Chat Penjual</span>
                     </a>
                 </div>
             @else

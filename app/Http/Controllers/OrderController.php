@@ -3,17 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
-use App\Models\Product;
-use App\Notifications\OrderCancelled;
+use App\Services\OrderService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class OrderController extends Controller
 {
     private const ALLOWED_ROLES = ['pembelian', 'penjualan'];
+
+    private const ALLOWED_VIEWS = ['aktif', 'riwayat'];
+
+    private const ALLOWED_LIST_STATUSES = ['semua', Order::STATUS_SELESAI, Order::STATUS_BATAL];
+
+    public function __construct(private readonly OrderService $orders) {}
 
     public function index(Request $request): View
     {
@@ -24,29 +28,35 @@ class OrderController extends Controller
             ? (string) $request->query('role')
             : 'pembelian';
 
-        $allowedStatuses = [
-            'semua',
-            Order::STATUS_DISEPAKATI,
-            Order::STATUS_SELESAI,
-            Order::STATUS_BATAL,
-        ];
+        $view = in_array((string) $request->query('view'), self::ALLOWED_VIEWS, true)
+            ? (string) $request->query('view')
+            : 'aktif';
 
-        $status = in_array($request->query('status'), $allowedStatuses, true)
+        // Filter status hanya berarti pada bagian Riwayat (aktif selalu menunggu COD).
+        $status = $view === 'riwayat'
+            && in_array((string) $request->query('status'), self::ALLOWED_LIST_STATUSES, true)
             ? (string) $request->query('status')
             : 'semua';
 
         $roleColumn = $role === 'penjualan' ? 'seller_id' : 'buyer_id';
 
-        $orders = Order::query()
+        $query = Order::query()
             ->with(['product.primaryImage', 'buyer', 'seller'])
             ->withExists([
-                'reviews as has_reviewed' => fn($query) => $query->where('reviewer_id', $userId),
+                'reviews as has_reviewed' => fn ($q) => $q->where('reviewer_id', $userId),
             ])
-            ->where($roleColumn, $userId)
-            ->when($status !== 'semua', fn($query) => $query->where('status', $status))
-            ->latest()
-            ->paginate(10)
-            ->withQueryString();
+            ->where($roleColumn, $userId);
+
+        if ($view === 'aktif') {
+            $query->where('status', Order::STATUS_DISEPAKATI);
+        } else {
+            $query->whereIn('status', [Order::STATUS_SELESAI, Order::STATUS_BATAL]);
+            if ($status !== 'semua') {
+                $query->where('status', $status);
+            }
+        }
+
+        $orders = $query->latest()->paginate(10)->withQueryString();
 
         $activeBuyingCount = Order::query()
             ->where('buyer_id', $userId)
@@ -61,6 +71,7 @@ class OrderController extends Controller
         return view('orders.index', [
             'orders' => $orders,
             'role' => $role,
+            'view' => $view,
             'status' => $status,
             'activeBuyingCount' => $activeBuyingCount,
             'activeSellingCount' => $activeSellingCount,
@@ -76,51 +87,26 @@ class OrderController extends Controller
         abort_unless($isBuyer || $isSeller, 403);
 
         $validated = $request->validate([
-            'status' => ['required', 'in:' . Order::STATUS_SELESAI . ',' . Order::STATUS_BATAL],
+            'status' => ['required', 'in:'.Order::STATUS_SELESAI.','.Order::STATUS_BATAL],
+            'completion_type' => ['nullable', 'in:'.Order::COMPLETION_STOCK_OUT.','.Order::COMPLETION_STOCK_AVAILABLE],
+            'cancel_reason' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $nextStatus = $validated['status'];
+        if ($validated['status'] === Order::STATUS_SELESAI) {
+            abort_unless($isSeller, 403, 'Hanya penjual yang bisa menyelesaikan transaksi.');
+            abort_unless(filled($validated['completion_type'] ?? null), 422, 'Pilih status stok untuk menyelesaikan transaksi.');
 
-        abort_unless($order->status === Order::STATUS_DISEPAKATI, 409, 'Status transaksi ini sudah tidak dapat diubah.');
+            $this->orders->complete($order, $userId, $validated['completion_type']);
 
-        if ($nextStatus === Order::STATUS_SELESAI) {
-            // Samakan persis dengan ChatController::markSold()
-            abort_unless($isSeller, 403, 'Hanya penjual yang bisa menandai produk terjual.');
-
-            $product = $order->product;
-            abort_if($product === null, 404, 'Produk tidak ditemukan.');
-            abort_if($product->status !== Product::STATUS_DIJUAL, 409, 'Produk ini sudah tidak dijual.');
-
-            DB::transaction(function () use ($order, $product): void {
-                $product->update(['status' => Product::STATUS_TERJUAL]);
-
-                $order->update([
-                    'status' => Order::STATUS_SELESAI,
-                    'completed_at' => now(),
-                ]);
-
-                $others = Order::query()
-                    ->where('product_id', $product->id)
-                    ->whereKeyNot($order->getKey())
-                    ->where('status', Order::STATUS_DISEPAKATI)
-                    ->get();
-
-                foreach ($others as $other) {
-                    $other->update(['status' => Order::STATUS_BATAL]);
-                    $other->buyer?->notify(new OrderCancelled($product->judul, $other->conversation_id));
-                }
-            });
-
-            return back()->with('success', 'Produk ditandai terjual dan transaksi selesai. Anda sekarang dapat memberi ulasan.');
+            return back()->with(
+                'success',
+                $validated['completion_type'] === Order::COMPLETION_STOCK_OUT
+                    ? 'Transaksi selesai. Produk sudah ditandai habis dan Anda dapat memberi ulasan.'
+                    : 'Transaksi selesai. Produk masih tersedia dan tetap ditayangkan. Anda dapat memberi ulasan.',
+            );
         }
 
-        // Pembatalan kesepakatan oleh pembeli atau penjual
-        $order->update(['status' => Order::STATUS_BATAL]);
-
-        $counterpart = $isSeller ? $order->buyer : $order->seller;
-        if ($order->product !== null) {
-            $counterpart?->notify(new OrderCancelled($order->product->judul, $order->conversation_id));
-        }
+        $this->orders->cancel($order, $userId, $validated['cancel_reason'] ?? null);
 
         return back()->with('success', 'Kesepakatan transaksi telah dibatalkan.');
     }
