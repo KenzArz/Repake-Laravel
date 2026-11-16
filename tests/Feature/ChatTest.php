@@ -57,19 +57,20 @@ test('the chat shows the review action and no complete button once the offer is 
         'status' => Order::STATUS_DISEPAKATI,
     ]);
 
-    // Pembeli melihat tombol ulasan, bukan "Selesaikan Transaksi".
+    // Pembeli melihat tautan ulasan, bukan aksi tandai terjual milik penjual.
     $this->actingAs($this->buyer)
         ->get(route('chat.show', $this->conversation))
         ->assertOk()
-        ->assertSee('Tinggalkan ulasan')
-        ->assertDontSee('Selesaikan Transaksi')
-        ->assertDontSee('Tandai Terjual');
+        ->assertSee('Nilai')
+        ->assertSee('#ulasan-produk')
+        ->assertDontSee(route('chat.sold', $this->conversation));
 
-    // Penjual melihat "Tandai Terjual".
+    // Penjual melihat aksi "Terjual".
     $this->actingAs($this->seller)
         ->get(route('chat.show', $this->conversation))
         ->assertOk()
-        ->assertSee('Tandai Terjual');
+        ->assertSee(route('chat.sold', $this->conversation))
+        ->assertSee('Terjual');
 });
 
 test('the review action turns into edit ulasan after the buyer reviews', function () {
@@ -92,8 +93,8 @@ test('the review action turns into edit ulasan after the buyer reviews', functio
     $this->actingAs($this->buyer)
         ->get(route('chat.show', $this->conversation))
         ->assertOk()
-        ->assertSee('Edit ulasan')
-        ->assertDontSee('Tinggalkan ulasan');
+        ->assertSee('#ulasan-produk')
+        ->assertDontSee('Nilai');
 });
 
 test('a buyer starts a conversation from a product page', function () {
