@@ -81,8 +81,9 @@
             @endif
 
             <span class="text-neutral-300" aria-hidden="true">•</span>
-            <time datetime="{{ $order->created_at?->toIso8601String() }}" class="shrink-0 text-[11px] text-neutral-500">
-                {{ $order->created_at?->translatedFormat('d M Y') }}
+            <time datetime="{{ $order->created_at?->toIso8601String() }}" data-local-time="date"
+                class="shrink-0 text-[11px] text-neutral-500">
+                {{ $order->created_at?->copy()->timezone('Asia/Jakarta')->locale('id')->translatedFormat('d M Y') }}
             </time>
         </div>
 
@@ -135,7 +136,11 @@
 
                 @if ($order->status === Order::STATUS_SELESAI && $order->completed_at)
                     <p class="mt-1 text-[11px] text-neutral-500">
-                        Selesai pada {{ $order->completed_at->translatedFormat('d M Y, H:i') }}
+                        Selesai pada
+                        <time datetime="{{ $order->completed_at->toIso8601String() }}" data-local-time="datetime">
+                            {{ $order->completed_at->copy()->timezone('Asia/Jakarta')->locale('id')->translatedFormat('d M Y, H.i') }}
+                            WIB
+                        </time>
                     </p>
                 @elseif (!$isSelling && $order->status === Order::STATUS_DISEPAKATI)
                     <p class="mt-1 text-[11px] text-neutral-500">

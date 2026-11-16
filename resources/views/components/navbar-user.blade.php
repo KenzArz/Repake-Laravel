@@ -33,7 +33,8 @@
         : 0;
 @endphp
 
-<header class="sticky top-0 z-40 border-b border-neutral-200 bg-white/95 backdrop-blur-md">
+<header
+    class="sticky top-0 z-40 border-b border-neutral-200 bg-white/95 backdrop-blur-md {{ request()->routeIs('chat.show') ? 'hidden md:block' : '' }}">
     <div
         class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2.5 px-4 py-2.5 sm:px-6 md:flex-nowrap md:gap-3 md:py-3">
 
@@ -351,79 +352,79 @@
 
 {{-- Bottom nav (mobile saja) - Floating Curved Pill Bar --}}
 @unless (request()->routeIs('chat.show'))
-<div class="fixed inset-x-0 bottom-3 z-40 px-4 md:hidden">
-    <nav class="mx-auto flex max-w-sm items-center justify-around rounded-[32px] border border-neutral-300 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-md"
-        aria-label="Navigasi utama">
-        @php
-            $isHome = request()->routeIs('home');
-            $isFav = request()->routeIs('favorites.*');
-            $isOrders = request()->routeIs('orders.*');
-            $itemCls = 'flex flex-1 flex-col items-center justify-center gap-1 text-xs transition';
-            $activeCls = 'font-semibold text-lime-700';
-            $inactiveCls = 'text-neutral-700 hover:text-neutral-900';
-        @endphp
+    <div class="fixed inset-x-0 bottom-3 z-40 px-4 md:hidden">
+        <nav class="mx-auto flex max-w-sm items-center justify-around rounded-[32px] border border-neutral-300 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-md"
+            aria-label="Navigasi utama">
+            @php
+                $isHome = request()->routeIs('home');
+                $isFav = request()->routeIs('favorites.*');
+                $isOrders = request()->routeIs('orders.*');
+                $itemCls = 'flex flex-1 flex-col items-center justify-center gap-1 text-xs transition';
+                $activeCls = 'font-semibold text-lime-700';
+                $inactiveCls = 'text-neutral-700 hover:text-neutral-900';
+            @endphp
 
-        <a href="{{ route('home') }}" class="{{ $itemCls }} {{ $isHome ? $activeCls : $inactiveCls }}">
-            <svg viewBox="0 0 24 24"
-                class="size-6 {{ $isHome ? 'fill-current stroke-current' : 'fill-none stroke-current' }} stroke-[1.8]"
-                aria-hidden="true">
-                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                <path d="M9 22V12h6v10" />
-            </svg>
-            <span class="text-[11px] leading-none">Home</span>
-        </a>
-
-        <a href="{{ route('favorites.index') }}" {{ $needLogin }}
-            class="{{ $itemCls }} {{ $isFav ? $activeCls : $inactiveCls }}">
-            <svg viewBox="0 0 24 24"
-                class="size-6 {{ $isFav ? 'fill-current stroke-current' : 'fill-none stroke-current' }} stroke-[1.8]"
-                aria-hidden="true">
-                <path
-                    d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-            </svg>
-            <span class="text-[11px] leading-none">Favorite</span>
-        </a>
-
-        <a href="{{ Route::has('products.create') ? route('products.create') : '#' }}" {{ $needLogin }}
-            class="{{ $itemCls }} {{ request()->routeIs('products.create') ? $activeCls : $inactiveCls }}">
-            <svg viewBox="0 0 24 24" class="size-6 fill-none stroke-current stroke-[1.8]" aria-hidden="true">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 8v8M8 12h8" />
-            </svg>
-            <span class="text-[11px] leading-none">Jual</span>
-        </a>
-
-        <a href="{{ $r('orders.index') }}" {{ $needLogin }}
-            class="{{ $itemCls }} {{ $isOrders ? $activeCls : $inactiveCls }}">
-            <span class="relative inline-flex">
-                <svg viewBox="0 0 24 24" class="size-6 fill-none stroke-current stroke-[1.8]" aria-hidden="true">
-                    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
-                    <rect x="9" y="3" width="6" height="4" rx="1" />
-                    <path d="M9 12h6M9 16h4" />
+            <a href="{{ route('home') }}" class="{{ $itemCls }} {{ $isHome ? $activeCls : $inactiveCls }}">
+                <svg viewBox="0 0 24 24"
+                    class="size-6 {{ $isHome ? 'fill-current stroke-current' : 'fill-none stroke-current' }} stroke-[1.8]"
+                    aria-hidden="true">
+                    <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <path d="M9 22V12h6v10" />
                 </svg>
-                @if ($activeOrderCount > 0)
-                    <span
-                        class="absolute -right-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-lime-400 px-1 text-[10px] font-extrabold leading-none text-neutral-900">
-                        {{ $activeOrderCount }}
-                    </span>
-                @endif
-            </span>
-            <span class="text-[11px] leading-none">Transaksi</span>
-        </a>
+                <span class="text-[11px] leading-none">Home</span>
+            </a>
 
-        <a href="{{ Route::has('chat.index') ? route('chat.index') : '#' }}" {{ $needLogin }}
-            class="{{ $itemCls }} {{ request()->routeIs('chat.*') ? $activeCls : $inactiveCls }}">
-            <span class="relative inline-flex">
-                <svg viewBox="0 0 24 24" class="size-6 fill-none stroke-current stroke-[1.8]" aria-hidden="true">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            <a href="{{ route('favorites.index') }}" {{ $needLogin }}
+                class="{{ $itemCls }} {{ $isFav ? $activeCls : $inactiveCls }}">
+                <svg viewBox="0 0 24 24"
+                    class="size-6 {{ $isFav ? 'fill-current stroke-current' : 'fill-none stroke-current' }} stroke-[1.8]"
+                    aria-hidden="true">
+                    <path
+                        d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
                 </svg>
-                @auth
-                    <span data-chat-badge data-badge-url="{{ route('chat.unread') }}" style="display:none"
-                        class="absolute -right-2 -top-1.5 h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">0</span>
-                @endauth
-            </span>
-            <span class="text-[11px] leading-none">Chat</span>
-        </a>
-    </nav>
-</div>
+                <span class="text-[11px] leading-none">Favorite</span>
+            </a>
+
+            <a href="{{ Route::has('products.create') ? route('products.create') : '#' }}" {{ $needLogin }}
+                class="{{ $itemCls }} {{ request()->routeIs('products.create') ? $activeCls : $inactiveCls }}">
+                <svg viewBox="0 0 24 24" class="size-6 fill-none stroke-current stroke-[1.8]" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 8v8M8 12h8" />
+                </svg>
+                <span class="text-[11px] leading-none">Jual</span>
+            </a>
+
+            <a href="{{ $r('orders.index') }}" {{ $needLogin }}
+                class="{{ $itemCls }} {{ $isOrders ? $activeCls : $inactiveCls }}">
+                <span class="relative inline-flex">
+                    <svg viewBox="0 0 24 24" class="size-6 fill-none stroke-current stroke-[1.8]" aria-hidden="true">
+                        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+                        <rect x="9" y="3" width="6" height="4" rx="1" />
+                        <path d="M9 12h6M9 16h4" />
+                    </svg>
+                    @if ($activeOrderCount > 0)
+                        <span
+                            class="absolute -right-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-lime-400 px-1 text-[10px] font-extrabold leading-none text-neutral-900">
+                            {{ $activeOrderCount }}
+                        </span>
+                    @endif
+                </span>
+                <span class="text-[11px] leading-none">Transaksi</span>
+            </a>
+
+            <a href="{{ Route::has('chat.index') ? route('chat.index') : '#' }}" {{ $needLogin }}
+                class="{{ $itemCls }} {{ request()->routeIs('chat.*') ? $activeCls : $inactiveCls }}">
+                <span class="relative inline-flex">
+                    <svg viewBox="0 0 24 24" class="size-6 fill-none stroke-current stroke-[1.8]" aria-hidden="true">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                    @auth
+                        <span data-chat-badge data-badge-url="{{ route('chat.unread') }}" style="display:none"
+                            class="absolute -right-2 -top-1.5 h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">0</span>
+                    @endauth
+                </span>
+                <span class="text-[11px] leading-none">Chat</span>
+            </a>
+        </nav>
+    </div>
 @endunless

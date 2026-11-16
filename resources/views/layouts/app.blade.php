@@ -30,7 +30,7 @@
 </head>
 
 <body
-    class="flex flex-col bg-neutral-100/60 text-neutral-900 antialiased selection:bg-lime-300 selection:text-neutral-900 @hasSection('app-shell') h-dvh overflow-hidden @else min-h-dvh @endif"
+    class="bg-neutral-100/60 text-neutral-900 antialiased selection:bg-lime-300 selection:text-neutral-900 @hasSection('app-shell') flex h-dvh flex-col overflow-hidden @else min-h-screen overflow-x-clip @endif"
     data-authed="{{ auth()->check() ? '1' : '0' }}">
     <x-navbar-user />
 
@@ -48,8 +48,8 @@
         </div>
     @endif
 
-    <div class="flex min-h-0 flex-1 flex-col">
-        <main class="flex min-h-0 flex-1 flex-col">
+    <div class="@hasSection('app-shell') flex min-h-0 flex-1 flex-col @else min-h-[calc(100vh-200px)] @endif">
+        <main class="@hasSection('app-shell') flex min-h-0 flex-1 flex-col @endif">
             @yield('content')
         </main>
 

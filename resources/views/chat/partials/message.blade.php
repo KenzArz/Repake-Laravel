@@ -28,6 +28,7 @@
          data-message-id="{{ $message->id }}"
          data-sender-id="{{ $message->sender_id }}"
          data-type="{{ $message->type }}"
+         data-timestamp="{{ $message->created_at?->getTimestamp() ?? 0 }}"
          data-version="{{ $message->updated_at?->getTimestamp() ?? 0 }}">
         @unless ($isMine)
             <img src="{{ $otherAvatar }}" alt="" class="mt-0.5 size-6 shrink-0 rounded-full object-cover">
@@ -165,8 +166,8 @@
                 </div>
             @endif
 
-            {{-- Jam + resi: hanya tampil di pesan terakhir tiap grup (diatur JS). --}}
-            <div class="mt-1 flex items-center gap-1 px-1 text-[10.5px] text-neutral-500" data-group-meta>
+            {{-- Jam + resi: hanya tampil di pesan terakhir tiap grup. --}}
+            <div class="mt-1 flex items-center gap-1 px-1 text-[10.5px] text-neutral-500 {{ ($hideMeta ?? false) ? 'hidden' : '' }}" data-group-meta>
                 <time datetime="{{ $message->created_at?->toIso8601String() }}" data-local-time>{{ $time }}</time>
                 @if ($isMine)
                     <span data-receipt="{{ $receipt }}" title="{{ $receipt === 'read' ? 'Dibaca' : ($receipt === 'delivered' ? 'Diterima' : 'Terkirim') }}">

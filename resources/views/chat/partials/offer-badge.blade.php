@@ -12,8 +12,9 @@
 
 @if ($offer !== null && $label !== null)
     <div class="shrink-0 text-right" data-offer-badge="{{ $status }}">
-        <span class="inline-block rounded-full {{ $tone }} px-2.5 py-0.5 text-[11px] font-semibold text-white">{{ $label }}</span>
-        <p class="mt-1 text-[16px] font-extrabold leading-tight text-neutral-900">
+        <span
+            class="inline-block rounded-full {{ $tone }} px-2.5 py-0.5 text-[10px] font-semibold text-white">{{ $label }}</span>
+        <p class="mt-0.3 text-[14px] font-extrabold leading-tight text-neutral-900">
             Rp {{ number_format((int) $offer->offer_amount, 0, ',', '.') }}
         </p>
     </div>

@@ -32,7 +32,7 @@
                                 Pilih Sampai 3 Gambar Produk
                             </h3>
                             <p class="mt-1 text-xs font-medium text-[var(--color-text-secondary)]">
-                                Format otomatis dikompresi ke WebP. Gambar pertama otomatis jadi Cover.
+                                Gambar pertama otomatis jadi Cover.
                             </p>
                         </div>
 

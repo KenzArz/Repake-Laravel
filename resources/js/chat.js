@@ -49,7 +49,8 @@ function relativeTime(iso) {
     if (Number.isNaN(diffMs)) return "";
     const minutes = Math.round(diffMs / 60000);
     if (Math.abs(minutes) < 1) return "baru saja";
-    if (Math.abs(minutes) < 60) return relativeFormatter.format(minutes, "minute");
+    if (Math.abs(minutes) < 60)
+        return relativeFormatter.format(minutes, "minute");
     const hours = Math.round(minutes / 60);
     if (Math.abs(hours) < 24) return relativeFormatter.format(hours, "hour");
     return relativeFormatter.format(Math.round(hours / 24), "day");
@@ -64,7 +65,8 @@ function renderPresence(node, presence) {
     if (!node) return;
 
     const online = Boolean(presence?.online);
-    const iso = presence?.last_seen_at ?? node.getAttribute("data-last-seen-at") ?? "";
+    const iso =
+        presence?.last_seen_at ?? node.getAttribute("data-last-seen-at") ?? "";
 
     node.dataset.online = online ? "1" : "0";
     if (iso) node.setAttribute("data-last-seen-at", iso);
@@ -93,11 +95,52 @@ function hydratePresence(node) {
     });
 }
 
-function hydrateTimes(root = document) {
+// 1. Ganti bagian dateFormatter & formatLocalNode di resources/js/chat.js
+const dateFormatter = new Intl.DateTimeFormat(LOCALE, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+});
+
+const tzFormatter = new Intl.DateTimeFormat(LOCALE, {
+    timeZoneName: "short",
+});
+
+const TZ_MAP = {
+    "GMT+7": "WIB",
+    "GMT+8": "WITA",
+    "GMT+9": "WIT",
+};
+
+function getTimezoneLabel(date) {
+    const raw =
+        tzFormatter.formatToParts(date).find((p) => p.type === "timeZoneName")
+            ?.value ?? "WIB";
+    return TZ_MAP[raw] ?? raw;
+}
+
+function formatLocalNode(iso, mode) {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "";
+
+    if (mode === "date") {
+        return dateFormatter.format(date);
+    }
+
+    if (mode === "datetime") {
+        const jam = timeFormatter.format(date).replace(":", ".");
+        return `${dateFormatter.format(date)}, ${jam} ${getTimezoneLabel(date)}`;
+    }
+
+    // Default untuk chat (jam saja, mis. 18.20)
+    return timeFormatter.format(date).replace(":", ".");
+}
+
+export function hydrateTimes(root = document) {
     root.querySelectorAll("time[data-local-time]").forEach((node) => {
         const iso = node.getAttribute("datetime");
         if (!iso || node.dataset.localized === "1") return;
-        node.textContent = formatTime(iso);
+        node.textContent = formatLocalNode(iso, node.dataset.localTime);
         node.dataset.localized = "1";
     });
 }
@@ -168,7 +211,11 @@ export function initChatSidebar() {
     });
 
     document.addEventListener("click", (event) => {
-        if (menu && !menu.contains(event.target) && !toggle?.contains(event.target)) {
+        if (
+            menu &&
+            !menu.contains(event.target) &&
+            !toggle?.contains(event.target)
+        ) {
             closeMenu();
         }
     });
@@ -197,12 +244,15 @@ export function initChatSidebar() {
         let visible = 0;
 
         list.querySelectorAll("[data-conversation-item]").forEach((item) => {
-            const match = needle === "" || (item.dataset.searchText ?? "").includes(needle);
+            const match =
+                needle === "" ||
+                (item.dataset.searchText ?? "").includes(needle);
             item.classList.toggle("hidden", !match);
             if (match) visible += 1;
         });
 
-        if (empty) empty.classList.toggle("hidden", visible !== 0 || needle === "");
+        if (empty)
+            empty.classList.toggle("hidden", visible !== 0 || needle === "");
     };
 
     search?.addEventListener("input", () => filterItems(search.value));
@@ -278,9 +328,13 @@ export function initChat() {
 
     let pinnedToBottom = true;
 
-    box.addEventListener("scroll", () => {
-        pinnedToBottom = nearBottom();
-    }, { passive: true });
+    box.addEventListener(
+        "scroll",
+        () => {
+            pinnedToBottom = nearBottom();
+        },
+        { passive: true },
+    );
 
     /* ------------------------------------------------------------ helpers */
 
@@ -308,12 +362,17 @@ export function initChat() {
     function stickImages(node, shouldStick) {
         node.querySelectorAll("img").forEach((img) => {
             if (img.complete) return;
-            img.addEventListener("load", () => {
-                if (shouldStick()) scrollToBottom();
-            }, { once: true });
+            img.addEventListener(
+                "load",
+                () => {
+                    if (shouldStick()) scrollToBottom();
+                },
+                { once: true },
+            );
         });
     }
 
+    //jam chat dengan patokan 1 menit
     function refreshMeta() {
         const nodes = [...box.querySelectorAll("[data-message-id]")].filter(
             (node) => node.dataset.type !== "system",
@@ -322,9 +381,20 @@ export function initChat() {
         nodes.forEach((node, index) => {
             const meta = node.querySelector("[data-group-meta]");
             if (!meta) return;
+
             const next = nodes[index + 1];
-            const hide = Boolean(next) && next.dataset.senderId === node.dataset.senderId;
-            meta.classList.toggle("hidden", hide);
+            const sameSender =
+                Boolean(next) &&
+                next.dataset.senderId === node.dataset.senderId;
+
+            const currTs = Number(node.dataset.timestamp) || 0;
+            const nextTs = Number(next?.dataset.timestamp) || 0;
+            const sameMinute =
+                currTs > 0 && nextTs > 0
+                    ? Math.floor(currTs / 60) === Math.floor(nextTs / 60)
+                    : true;
+
+            meta.classList.toggle("hidden", sameSender && sameMinute);
         });
     }
 
@@ -358,7 +428,9 @@ export function initChat() {
         const node = template.content.firstElementChild;
         if (!node) return;
 
-        const current = box.querySelector(`[data-message-id="${node.dataset.messageId}"]`);
+        const current = box.querySelector(
+            `[data-message-id="${node.dataset.messageId}"]`,
+        );
         if (!current) {
             appendHtml(html);
             return;
@@ -406,7 +478,12 @@ export function initChat() {
 
     /* --------------------------------------------------------------- send */
 
-    async function send({ body = "", files = [], type = "text", amount = null }) {
+    async function send({
+        body = "",
+        files = [],
+        type = "text",
+        amount = null,
+    }) {
         if (submitting) return false;
 
         submitting = true;
@@ -427,11 +504,12 @@ export function initChat() {
             files.forEach((file) => data.append("images[]", file, file.name));
         }
 
-        const pendingLabel = type === "offer"
-            ? "Mengirim tawaran..."
-            : files.length > 1
-                ? `Mengirim ${files.length} foto...`
-                : files.length === 1
+        const pendingLabel =
+            type === "offer"
+                ? "Mengirim tawaran..."
+                : files.length > 1
+                  ? `Mengirim ${files.length} foto...`
+                  : files.length === 1
                     ? "Mengirim foto..."
                     : "Mengirim...";
 
@@ -448,12 +526,16 @@ export function initChat() {
             });
 
             if (response.status === 419) {
-                throw new Error("Sesi kamu berakhir. Muat ulang halaman lalu kirim lagi.");
+                throw new Error(
+                    "Sesi kamu berakhir. Muat ulang halaman lalu kirim lagi.",
+                );
             }
 
             if (response.status === 413) {
                 const payload = await response.json().catch(() => ({}));
-                throw new Error(payload.message ?? "Ukuran gambar terlalu besar.");
+                throw new Error(
+                    payload.message ?? "Ukuran gambar terlalu besar.",
+                );
             }
 
             if (response.status === 422) {
@@ -462,7 +544,8 @@ export function initChat() {
                 throw new Error(first?.[0] ?? "Pesan belum lengkap.");
             }
 
-            if (!response.ok) throw new Error("Pesan gagal terkirim. Coba lagi.");
+            if (!response.ok)
+                throw new Error("Pesan gagal terkirim. Coba lagi.");
 
             const payload = await response.json();
             pending?.remove();
@@ -521,7 +604,9 @@ export function initChat() {
 
     // Laptop/desktop: Enter kirim, Shift+Enter baris baru.
     // HP/tablet (layar sentuh): Enter tetap baris baru, kirim lewat tombol.
-    const touchFirst = window.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches ?? false;
+    const touchFirst =
+        window.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches ??
+        false;
 
     input.addEventListener("keydown", (event) => {
         if (event.key !== "Enter" || event.shiftKey) return;
@@ -596,12 +681,17 @@ export function initChat() {
         const startIndex = pendingFiles.length;
 
         // Kompres dulu secara paralel, baru terima sesuai sisa kuota ukuran.
-        const prepared = await Promise.all(images.slice(0, remaining).map(async (file) => ({
-            id: uid(),
-            file: await compressImage(file),
-        })));
+        const prepared = await Promise.all(
+            images.slice(0, remaining).map(async (file) => ({
+                id: uid(),
+                file: await compressImage(file),
+            })),
+        );
 
-        let totalBytes = pendingFiles.reduce((sum, item) => sum + item.file.size, 0);
+        let totalBytes = pendingFiles.reduce(
+            (sum, item) => sum + item.file.size,
+            0,
+        );
         const accepted = [];
 
         prepared.forEach((item) => {
@@ -634,7 +724,8 @@ export function initChat() {
             const tile = document.createElement("div");
             tile.dataset.attachTile = String(index);
             tile.setAttribute("role", "listitem");
-            tile.className = "relative size-16 shrink-0 overflow-hidden rounded-xl border-2 border-transparent";
+            tile.className =
+                "relative size-16 shrink-0 overflow-hidden rounded-xl border-2 border-transparent";
 
             const openButton = document.createElement("button");
             openButton.type = "button";
@@ -651,9 +742,11 @@ export function initChat() {
             const removeButton = document.createElement("button");
             removeButton.type = "button";
             removeButton.dataset.attachRemove = String(index);
-            removeButton.className = "absolute left-1 top-1 grid size-5 place-items-center rounded-full bg-black/65 text-white transition hover:bg-black";
+            removeButton.className =
+                "absolute left-1 top-1 grid size-5 place-items-center rounded-full bg-black/65 text-white transition hover:bg-black";
             removeButton.setAttribute("aria-label", `Hapus foto ${index + 1}`);
-            removeButton.innerHTML = '<svg viewBox="0 0 24 24" class="size-3 fill-none stroke-current stroke-[2.5]" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" stroke-linecap="round"/></svg>';
+            removeButton.innerHTML =
+                '<svg viewBox="0 0 24 24" class="size-3 fill-none stroke-current stroke-[2.5]" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" stroke-linecap="round"/></svg>';
 
             tile.append(openButton, removeButton);
             attachList.appendChild(tile);
@@ -663,9 +756,11 @@ export function initChat() {
             const addButton = document.createElement("button");
             addButton.type = "button";
             addButton.dataset.attachAdd = "";
-            addButton.className = "grid size-16 shrink-0 place-items-center rounded-xl border-2 border-dashed border-neutral-300 text-neutral-500 transition hover:border-neutral-400 hover:text-neutral-700";
+            addButton.className =
+                "grid size-16 shrink-0 place-items-center rounded-xl border-2 border-dashed border-neutral-300 text-neutral-500 transition hover:border-neutral-400 hover:text-neutral-700";
             addButton.setAttribute("aria-label", "Tambah foto");
-            addButton.innerHTML = '<svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current stroke-2" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>';
+            addButton.innerHTML =
+                '<svg viewBox="0 0 24 24" class="size-5 fill-none stroke-current stroke-2" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>';
             attachList.appendChild(addButton);
         }
 
@@ -675,7 +770,10 @@ export function initChat() {
         attachPanel?.classList.toggle("flex", hasItems);
 
         // Panel pratinjau menggantikan area produk + pesan supaya lebih tinggi.
-        app.querySelector("[data-attach-hide]")?.classList.toggle("hidden", hasItems);
+        app.querySelector("[data-attach-hide]")?.classList.toggle(
+            "hidden",
+            hasItems,
+        );
 
         syncCaptionPlaceholder();
     }
@@ -687,11 +785,15 @@ export function initChat() {
             return;
         }
 
-        activeAttachment = Math.min(Math.max(index, 0), pendingFiles.length - 1);
+        activeAttachment = Math.min(
+            Math.max(index, 0),
+            pendingFiles.length - 1,
+        );
         const item = pendingFiles[activeAttachment];
 
         if (attachImg) attachImg.src = item.url;
-        if (attachCounter) attachCounter.textContent = `${activeAttachment + 1} / ${pendingFiles.length}`;
+        if (attachCounter)
+            attachCounter.textContent = `${activeAttachment + 1} / ${pendingFiles.length}`;
 
         attachList?.querySelectorAll("[data-attach-tile]").forEach((tile) => {
             const active = Number(tile.dataset.attachTile) === activeAttachment;
@@ -704,7 +806,10 @@ export function initChat() {
         const [removed] = pendingFiles.splice(index, 1);
         if (removed) URL.revokeObjectURL(removed.url);
 
-        activeAttachment = Math.min(activeAttachment, Math.max(0, pendingFiles.length - 1));
+        activeAttachment = Math.min(
+            activeAttachment,
+            Math.max(0, pendingFiles.length - 1),
+        );
         renderAttachments();
         setActiveAttachment(activeAttachment);
     }
@@ -721,7 +826,8 @@ export function initChat() {
 
     function syncCaptionPlaceholder() {
         if (offerMode) return;
-        input.placeholder = pendingFiles.length > 0 ? "Tambah keterangan..." : "Ketik pesan";
+        input.placeholder =
+            pendingFiles.length > 0 ? "Tambah keterangan..." : "Ketik pesan";
     }
 
     attachStrip?.addEventListener("click", (event) => {
@@ -738,7 +844,8 @@ export function initChat() {
         }
 
         const openButton = event.target.closest("[data-attach-open]");
-        if (openButton) setActiveAttachment(Number(openButton.dataset.attachOpen));
+        if (openButton)
+            setActiveAttachment(Number(openButton.dataset.attachOpen));
     });
 
     // Aksi untuk foto yang sedang tampil di panel pratinjau.
@@ -754,17 +861,22 @@ export function initChat() {
         }
     });
 
-    attachPanel?.querySelector("[data-attach-close]")?.addEventListener("click", () => {
-        clearAttachments();
-        input.focus();
-    });
+    attachPanel
+        ?.querySelector("[data-attach-close]")
+        ?.addEventListener("click", () => {
+            clearAttachments();
+            input.focus();
+        });
 
     async function openEditor(index) {
         const item = pendingFiles[index];
         if (!item || !editorDialog) return;
 
         if (item.file.type === "image/gif") {
-            toast("GIF tidak bisa diedit. Kirim apa adanya atau pilih foto biasa.", true);
+            toast(
+                "GIF tidak bisa diedit. Kirim apa adanya atau pilih foto biasa.",
+                true,
+            );
             return;
         }
 
@@ -807,7 +919,12 @@ export function initChat() {
     ["dragover", "drop"].forEach((type) => {
         app.addEventListener(type, (event) => {
             if (offerMode) return;
-            if (![...(event.dataTransfer?.items ?? [])].some((item) => item.kind === "file" && item.type.startsWith("image/"))) {
+            if (
+                ![...(event.dataTransfer?.items ?? [])].some(
+                    (item) =>
+                        item.kind === "file" && item.type.startsWith("image/"),
+                )
+            ) {
                 return;
             }
             event.preventDefault();
@@ -833,7 +950,9 @@ export function initChat() {
         }
 
         openLightbox(
-            Array.isArray(group) && group.length > 0 ? group : [trigger.querySelector("img")?.src ?? ""],
+            Array.isArray(group) && group.length > 0
+                ? group
+                : [trigger.querySelector("img")?.src ?? ""],
             Number(trigger.dataset.lightboxIndex) || 0,
             groupNode?.dataset.lightboxCaption ?? "",
         );
@@ -860,7 +979,8 @@ export function initChat() {
         const total = lightboxGroup.length;
 
         if (lightboxCounter) {
-            lightboxCounter.textContent = total > 1 ? `${lightboxIndex + 1} / ${total}` : "Foto";
+            lightboxCounter.textContent =
+                total > 1 ? `${lightboxIndex + 1} / ${total}` : "Foto";
         }
 
         [lightboxPrev, lightboxNext].forEach((button) => {
@@ -874,11 +994,16 @@ export function initChat() {
     function stepLightbox(step) {
         if (!lightbox?.open || lightboxGroup.length <= 1) return;
 
-        lightboxIndex = Math.min(Math.max(lightboxIndex + step, 0), lightboxGroup.length - 1);
+        lightboxIndex = Math.min(
+            Math.max(lightboxIndex + step, 0),
+            lightboxGroup.length - 1,
+        );
         updateLightbox();
     }
 
-    lightbox?.querySelector("[data-lightbox-close]")?.addEventListener("click", () => lightbox.close());
+    lightbox
+        ?.querySelector("[data-lightbox-close]")
+        ?.addEventListener("click", () => lightbox.close());
     lightboxPrev?.addEventListener("click", () => stepLightbox(-1));
     lightboxNext?.addEventListener("click", () => stepLightbox(1));
     lightbox?.addEventListener("click", (event) => {
@@ -898,17 +1023,27 @@ export function initChat() {
     });
 
     let lightboxTouchX = null;
-    lightbox?.addEventListener("touchstart", (event) => {
-        lightboxTouchX = event.touches[0]?.clientX ?? null;
-    }, { passive: true });
-    lightbox?.addEventListener("touchend", (event) => {
-        if (lightboxTouchX === null) return;
+    lightbox?.addEventListener(
+        "touchstart",
+        (event) => {
+            lightboxTouchX = event.touches[0]?.clientX ?? null;
+        },
+        { passive: true },
+    );
+    lightbox?.addEventListener(
+        "touchend",
+        (event) => {
+            if (lightboxTouchX === null) return;
 
-        const delta = (event.changedTouches[0]?.clientX ?? lightboxTouchX) - lightboxTouchX;
-        lightboxTouchX = null;
+            const delta =
+                (event.changedTouches[0]?.clientX ?? lightboxTouchX) -
+                lightboxTouchX;
+            lightboxTouchX = null;
 
-        if (Math.abs(delta) > 45) stepLightbox(delta > 0 ? -1 : 1);
-    }, { passive: true });
+            if (Math.abs(delta) > 45) stepLightbox(delta > 0 ? -1 : 1);
+        },
+        { passive: true },
+    );
 
     /* ------------------------------------------------------ offer actions */
 
@@ -925,10 +1060,14 @@ export function initChat() {
             const response = await fetch(url, {
                 method: "POST",
                 body: payload,
-                headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
+                headers: {
+                    Accept: "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
+                },
             });
 
-            if (response.status === 409) throw new Error("Tawaran ini sudah diproses.");
+            if (response.status === 409)
+                throw new Error("Tawaran ini sudah diproses.");
             if (!response.ok) throw new Error("Gagal memproses tawaran.");
 
             const data = await response.json();
@@ -950,7 +1089,9 @@ export function initChat() {
         editingOfferUrl = card.dataset.offerEditUrl || "";
         editingOfferId = Number(card.dataset.offerCard) || 0;
         offerError?.classList.add("hidden");
-        offerInput.value = new Intl.NumberFormat(LOCALE).format(Number(card.dataset.offerAmount) || 0);
+        offerInput.value = new Intl.NumberFormat(LOCALE).format(
+            Number(card.dataset.offerAmount) || 0,
+        );
         if (!offerModal.open) offerModal.showModal();
         offerInput.focus();
         offerInput.select();
@@ -958,10 +1099,15 @@ export function initChat() {
 
     offerInput?.addEventListener("input", () => {
         const digits = offerInput.value.replace(/[^0-9]/g, "");
-        offerInput.value = digits === "" ? "" : new Intl.NumberFormat(LOCALE).format(Number(digits));
+        offerInput.value =
+            digits === ""
+                ? ""
+                : new Intl.NumberFormat(LOCALE).format(Number(digits));
     });
 
-    offerModal?.querySelector("[data-offer-modal-cancel]")?.addEventListener("click", () => offerModal.close());
+    offerModal
+        ?.querySelector("[data-offer-modal-cancel]")
+        ?.addEventListener("click", () => offerModal.close());
 
     offerForm?.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -988,7 +1134,8 @@ export function initChat() {
                 body: JSON.stringify({ offer_amount: amount }),
             });
 
-            if (response.status === 409) throw new Error("Tawaran ini sudah diproses.");
+            if (response.status === 409)
+                throw new Error("Tawaran ini sudah diproses.");
             if (!response.ok) throw new Error("Gagal mengubah tawaran.");
 
             const data = await response.json();
@@ -997,7 +1144,8 @@ export function initChat() {
             offerModal.close();
         } catch (error) {
             if (offerError) {
-                offerError.textContent = error.message || "Gagal mengubah tawaran.";
+                offerError.textContent =
+                    error.message || "Gagal mengubah tawaran.";
                 offerError.classList.remove("hidden");
             }
         }
@@ -1018,12 +1166,22 @@ export function initChat() {
             if (!badge) return;
 
             const id = Number(node.dataset.messageId) || 0;
-            const status = id <= readUpto ? "read" : id <= deliveredUpto ? "delivered" : "sent";
+            const status =
+                id <= readUpto
+                    ? "read"
+                    : id <= deliveredUpto
+                      ? "delivered"
+                      : "sent";
 
             if (badge.dataset.receipt === status) return;
 
             badge.dataset.receipt = status;
-            badge.title = status === "read" ? "Dibaca" : status === "delivered" ? "Diterima" : "Terkirim";
+            badge.title =
+                status === "read"
+                    ? "Dibaca"
+                    : status === "delivered"
+                      ? "Diterima"
+                      : "Terkirim";
             badge.innerHTML = receiptSvg(status);
         });
     }
@@ -1066,7 +1224,10 @@ export function initChat() {
         try {
             const url = `${pollUrl}?after=${lastId}&visible=1`;
             const response = await fetch(url, {
-                headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
+                headers: {
+                    Accept: "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
+                },
                 signal: pollAbort.signal,
             });
 
@@ -1074,12 +1235,17 @@ export function initChat() {
 
             const data = await response.json();
 
-            (data.messages ?? []).forEach((message) => appendHtml(message.html));
+            (data.messages ?? []).forEach((message) =>
+                appendHtml(message.html),
+            );
 
             (data.offers ?? []).forEach((offer) => {
-                const node = box.querySelector(`[data-message-id="${offer.id}"]`);
+                const node = box.querySelector(
+                    `[data-message-id="${offer.id}"]`,
+                );
                 if (!node) return;
-                if (String(node.dataset.version) === String(offer.version)) return;
+                if (String(node.dataset.version) === String(offer.version))
+                    return;
                 replaceHtml(offer.html);
             });
 
@@ -1091,7 +1257,9 @@ export function initChat() {
             failures = Math.min(failures + 1, 4);
         } finally {
             polling = false;
-            pollLater(failures === 0 ? 2500 : Math.min(20000, 2000 * 2 ** failures));
+            pollLater(
+                failures === 0 ? 2500 : Math.min(20000, 2000 * 2 ** failures),
+            );
         }
     }
 
@@ -1136,7 +1304,11 @@ export function initChat() {
     });
 
     document.addEventListener("click", (event) => {
-        if (menu && !menu.contains(event.target) && !menuToggle?.contains(event.target)) {
+        if (
+            menu &&
+            !menu.contains(event.target) &&
+            !menuToggle?.contains(event.target)
+        ) {
             menu.classList.add("hidden");
             menuToggle?.setAttribute("aria-expanded", "false");
         }
@@ -1204,7 +1376,9 @@ export function initChatBadge() {
 
     const refresh = async () => {
         try {
-            const response = await fetch(badgeUrl, { headers: { Accept: "application/json" } });
+            const response = await fetch(badgeUrl, {
+                headers: { Accept: "application/json" },
+            });
             if (!response.ok) return;
             const data = await response.json();
             update(data.total);
@@ -1215,10 +1389,13 @@ export function initChatBadge() {
 
     const schedule = () => {
         clearTimeout(timer);
-        timer = setTimeout(async () => {
-            if (!document.hidden) await refresh();
-            schedule();
-        }, document.hidden ? 60000 : 25000);
+        timer = setTimeout(
+            async () => {
+                if (!document.hidden) await refresh();
+                schedule();
+            },
+            document.hidden ? 60000 : 25000,
+        );
     };
 
     refresh();
