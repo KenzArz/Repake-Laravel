@@ -110,7 +110,8 @@ test('penjual dapat menandai produk terjual lewat chat', function () {
     ]);
     Sanctum::actingAs($seller);
 
-    $this->postJson('/api/v1/chats/'.$conversation->id.'/sold')->assertOk();
+    $this->postJson('/api/v1/chats/'.$conversation->id.'/sold', ['completion_type' => Order::COMPLETION_STOCK_OUT])
+        ->assertOk();
 
     expect($product->refresh()->status)->toBe(Product::STATUS_TERJUAL);
 });

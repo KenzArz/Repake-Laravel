@@ -190,7 +190,7 @@ class ProductController extends Controller
             ->where('buyer_id', $viewer->id)
             ->exists();
 
-        $hiddenStatuses = [Product::STATUS_DRAFT, Product::STATUS_DITANGGUIHKAN, Product::STATUS_TERJUAL];
+        $hiddenStatuses = [Product::STATUS_DRAFT, Product::STATUS_DITANGGUIHKAN, Product::STATUS_DITINJAU, Product::STATUS_TERJUAL];
         abort_if(! $isAdmin && ! $isOwner && ! $hasOrder && in_array($product->status, $hiddenStatuses, true), 404);
         abort_if(! $isAdmin && ! $hasOrder && $product->user?->is_banned, 404);
 
@@ -211,9 +211,9 @@ class ProductController extends Controller
             ->selectRaw('COUNT(*) as total, COALESCE(AVG(rating), 0) as avg_rating')
             ->first();
 
-        $soldCount = Product::query()
-            ->where('user_id', $product->user_id)
-            ->where('status', Product::STATUS_TERJUAL)
+        $soldCount = Order::query()
+            ->where('seller_id', $product->user_id)
+            ->where('status', Order::STATUS_SELESAI)
             ->count();
 
         $product->seller_stats = [
@@ -237,7 +237,7 @@ class ProductController extends Controller
             : Order::query()
                 ->where('product_id', $product->id)
                 ->where('buyer_id', $viewer->id)
-                ->whereIn('status', [Order::STATUS_DISEPAKATI, Order::STATUS_SELESAI])
+                ->where('status', Order::STATUS_SELESAI)
                 ->latest('id')
                 ->first();
 

@@ -19,6 +19,21 @@ class Order extends Model
 
     public const STATUS_BATAL = 'batal';
 
+    /** Saat transaksi diselesaikan dan stok produk habis (produk ditandai terjual). */
+    public const COMPLETION_STOCK_OUT = 'stok_habis';
+
+    /** Saat transaksi diselesaikan tetapi produk masih tersedia (tetap dijual). */
+    public const COMPLETION_STOCK_AVAILABLE = 'stok_tersedia';
+
+    /** Order dibatalkan otomatis karena produk terjual ke pembeli lain. */
+    public const CANCEL_REASON_SOLD_ELSEWHERE = 'sold_elsewhere';
+
+    /** Transaksi diselesaikan oleh penjual setelah COD. */
+    public const COMPLETED_BY_SELLER = 'penjual';
+
+    /** Transaksi diselesaikan oleh pembeli lewat konfirmasi terima barang. */
+    public const COMPLETED_BY_BUYER = 'pembeli';
+
     protected $fillable = [
         'conversation_id',
         'buyer_id',
@@ -27,7 +42,25 @@ class Order extends Model
         'harga_final',
         'status',
         'completed_at',
+        'completion_type',
+        'completed_by',
+        'cancelled_by',
+        'cancel_reason',
     ];
+
+    /**
+     * Label status transaksi untuk tampilan (dipakai kartu order, resource API,
+     * dan halaman riwayat agar konsisten di seluruh aplikasi).
+     */
+    public function statusLabel(): string
+    {
+        return match ($this->status) {
+            self::STATUS_DISEPAKATI => 'Menunggu COD',
+            self::STATUS_SELESAI => 'Selesai',
+            self::STATUS_BATAL => 'Dibatalkan',
+            default => ucfirst((string) $this->status),
+        };
+    }
 
     protected function casts(): array
     {

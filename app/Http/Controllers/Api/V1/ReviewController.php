@@ -18,7 +18,7 @@ class ReviewController extends Controller
         $userId = (string) $request->user()->id;
 
         abort_unless($userId === $order->buyer_id || $userId === $order->seller_id, 403, 'Anda bukan pihak pada transaksi ini.');
-        abort_unless(in_array($order->status, [Order::STATUS_DISEPAKATI, Order::STATUS_SELESAI], true), 403, 'Transaksi ini belum dapat diulas.');
+        abort_unless($order->status === Order::STATUS_SELESAI, 403, 'Transaksi ini belum dapat diulas.');
         abort_if($order->reviews()->where('reviewer_id', $userId)->exists(), 409, 'Anda sudah pernah mengulas transaksi ini.');
 
         $isBuyer = $userId === $order->buyer_id;

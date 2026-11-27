@@ -48,10 +48,23 @@ class Conversation extends Model
 
     /**
      * Order yang lahir dari penawaran yang disetujui dalam percakapan ini.
+     *
+     * Memakai latestOfMany supaya bila ada lebih dari satu order tersisa
+     * (mis. pembatalan lalu tawaran baru), yang benar-benar populer adalah
+     * order terbaru.
      */
     public function order(): HasOne
     {
-        return $this->hasOne(Order::class);
+        return $this->hasOne(Order::class)->latestOfMany();
+    }
+
+    /**
+     * Seluruh order pada percakapan ini. Dipakai untuk mencari transaksi yang
+     * masih berjalan (`disepakati`) tanpa tertukar dengan riwayat selesai.
+     */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
     }
 
     /**
