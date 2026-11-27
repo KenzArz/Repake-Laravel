@@ -52,35 +52,50 @@ class DemoSeeder extends Seeder
      * Tiga persona demo. Email diambil dari config demo agar login persona
      * dan data seed tidak pernah berbeda.
      *
+     * Dibuat lewat forceCreate, bukan User::factory(), karena factory memanggil
+     * fake() yang hanya ada saat fakerphp/faker (require-dev) terpasang.
+     * Instance demo di-deploy dengan `composer install --no-dev`, jadi seeder
+     * ini wajib tetap jalan tanpa Faker. forceCreate dipakai karena
+     * email_verified_at tidak termasuk atribut #[Fillable] pada model User.
+     *
      * @return array{0: User, 1: User, 2: User}
      */
     private function createUsers(): array
     {
-        $pembeli = User::factory()->create([
+        $pembeli = User::query()->forceCreate([
             'name' => 'Juri Pembeli',
             'email' => config('demo.personas.pembeli'),
             'username' => 'juri.pembeli',
+            'password' => 'password', // cast 'hashed' pada model meng-hash otomatis
+            'email_verified_at' => now(),
             'phone' => '081200000001',
             'kota' => 'Karawang',
             'bio' => 'Mahasiswa yang sedang mencari barang bekas berkualitas di sekitar kampus.',
+            'role' => User::ROLE_MAHASISWA,
         ]);
 
-        $penjual = User::factory()->create([
+        $penjual = User::query()->forceCreate([
             'name' => 'Juri Penjual',
             'email' => config('demo.personas.penjual'),
             'username' => 'juri.penjual',
+            'password' => 'password',
+            'email_verified_at' => now(),
             'phone' => '081200000002',
             'kota' => 'Karawang',
             'bio' => 'Mahasiswa yang menjual barang layak pakai dengan harga ramah kantong.',
+            'role' => User::ROLE_MAHASISWA,
         ]);
 
-        $admin = User::factory()->admin()->create([
+        $admin = User::query()->forceCreate([
             'name' => 'Admin RePake',
             'email' => config('demo.personas.admin'),
             'username' => 'juri.admin',
+            'password' => 'password',
+            'email_verified_at' => now(),
             'phone' => '081200000003',
             'kota' => 'Karawang',
             'bio' => 'Moderator konten dan transaksi RePake.',
+            'role' => User::ROLE_ADMIN,
         ]);
 
         return [$pembeli, $penjual, $admin];
