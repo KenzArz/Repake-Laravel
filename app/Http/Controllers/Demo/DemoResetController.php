@@ -6,13 +6,15 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
+use Throwable;
 
 /**
  * Tombol "Reset Data Demo" pada panel juri.
  *
- * Setelah `migrate:fresh`, seluruh sesi lama ikut terhapus (SESSION_DRIVER
- * database). Karena itu respons diarahkan ke route login persona admin agar
- * sesi baru langsung terbentuk dan juri mendarat di dashboard.
+ * Reset berjalan tanpa DDL: data demo dihapus lalu diisi ulang dalam satu
+ * transaksi oleh `demo:reset`. Karena sesi tidak ikut terhapus, respons
+ * tetap diarahkan ke route login persona admin agar sesi baru langsung
+ * terbentuk dan juri mendarat di dashboard.
  */
 class DemoResetController extends Controller
 {
@@ -29,7 +31,21 @@ class DemoResetController extends Controller
             'Hanya persona admin yang boleh mereset data demo.',
         );
 
-        Artisan::call('demo:reset', ['--force' => true]);
+        if (function_exists('set_time_limit')) {
+            set_time_limit(120);
+        }
+
+        try {
+            $exitCode = Artisan::call('demo:reset', ['--force' => true]);
+        } catch (Throwable $e) {
+            report($e);
+
+            return back()->with('error', 'Reset data demo gagal dijalankan. Data lama tidak diubah, silakan coba lagi.');
+        }
+
+        if ($exitCode !== 0) {
+            return back()->with('error', 'Reset data demo gagal dijalankan. Data lama tidak diubah, silakan coba lagi.');
+        }
 
         return redirect()
             ->route('demo.login', ['persona' => 'admin', 'to' => '/admin/dashboard'])

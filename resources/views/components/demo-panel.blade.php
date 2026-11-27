@@ -6,6 +6,7 @@
 @if (config('demo.enabled'))
     @php
         $personaAktif = auth()->user()?->email;
+        $adalahAdmin = $personaAktif !== null && $personaAktif === config('demo.personas.admin');
         $uriSekarang = request()->getRequestUri();
 
         $personaDemo = [
@@ -57,10 +58,9 @@
             <div class="mt-3 space-y-1.5">
                 @foreach ($personaDemo as $persona => $meta)
                     @php
-                        // Admin bukan peserta percakapan, jadi selalu mendarat di dashboard.
-                        $tujuan = $persona === 'admin'
-                            ? route('admin.dashboard', absolute: false)
-                            : $uriSekarang;
+                        // Tujuan divalidasi per persona di DemoLoginController,
+                        // jadi panel cukup mengirim halaman yang sedang dibuka.
+                        $tujuan = $uriSekarang;
                         $aktif = $personaAktif === config("demo.personas.{$persona}");
                     @endphp
 
@@ -87,19 +87,27 @@
                 @endforeach
             </div>
 
-            <form method="POST" action="{{ route('demo.reset') }}" class="mt-3 border-t border-neutral-200 pt-3"
-                onsubmit="return confirm('Reset seluruh data demo ke kondisi awal? Tindakan ini menghapus data yang dibuat selama mencoba.');">
-                @csrf
-                <button type="submit"
-                    class="flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:border-red-300 hover:bg-red-100">
-                    <svg viewBox="0 0 24 24"
-                        class="size-3.5 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]">
-                        <path d="M3 12a9 9 0 1 0 3-6.7" />
-                        <polyline points="3 4 3 10 9 10" />
-                    </svg>
-                    Reset Data Demo
-                </button>
-            </form>
+            {{-- Endpoint reset hanya menerima persona admin, jadi tombolnya
+                 pun hanya ditampilkan untuk admin agar juri tidak kena 403. --}}
+            @if ($adalahAdmin)
+                <form method="POST" action="{{ route('demo.reset') }}" class="mt-3 border-t border-neutral-200 pt-3"
+                    onsubmit="return confirm('Reset seluruh data demo ke kondisi awal? Tindakan ini menghapus data yang dibuat selama mencoba.');">
+                    @csrf
+                    <button type="submit"
+                        class="flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:border-red-300 hover:bg-red-100">
+                        <svg viewBox="0 0 24 24"
+                            class="size-3.5 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]">
+                            <path d="M3 12a9 9 0 1 0 3-6.7" />
+                            <polyline points="3 4 3 10 9 10" />
+                        </svg>
+                        Reset Data Demo
+                    </button>
+                </form>
+            @else
+                <p class="mt-3 border-t border-neutral-200 pt-3 text-[10px] font-medium leading-relaxed text-neutral-500">
+                    Reset data demo hanya tersedia untuk persona Admin.
+                </p>
+            @endif
         </div>
     </div>
 @endif

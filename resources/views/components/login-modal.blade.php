@@ -43,9 +43,8 @@
                     <div class="mt-2 space-y-1.5">
                         @foreach (['pembeli' => 'Pembeli — cari & tawar barang', 'penjual' => 'Penjual — kelola produk & tawaran', 'admin' => 'Admin — moderasi laporan'] as $persona => $label)
                             @php
-                                $tujuan = $persona === 'admin'
-                                    ? route('admin.dashboard', absolute: false)
-                                    : request()->getRequestUri();
+                                // Tujuan divalidasi per persona di DemoLoginController.
+                                $tujuan = request()->getRequestUri();
                             @endphp
                             <a href="{{ route('demo.login', ['persona' => $persona, 'to' => $tujuan]) }}"
                                 class="flex items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-bold text-neutral-800 transition hover:border-neutral-400 hover:bg-neutral-50">

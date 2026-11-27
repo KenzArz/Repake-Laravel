@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Conversation;
+use App\Models\Product;
 use App\Models\User;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -40,12 +41,12 @@ test('demo login rejects a persona outside the configured list', function () {
     $this->assertGuest();
 });
 
-test('demo login signs in the expected persona', function (string $persona, string $role) {
+test('demo login signs in the expected persona', function (string $persona, string $role, string $tujuan) {
     config(['demo.enabled' => true]);
     $this->seed(DemoSeeder::class);
 
     $this->get(route('demo.login', ['persona' => $persona]))
-        ->assertRedirect(route('home'));
+        ->assertRedirect($tujuan);
 
     $user = User::query()->where('email', config("demo.personas.{$persona}"))->sole();
 
@@ -53,9 +54,9 @@ test('demo login signs in the expected persona', function (string $persona, stri
     expect($user->role)->toBe($role)
         ->and($user->email_verified_at)->not->toBeNull();
 })->with([
-    ['pembeli', User::ROLE_MAHASISWA],
-    ['penjual', User::ROLE_MAHASISWA],
-    ['admin', User::ROLE_ADMIN],
+    ['pembeli', User::ROLE_MAHASISWA, '/'],
+    ['penjual', User::ROLE_MAHASISWA, '/'],
+    ['admin', User::ROLE_ADMIN, '/admin/dashboard'],
 ]);
 
 test('demo login writes the profile session used by the navbar', function () {
@@ -92,6 +93,60 @@ test('demo login never redirects to an external destination', function (string $
     'backslash trick' => '/\\evil.com',
     'javascript scheme' => 'javascript:alert(1)',
 ]);
+
+test('demo login sends a non-admin persona to home from an admin page', function () {
+    config(['demo.enabled' => true]);
+    $this->seed(DemoSeeder::class);
+
+    $this->get(route('demo.login', ['persona' => 'pembeli', 'to' => '/admin/dashboard']))
+        ->assertRedirect(route('home'));
+
+    $this->get(route('demo.login', ['persona' => 'penjual', 'to' => '/admin/dashboard']))
+        ->assertRedirect(route('home'));
+});
+
+test('demo login sends a non-admin persona to home from a page it does not own', function () {
+    config(['demo.enabled' => true]);
+    $this->seed(DemoSeeder::class);
+
+    $this->get(route('demo.login', ['persona' => 'pembeli', 'to' => '/products/abc/edit']))
+        ->assertRedirect(route('home'));
+});
+
+test('demo login keeps a safe page with its query string', function () {
+    config(['demo.enabled' => true]);
+    $this->seed(DemoSeeder::class);
+
+    $this->get(route('demo.login', ['persona' => 'pembeli', 'to' => '/products?kategori=olahraga']))
+        ->assertRedirect('/products?kategori=olahraga');
+
+    $this->get(route('demo.login', ['persona' => 'penjual', 'to' => '/produk/tumbler-corkcicle-750ml']))
+        ->assertRedirect('/produk/tumbler-corkcicle-750ml');
+});
+
+test('demo login rejects a destination with traversal segments', function () {
+    config(['demo.enabled' => true]);
+    $this->seed(DemoSeeder::class);
+
+    $this->get(route('demo.login', ['persona' => 'pembeli', 'to' => '/produk/../admin/dashboard']))
+        ->assertRedirect(route('home'));
+});
+
+test('demo admin lands on the dashboard from a non-admin page', function () {
+    config(['demo.enabled' => true]);
+    $this->seed(DemoSeeder::class);
+
+    $this->get(route('demo.login', ['persona' => 'admin', 'to' => '/chat/1']))
+        ->assertRedirect('/admin/dashboard');
+});
+
+test('demo admin keeps an admin page', function () {
+    config(['demo.enabled' => true]);
+    $this->seed(DemoSeeder::class);
+
+    $this->get(route('demo.login', ['persona' => 'admin', 'to' => '/admin/reports/abc']))
+        ->assertRedirect('/admin/reports/abc');
+});
 
 test('demo accounts cannot sign in through the production firebase path', function () {
     $this->seed(DemoSeeder::class);
@@ -134,6 +189,31 @@ test('demo panel keeps the current conversation when switching persona', functio
         ->assertSee('demo/masuk/penjual?to='.urlencode('/chat/'.$conversation->id));
 });
 
+test('demo panel only offers the reset button to the admin persona', function () {
+    config(['demo.enabled' => true]);
+    $this->seed(DemoSeeder::class);
+
+    // Tamu: panel tampil, tetapi tombol reset tidak.
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertDontSee('Reset Data Demo')
+        ->assertSee('Reset data demo hanya tersedia untuk persona Admin.');
+
+    // Pembeli: tetap tanpa tombol reset.
+    $this->get(route('demo.login', ['persona' => 'pembeli']));
+
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertDontSee('Reset Data Demo');
+
+    // Admin: tombol reset tersedia di dashboard.
+    $this->get(route('demo.login', ['persona' => 'admin', 'to' => '/admin/dashboard']));
+
+    $this->get(route('admin.dashboard'))
+        ->assertOk()
+        ->assertSee('Reset Data Demo');
+});
+
 test('demo reset is only reachable by the admin persona in demo mode', function () {
     config(['demo.enabled' => false]);
     $this->post(route('demo.reset'))->assertNotFound();
@@ -144,6 +224,40 @@ test('demo reset is only reachable by the admin persona in demo mode', function 
     $this->get(route('demo.login', ['persona' => 'pembeli']));
 
     $this->post(route('demo.reset'))->assertForbidden();
+
+    $this->post(route('logout'));
+
+    $this->post(route('demo.reset'))->assertForbidden();
+});
+
+test('demo reset restores the seeded dataset without rebuilding the schema', function () {
+    config(['demo.enabled' => true]);
+    $this->seed(DemoSeeder::class);
+
+    User::query()->forceCreate([
+        'name' => 'Penyusup',
+        'email' => 'penyusup@demo.local',
+        'password' => 'password',
+    ]);
+
+    expect(User::count())->toBe(4);
+
+    $this->get(route('demo.login', ['persona' => 'admin', 'to' => '/admin/dashboard']));
+
+    $this->post(route('demo.reset'))
+        ->assertRedirect(route('demo.login', ['persona' => 'admin', 'to' => '/admin/dashboard']));
+
+    expect(User::count())->toBe(3)
+        ->and(Product::count())->toBe(14)
+        ->and(Conversation::count())->toBe(3);
+});
+
+test('demo reset command refuses to run outside demo mode', function () {
+    config(['demo.enabled' => false]);
+
+    $this->artisan('demo:reset', ['--force' => true])
+        ->expectsOutputToContain('Mode demo nonaktif')
+        ->assertFailed();
 });
 
 test('demo panel and juri login block only render when demo mode is on', function () {

@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class DemoLoginController extends Controller
 {
@@ -43,16 +44,39 @@ class DemoLoginController extends Controller
             'is_verified' => true,
         ]);
 
-        return redirect($this->destination($request));
+        return redirect($this->destination($request, $persona));
     }
 
     /**
-     * Halaman tujuan setelah login. Hanya path internal yang diterima supaya
-     * parameter `to` tidak bisa dipakai mengalihkan juri ke domain lain.
+     * Halaman tujuan setelah login.
+     *
+     * Persona admin hanya boleh mendarat di wilayah admin; pembeli dan
+     * penjual hanya di halaman yang memang bisa mereka buka. Tujuan lain
+     * (mis. /admin/dashboard milik persona admin atau /products/{id}/edit
+     * milik penjual lain) jatuh ke beranda agar juri tidak menemui 403.
      */
-    private function destination(Request $request): string
+    private function destination(Request $request, string $persona): string
     {
         $to = (string) $request->query('to', '');
+        $path = $this->internalPath($to);
+
+        if ($path === null) {
+            return $this->fallback($persona);
+        }
+
+        return $this->diizinkan($persona, $path) ? $to : $this->fallback($persona);
+    }
+
+    /**
+     * Ambil path dari tujuan yang benar-benar internal, atau null bila
+     * parameter `to` mencoba keluar dari aplikasi.
+     */
+    private function internalPath(string $to): ?string
+    {
+        if ($to === '' || preg_match('/[\x00-\x1F\x7F]/', $to) === 1) {
+            return null;
+        }
+
         $parts = parse_url($to);
 
         $isInternal = $parts !== false
@@ -62,6 +86,43 @@ class DemoLoginController extends Controller
             && ! str_starts_with($to, '//')
             && ! str_contains($to, '\\');
 
-        return $isInternal ? $to : route('home');
+        if (! $isInternal) {
+            return null;
+        }
+
+        $path = $parts['path'] ?? '/';
+
+        foreach (explode('/', $path) as $segmen) {
+            if ($segmen === '..' || $segmen === '.') {
+                return null;
+            }
+        }
+
+        return $path;
+    }
+
+    /**
+     * Apakah persona boleh membuka path tersebut?
+     */
+    private function diizinkan(string $persona, string $path): bool
+    {
+        if ($persona === 'admin') {
+            return $path === '/admin' || str_starts_with($path, '/admin/');
+        }
+
+        foreach ((array) config('demo.safe_paths', []) as $pola) {
+            if (Str::is($pola, $path)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function fallback(string $persona): string
+    {
+        return $persona === 'admin'
+            ? route('admin.dashboard', absolute: false)
+            : route('home', absolute: false);
     }
 }

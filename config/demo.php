@@ -23,6 +23,34 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Halaman Aman Saat Berganti Persona
+    |--------------------------------------------------------------------------
+    |
+    | Panel demo meneruskan URI halaman aktif sebagai tujuan setelah login.
+    | Hanya path yang cocok dengan pola di bawah yang dipertahankan untuk
+    | persona pembeli/penjual; halaman lain jatuh ke beranda supaya juri
+    | tidak menabrak 403 (mis. /admin/* atau /products/{id}/edit).
+    | Pola memakai wildcard `*` dari Str::is().
+    |
+    */
+
+    'safe_paths' => [
+        '/',
+        '/products',
+        '/products/create',
+        '/produk/*',
+        '/penjual/*',
+        '/chat',
+        '/chat/*',
+        '/orders',
+        '/profile',
+        '/profile/*',
+        '/favorites',
+        '/notifications',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Tautan Instance Demo
     |--------------------------------------------------------------------------
     |
