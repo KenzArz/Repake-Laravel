@@ -6,6 +6,8 @@ use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Auth\FirebaseAuthController;
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\Demo\DemoLoginController;
+use App\Http\Controllers\Demo\DemoResetController;
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LocationController;
@@ -27,6 +29,18 @@ Route::post('/auth/firebase', [FirebaseAuthController::class, 'login'])
 Route::post('/logout', [FirebaseAuthController::class, 'logout'])
     ->middleware('auth')
     ->name('logout');
+
+// Mode demo penilaian: login persona juri. Rute ini hanya hidup saat
+// DEMO_MODE=true dan sengaja berada di luar grup auth.
+Route::get('/demo/masuk/{persona}', [DemoLoginController::class, 'login'])
+    ->middleware('throttle:30,1')
+    ->name('demo.login');
+
+// Reset data demo: hanya persona admin yang lolos (dicek di controller),
+// CSRF tetap aktif karena rute ini berada di grup middleware web.
+Route::post('/demo/reset', DemoResetController::class)
+    ->middleware('throttle:6,1')
+    ->name('demo.reset');
 
 // Jual Produk (wajib login) — rute statis, harus sebelum wildcard /products/{id}
 Route::middleware(['auth', 'banned'])->group(function () {

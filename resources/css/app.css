@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "./theme/theme.css" layer(base);
 
+/* Sembunyikan elemen Alpine (x-cloak) sampai komponen selesai diinisialisasi. */
+[x-cloak] {
+    display: none !important;
+}
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 
