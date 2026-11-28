@@ -18,6 +18,7 @@
 
     {{-- `open-persona-panel` dipakai modal login demo agar membuka panel yang sama. --}}
     <div x-data="{ buka: false }"
+        x-init="if (window.location.hash === '#persona') { buka = true; history.replaceState(null, '', window.location.pathname + window.location.search); }"
         x-on:open-persona-panel.window="buka = true"
         x-on:keydown.escape.window="buka = false"
         class="relative z-50 shrink-0 print:hidden">
@@ -117,10 +118,6 @@
                                 Reset Data Demo
                             </button>
                         </form>
-                    @else
-                        <p class="mt-4 border-t border-neutral-200 pt-4 text-[10px] font-medium leading-relaxed text-neutral-500">
-                            Reset data demo hanya tersedia untuk persona Admin.
-                        </p>
                     @endif
                 </div>
             </div>

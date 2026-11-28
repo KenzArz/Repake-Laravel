@@ -195,11 +195,11 @@ test('demo panel only offers the reset button to the admin persona', function ()
     config(['demo.enabled' => true]);
     $this->seed(DemoSeeder::class);
 
-    // Tamu: panel tampil, tetapi tombol reset tidak.
+    // Tamu: panel tampil, tetapi tombol reset dan catatan kaki tidak.
     $this->get(route('home'))
         ->assertOk()
         ->assertDontSee('Reset Data Demo')
-        ->assertSee('Reset data demo hanya tersedia untuk persona Admin.');
+        ->assertDontSee('Reset data demo hanya tersedia untuk persona Admin.');
 
     // Pembeli: tetap tanpa tombol reset.
     $this->get(route('demo.login', ['persona' => 'pembeli']));
@@ -269,9 +269,14 @@ test('demo panel and persona access only render when demo mode is on', function 
         ->assertOk()
         ->assertSee('Tampilan mode demo')
         ->assertSee('Ganti Akun Persona')
-        ->assertSee('Pilih akun persona demo')
-        ->assertSee('Masuk dengan Google @unsika.ac.id')
-        ->assertSee(config('demo.production_url'), false);
+        ->assertSee('Masuk dengan Google')
+        ->assertSee('Masuk dengan akun persona')
+        ->assertSee('#login', false)
+        ->assertSee('#persona', false)
+        ->assertSee(config('demo.production_url'), false)
+        ->assertSee(config('demo.url'), false)
+        ->assertDontSee('Pilih akun persona demo')
+        ->assertDontSee('Masuk dengan Google @unsika.ac.id');
 
     config(['demo.enabled' => false]);
 
@@ -280,8 +285,14 @@ test('demo panel and persona access only render when demo mode is on', function 
         ->assertDontSee('Tampilan mode demo')
         ->assertDontSee('Ganti Akun Persona')
         ->assertDontSee('Pilih akun persona demo')
-        ->assertSee('Continue with Google')
-        ->assertSee('Buka demo penilaian');
+        ->assertSee('Masuk dengan Google')
+        ->assertSee('Masuk dengan akun persona')
+        ->assertSee('#login', false)
+        ->assertSee('#persona', false)
+        ->assertSee(config('demo.production_url'), false)
+        ->assertSee(config('demo.url'), false)
+        ->assertDontSee('Continue with Google')
+        ->assertDontSee('Buka demo penilaian');
 });
 
 test('demo panel shows the seeded persona display names', function () {

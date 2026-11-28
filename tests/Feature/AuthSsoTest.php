@@ -11,7 +11,7 @@ test('login modal is present on the page for guests', function () {
     $response->assertStatus(200);
     $response->assertSee('Masuk ke RePake');
     $response->assertSee('Silahkan masuk menggunakan akun Google UNSIKA anda');
-    $response->assertSee('Continue with Google');
+    $response->assertSee('Masuk dengan Google');
 });
 
 test('login modal no longer contains manual email login', function () {
