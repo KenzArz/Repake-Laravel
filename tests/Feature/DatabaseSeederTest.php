@@ -14,7 +14,8 @@ test('database seeder fills core data and admin only, without dummy data', funct
 
     expect(Category::count())->toBe(8)
         ->and(User::where('role', User::ROLE_ADMIN)->count())->toBe(1)
-        ->and(Banner::count())->toBe(0)
+        // BannerSeeder bagian dari seed inti (3 banner bawaan), bukan data dummy.
+        ->and(Banner::count())->toBe(3)
         ->and(Product::count())->toBe(0)
         ->and(Report::count())->toBe(0);
 });
@@ -25,7 +26,7 @@ test('database seeder is idempotent when run twice', function () {
 
     expect(Category::count())->toBe(8)
         ->and(User::where('role', User::ROLE_ADMIN)->count())->toBe(1)
-        ->and(Banner::count())->toBe(0)
+        ->and(Banner::count())->toBe(3)
         ->and(Product::count())->toBe(0)
         ->and(Report::count())->toBe(0);
 });

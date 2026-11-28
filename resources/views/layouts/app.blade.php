@@ -32,6 +32,9 @@
 <body
     class="bg-neutral-100/60 text-neutral-900 antialiased selection:bg-lime-300 selection:text-neutral-900 @hasSection('app-shell') flex h-dvh flex-col overflow-hidden @else min-h-screen overflow-x-clip @endif"
     data-authed="{{ auth()->check() ? '1' : '0' }}">
+    {{-- Banner + panel juri, hanya muncul saat DEMO_MODE=true [Fase 1]. --}}
+    @includeIf('components.demo-panel')
+
     <x-navbar-user />
 
     {{-- Pemicu deteksi lokasi [ALDI]; label kota di navbar tetap milik RAFIS --}}

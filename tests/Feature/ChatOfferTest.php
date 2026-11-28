@@ -12,7 +12,11 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     $this->seller = User::factory()->create();
     $this->buyer = User::factory()->create();
-    $this->product = Product::factory()->for($this->seller, 'seller')->create();
+    $this->product = Product::factory()->for($this->seller, 'seller')->create([
+        // Harga tetap supaya tawaran di test tidak pernah melebihi harga produk
+        // (factory memakai harga acak 10rb–5jt dan itu bikin test flaky).
+        'harga' => 1_000_000,
+    ]);
     $this->conversation = Conversation::factory()->create([
         'buyer_id' => $this->buyer->id,
         'seller_id' => $this->seller->id,

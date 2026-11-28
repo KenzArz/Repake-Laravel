@@ -152,16 +152,16 @@ test('homepage shows all active banners in the configured order', function () {
         ->assertSee('images/banner-4.webp')
         ->assertDontSee('images/banner-off.webp');
 
-    $positions = [
-        strpos($response->getContent(), 'images/banner-1.webp'),
-        strpos($response->getContent(), 'images/banner-2.webp'),
-        strpos($response->getContent(), 'images/banner-3.webp'),
-        strpos($response->getContent(), 'images/banner-4.webp'),
-    ];
-
-    expect($positions[0])->toBeLessThan($positions[1])
-        ->and($positions[1])->toBeLessThan($positions[2])
-        ->and($positions[2])->toBeLessThan($positions[3]);
+    // Carousel menambahkan slide clone (aria-hidden) di kedua ujung track,
+    // sehingga urutan DOM mentah bukan urutan asli. assertSeeInOrder mencari
+    // tiap banner setelah posisi banner sebelumnya, jadi urutan slide asli
+    // tetap terverifikasi tanpa terpengaruh clone.
+    $response->assertSeeInOrder([
+        'images/banner-1.webp',
+        'images/banner-2.webp',
+        'images/banner-3.webp',
+        'images/banner-4.webp',
+    ]);
 });
 
 test('admin reorders banners via drag and drop payload', function () {

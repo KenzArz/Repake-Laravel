@@ -28,11 +28,26 @@ class ProductImage extends Model
     }
 
     /**
-     * URL publik untuk gambar (via symlink /storage).
+     * URL publik untuk gambar.
+     *
+     * Data demo memakai URL Unsplash langsung, sedangkan unggahan pengguna
+     * tetap tersimpan di disk publik dan diakses lewat symlink /storage.
      */
     protected function pathUrl(): Attribute
     {
-        return Attribute::get(fn (): string => Storage::url($this->path));
+        return Attribute::get(function (): string {
+            $path = (string) $this->path;
+
+            if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+                return $path;
+            }
+
+            if (str_starts_with($path, '/')) {
+                return asset(ltrim($path, '/'));
+            }
+
+            return Storage::url($path);
+        });
     }
 
     public function product(): BelongsTo
