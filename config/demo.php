@@ -23,6 +23,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Nama Tampilan Persona
+    |--------------------------------------------------------------------------
+    |
+    | Email persona sengaja tetap memakai domain demo, tetapi nama yang
+    | terlihat di navbar, panel, dan percakapan memakai nama orang biasa agar
+    | suasana demo terasa seperti aplikasi sungguhan. Nilai ini juga dipakai
+    | DemoSeeder supaya nama di database dan panel tidak pernah berbeda.
+    |
+    */
+
+    'names' => [
+        'pembeli' => 'Alya Ramadhani',
+        'penjual' => 'Rizky Pratama',
+        'admin' => 'Admin Repake Demo',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Halaman Aman Saat Berganti Persona
     |--------------------------------------------------------------------------
     |
@@ -59,5 +77,17 @@ return [
     */
 
     'url' => env('DEMO_URL', 'https://demo.repake.dpdns.org'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Tautan Instance Produksi
+    |--------------------------------------------------------------------------
+    |
+    | Dipakai tombol Google di modal login instance demo. Login Google hanya
+    | berjalan di produksi, jadi tombol tersebut mengarah ke alamat ini.
+    |
+    */
+
+    'production_url' => env('DEMO_PRODUCTION_URL', 'https://repake.dpdns.org'),
 
 ];

@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Banner;
+use App\Models\Category;
 use App\Models\Conversation;
 use App\Models\Product;
 use App\Models\User;
@@ -20,7 +22,7 @@ function fakeDemoFirebaseLookup(array $overrides = []): void
             'users' => [array_merge([
                 'localId' => 'demo-firebase-uid',
                 'email' => 'juri.pembeli@demo.local',
-                'displayName' => 'Juri Pembeli',
+                'displayName' => 'Alya Ramadhani',
                 'emailVerified' => true,
             ], $overrides)],
         ]),
@@ -68,7 +70,7 @@ test('demo login writes the profile session used by the navbar', function () {
     $profile = session('user_profile');
 
     expect($profile)->toBeArray()
-        ->and($profile['name'])->toBe('Juri Pembeli')
+        ->and($profile['name'])->toBe(config('demo.names.pembeli'))
         ->and($profile['email'])->toBe(config('demo.personas.pembeli'))
         ->and($profile['kota'])->not->toBeEmpty();
 });
@@ -260,21 +262,60 @@ test('demo reset command refuses to run outside demo mode', function () {
         ->assertFailed();
 });
 
-test('demo panel and juri login block only render when demo mode is on', function () {
+test('demo panel and persona access only render when demo mode is on', function () {
     config(['demo.enabled' => true]);
 
     $this->get(route('home'))
         ->assertOk()
-        ->assertSee('Mode Demo Penilaian')
-        ->assertSee('Masuk sebagai Juri')
-        ->assertDontSee('Continue with Google');
+        ->assertSee('Tampilan mode demo')
+        ->assertSee('Ganti Akun Persona')
+        ->assertSee('Pilih akun persona demo')
+        ->assertSee('Masuk dengan Google @unsika.ac.id')
+        ->assertSee(config('demo.production_url'), false);
 
     config(['demo.enabled' => false]);
 
     $this->get(route('home'))
         ->assertOk()
-        ->assertDontSee('Mode Demo Penilaian')
-        ->assertDontSee('Masuk sebagai Juri')
+        ->assertDontSee('Tampilan mode demo')
+        ->assertDontSee('Ganti Akun Persona')
+        ->assertDontSee('Pilih akun persona demo')
         ->assertSee('Continue with Google')
         ->assertSee('Buka demo penilaian');
+});
+
+test('demo panel shows the seeded persona display names', function () {
+    config(['demo.enabled' => true]);
+    $this->seed(DemoSeeder::class);
+
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertSee(config('demo.names.pembeli'))
+        ->assertSee(config('demo.names.penjual'))
+        ->assertSee(config('demo.names.admin'));
+});
+
+test('demo seeder uses unsplash product photos and local banner assets', function () {
+    config(['demo.enabled' => true]);
+    $this->seed(DemoSeeder::class);
+
+    $cover = Product::query()
+        ->where('judul', 'Tumbler Corkcicle 750ml')
+        ->sole()
+        ->images()
+        ->where('is_cover', true)
+        ->sole();
+
+    expect($cover->path)->toStartWith('https://images.unsplash.com/')
+        ->and($cover->path_url)->toBe($cover->path);
+
+    expect(Banner::query()->where('sort_order', 1)->sole()->image_path)
+        ->toBe('images/banners/repake-promo.webp')
+        ->and(Banner::query()->where('sort_order', 2)->sole()->image_path)
+        ->toBe('images/banners/keyboard.webp')
+        ->and(Banner::query()->where('sort_order', 3)->sole()->image_path)
+        ->toBe('images/banners/earbuds.webp');
+
+    expect(Category::query()->where('slug', 'elektronik')->sole()->icon)
+        ->toBe('/images/categories/elektronik.webp');
 });

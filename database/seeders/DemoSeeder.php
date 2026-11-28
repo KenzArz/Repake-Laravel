@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Banner;
 use App\Models\Category;
 use App\Models\CodArea;
 use App\Models\Conversation;
@@ -40,12 +41,63 @@ class DemoSeeder extends Seeder
             BannerSeeder::class,
         ]);
 
+        // Seeder inti dipakai juga oleh produksi, jadi gambar khusus demo
+        // diterapkan setelahnya tanpa mengubah data bawaan produksi.
+        $this->configureDemoImages();
+
         [$pembeli, $penjual, $admin] = $this->createUsers();
         $products = $this->createProducts($penjual);
         $this->attachCodAreas($products);
         $this->createConversations($pembeli, $penjual, $products);
         $this->createReports($pembeli, $admin, $products);
         $this->createNotifications($pembeli);
+    }
+
+    /**
+     * Gambar khusus demo: banner promo dan ikon kategori diambil dari
+     * instance produksi supaya tampilan demo identik dengan aplikasi asli.
+     */
+    private function configureDemoImages(): void
+    {
+        $banners = [
+            1 => 'images/banners/repake-promo.webp',
+            2 => 'images/banners/keyboard.webp',
+            3 => 'images/banners/earbuds.webp',
+        ];
+
+        foreach ($banners as $sortOrder => $path) {
+            Banner::query()
+                ->where('sort_order', $sortOrder)
+                ->update(['image_path' => $path]);
+        }
+
+        $icons = [
+            'elektronik' => '/images/categories/elektronik.webp',
+            'pakaian' => '/images/categories/pakaian.webp',
+            'perabot' => '/images/categories/perabot.webp',
+            'olahraga' => '/images/categories/olahraga.webp',
+            'buku' => '/images/categories/buku.webp',
+            'hobi' => '/images/categories/hobi.webp',
+            'otomotif' => '/images/categories/otomotif.webp',
+            'lainnya' => '/images/categories/lainnya.webp',
+        ];
+
+        foreach ($icons as $slug => $icon) {
+            Category::query()
+                ->where('slug', $slug)
+                ->update(['icon' => $icon]);
+        }
+    }
+
+    /**
+     * Path gambar produk demo. URL Unsplash dipakai langsung (hotlink) agar
+     * repo tidak menyimpan 14 file biner; path lokal lama tetap didukung.
+     */
+    private function productImagePath(string $image): string
+    {
+        return str_starts_with($image, 'http://') || str_starts_with($image, 'https://')
+            ? $image
+            : 'products/'.$image;
     }
 
     /**
@@ -63,9 +115,9 @@ class DemoSeeder extends Seeder
     private function createUsers(): array
     {
         $pembeli = User::query()->forceCreate([
-            'name' => 'Juri Pembeli',
+            'name' => config('demo.names.pembeli'),
             'email' => config('demo.personas.pembeli'),
-            'username' => 'juri.pembeli',
+            'username' => 'alya.ramadhani',
             'password' => 'password', // cast 'hashed' pada model meng-hash otomatis
             'email_verified_at' => now(),
             'phone' => '081200000001',
@@ -75,9 +127,9 @@ class DemoSeeder extends Seeder
         ]);
 
         $penjual = User::query()->forceCreate([
-            'name' => 'Juri Penjual',
+            'name' => config('demo.names.penjual'),
             'email' => config('demo.personas.penjual'),
-            'username' => 'juri.penjual',
+            'username' => 'rizky.pratama',
             'password' => 'password',
             'email_verified_at' => now(),
             'phone' => '081200000002',
@@ -87,9 +139,9 @@ class DemoSeeder extends Seeder
         ]);
 
         $admin = User::query()->forceCreate([
-            'name' => 'Admin RePake',
+            'name' => config('demo.names.admin'),
             'email' => config('demo.personas.admin'),
-            'username' => 'juri.admin',
+            'username' => 'admin.repake.demo',
             'password' => 'password',
             'email_verified_at' => now(),
             'phone' => '081200000003',
@@ -102,8 +154,8 @@ class DemoSeeder extends Seeder
     }
 
     /**
-     * 14 produk yang tersebar di seluruh kategori, memakai foto yang sudah
-     * tersedia di storage/app/public/products (tanpa watermark).
+     * 14 produk yang tersebar di seluruh kategori, memakai foto Unsplash
+     * (hotlink) agar repo tidak menyimpan file biner tambahan.
      *
      * @return array<string, Product>
      */
@@ -136,7 +188,7 @@ class DemoSeeder extends Seeder
             ]);
 
             $product->images()->create([
-                'path' => 'products/'.$item['gambar'],
+                'path' => $this->productImagePath($item['gambar']),
                 'is_cover' => true,
                 'urutan' => 0,
             ]);
@@ -296,7 +348,7 @@ class DemoSeeder extends Seeder
         $conversations = Conversation::query()->orderBy('id')->pluck('id');
 
         foreach ($conversations->take(2) as $conversationId) {
-            $pembeli->notify(new NewMessage('Juri Penjual', (int) $conversationId));
+            $pembeli->notify(new NewMessage(config('demo.names.penjual'), (int) $conversationId));
         }
 
         $pembeli->notify(new OfferDecided(
@@ -353,7 +405,7 @@ class DemoSeeder extends Seeder
                 'kota' => 'Karawang',
                 'patokan_lokasi' => 'Kampus 1 UNSIKA Telukjambe',
                 'is_negotiable' => true,
-                'gambar' => 'laptop-asus-vivobook-14-ryzen-5-5500u.png',
+                'gambar' => 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=800&q=80',
             ],
             'monitor-lg' => [
                 'kategori' => 'elektronik',
@@ -365,7 +417,7 @@ class DemoSeeder extends Seeder
                 'kota' => 'Karawang',
                 'patokan_lokasi' => 'Kampus 1 UNSIKA Telukjambe',
                 'is_negotiable' => true,
-                'gambar' => 'monitor-lg-24mk430h-24-inch-ips.png',
+                'gambar' => 'https://images.unsplash.com/photo-1588746363141-364bcdd1d04d?auto=format&fit=crop&w=800&q=80',
             ],
             'galaxy-buds2' => [
                 'kategori' => 'elektronik',
@@ -377,7 +429,7 @@ class DemoSeeder extends Seeder
                 'kota' => 'Bekasi',
                 'patokan_lokasi' => 'Grand Metropolitan Bekasi',
                 'is_negotiable' => true,
-                'gambar' => 'samsung-galaxy-buds2-pro.png',
+                'gambar' => 'https://images.unsplash.com/photo-1572569511254-d8f925fe2cbb?auto=format&fit=crop&w=800&q=80',
             ],
             'powerbank-anker' => [
                 'kategori' => 'elektronik',
@@ -389,7 +441,7 @@ class DemoSeeder extends Seeder
                 'kota' => 'Bekasi',
                 'patokan_lokasi' => 'Summarecon Mall Bekasi',
                 'is_negotiable' => true,
-                'gambar' => 'powerbank-anker-powercore-20000mah.png',
+                'gambar' => 'https://images.unsplash.com/photo-1566554738544-d962991c3fee?auto=format&fit=crop&w=800&q=80',
             ],
             'jaket-varsity' => [
                 'kategori' => 'pakaian',
@@ -401,7 +453,7 @@ class DemoSeeder extends Seeder
                 'kota' => 'Karawang',
                 'patokan_lokasi' => 'Galuh Mas & Festive Walk',
                 'is_negotiable' => true,
-                'gambar' => 'jaket-varsity-unisex-size-l.png',
+                'gambar' => 'https://images.unsplash.com/photo-1760458955495-9712cc8f79c0?auto=format&fit=crop&w=800&q=80',
             ],
             'kemeja-flanel' => [
                 'kategori' => 'pakaian',
@@ -413,7 +465,7 @@ class DemoSeeder extends Seeder
                 'kota' => 'Karawang',
                 'patokan_lokasi' => 'Kampus 2 UNSIKA Klari',
                 'is_negotiable' => false,
-                'gambar' => 'kemeja-flanel-preloved-motif-kotak.png',
+                'gambar' => 'https://images.unsplash.com/photo-1611312449412-6cefac5dc3e4?auto=format&fit=crop&w=800&q=80',
             ],
             'meja-belajar' => [
                 'kategori' => 'perabot',
@@ -425,7 +477,7 @@ class DemoSeeder extends Seeder
                 'kota' => 'Karawang',
                 'patokan_lokasi' => 'Kampus 1 UNSIKA Telukjambe',
                 'is_negotiable' => true,
-                'gambar' => 'meja-belajar-lipat-kayu.png',
+                'gambar' => 'https://images.unsplash.com/photo-1597072689227-8882273e8f6a?auto=format&fit=crop&w=800&q=80',
             ],
             'rak-buku' => [
                 'kategori' => 'perabot',
@@ -437,7 +489,7 @@ class DemoSeeder extends Seeder
                 'kota' => 'Bandung',
                 'patokan_lokasi' => 'Dago & Simpang ITB',
                 'is_negotiable' => true,
-                'gambar' => 'rak-buku-minimalis-4-tingkat.png',
+                'gambar' => 'https://images.unsplash.com/photo-1593430980369-68efc5a5eb34?auto=format&fit=crop&w=800&q=80',
             ],
             'sepeda-mtb' => [
                 'kategori' => 'olahraga',
@@ -449,7 +501,7 @@ class DemoSeeder extends Seeder
                 'kota' => 'Karawang',
                 'patokan_lokasi' => 'Galuh Mas & Festive Walk',
                 'is_negotiable' => true,
-                'gambar' => 'sepeda-mtb-polygon-xtrada-5.png',
+                'gambar' => 'https://images.unsplash.com/photo-1534146789009-76ed5060ec70?auto=format&fit=crop&w=800&q=80',
             ],
             'dumbbell-5kg' => [
                 'kategori' => 'olahraga',
@@ -461,7 +513,7 @@ class DemoSeeder extends Seeder
                 'kota' => 'Karawang',
                 'patokan_lokasi' => 'Kampus 2 UNSIKA Klari',
                 'is_negotiable' => true,
-                'gambar' => 'dumbbell-5kg-sepasang.png',
+                'gambar' => 'https://images.unsplash.com/photo-1638536532686-d610adfc8e5c?auto=format&fit=crop&w=800&q=80',
             ],
             'buku-kalkulus' => [
                 'kategori' => 'buku',
@@ -473,7 +525,7 @@ class DemoSeeder extends Seeder
                 'kota' => 'Bandung',
                 'patokan_lokasi' => 'Dago & Simpang ITB',
                 'is_negotiable' => true,
-                'gambar' => 'buku-kalkulus-james-stewart-edisi-7.png',
+                'gambar' => 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80',
             ],
             'gitar-yamaha' => [
                 'kategori' => 'hobi',
@@ -485,7 +537,7 @@ class DemoSeeder extends Seeder
                 'kota' => 'Jakarta Pusat',
                 'patokan_lokasi' => 'Monas & Thamrin',
                 'is_negotiable' => true,
-                'gambar' => 'gitar-akustik-yamaha-f310.png',
+                'gambar' => 'https://images.unsplash.com/photo-1541689592655-f5f52825a3b8?auto=format&fit=crop&w=800&q=80',
             ],
             'helm-kyt' => [
                 'kategori' => 'otomotif',
@@ -497,7 +549,7 @@ class DemoSeeder extends Seeder
                 'kota' => 'Karawang',
                 'patokan_lokasi' => 'Kampus 1 UNSIKA Telukjambe',
                 'is_negotiable' => false,
-                'gambar' => 'helm-kyt-half-face.png',
+                'gambar' => 'https://images.unsplash.com/photo-1590506995460-d0d9892b54da?auto=format&fit=crop&w=800&q=80',
             ],
             'tumbler-corkcicle' => [
                 'kategori' => 'lainnya',
@@ -509,7 +561,7 @@ class DemoSeeder extends Seeder
                 'kota' => 'Jakarta Selatan',
                 'patokan_lokasi' => 'Blok M Hub',
                 'is_negotiable' => false,
-                'gambar' => 'tumbler-corkcicle-750ml.png',
+                'gambar' => 'https://images.unsplash.com/photo-1544003484-3cd181d17917?auto=format&fit=crop&w=800&q=80',
             ],
         ];
     }
